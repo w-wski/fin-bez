@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finansowa</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="css/historia.css">
+<link rel="stylesheet" href="css/kategorie.css">
+<link rel="stylesheet" href="css/paragon.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1f6f43">
+</head>
+<body>
+<header>
+  <h1>💰 Finansowa</h1>
+  <nav id="nav" hidden>
+    <button data-view="wpis" class="active">Wpis</button>
+    <button data-view="historia">Historia</button>
+    <button data-view="paragon">Paragon</button>
+    <button data-view="import">Import</button>
+    <button data-view="raporty">Raporty</button>
+    <button data-view="admin" data-admin hidden>Admin</button>
+  </nav>
+  <span id="netBadge" class="pill net" hidden></span>
+  <div id="who"></div>
+</header>
+
+<main>
+  <!-- LOGOWANIE -->
+  <section id="view-login" hidden>
+    <div class="card center">
+      <p>Finanse rodziny i spółki PERSEVERA.</p>
+      <a class="btn primary" href="/auth/login">Zaloguj przez Google</a>
+    </div>
+  </section>
+
+  <!-- WPIS (rdzeń: transakcja w ≤3 kliknięcia) -->
+  <section id="view-wpis" hidden>
+    <form id="txForm" class="card">
+      <div class="row seg" id="segType">
+        <button type="button" data-type="WYDATEK" class="active">Wydatek</button>
+        <button type="button" data-type="PRZYCHÓD">Przychód</button>
+      </div>
+      <input id="amount" type="text" inputmode="decimal" placeholder="Kwota (zł)" required autofocus>
+      <div class="row">
+        <select id="ledger"></select>
+        <input id="txDate" type="date" required>
+      </div>
+      <select id="catMain"><option value="">Kategoria…</option></select>
+      <select id="catSub" hidden><option value="">Podkategoria</option></select>
+      <!-- formularz dodawania kategorii pojawia się TU dopiero po wybraniu „DODAJ…" z listy -->
+      <div id="catAddBox"></div>
+      <input id="desc" type="text" placeholder="Opis">
+      <button class="btn primary big" type="submit">Zapisz</button>
+      <p id="txMsg" class="msg"></p>
+    </form>
+  </section>
+
+  <!-- HISTORIA -->
+  <section id="view-historia" hidden>
+    <div class="card">
+      <div class="row wrap">
+        <select id="fLedger"></select>
+        <input id="fFrom" type="date"><input id="fTo" type="date">
+        <select id="fType"><option value="">Typ: wszystkie</option><option>WYDATEK</option><option>PRZYCHÓD</option></select>
+        <span id="histTools"></span>
+        <button class="btn" id="fGo">Filtruj</button>
+      </div>
+      <table id="txTable"><thead>
+        <tr><th>Data</th><th>Typ</th><th>Kategoria</th><th class="num">Kwota</th><th>Opis</th><th>Kto</th><th></th></tr>
+      </thead><tbody></tbody></table>
+      <button class="btn" id="more" hidden>Pokaż więcej</button>
+    </div>
+  </section>
+
+  <!-- IMPORT CSV -->
+  <section id="view-import" hidden>
+    <div class="card">
+      <h2>Import wyciągu (PKO BP, mBank, ING, Santander, Revolut)</h2>
+      <form id="impForm" class="row wrap">
+        <input type="file" id="impFile" accept=".csv,text/csv" required>
+        <select id="impLedger"></select>
+        <select id="impBank"><option value="">Bank: wykryj automatycznie</option>
+          <option>PKO BP</option><option>mBank</option><option>ING</option><option>Santander</option><option>Revolut</option></select>
+        <button class="btn primary" type="submit">Importuj</button>
+      </form>
+      <p id="impMsg" class="msg"></p>
+      <h2>Do uzgodnienia <span id="unCount" class="pill"></span></h2>
+      <div id="unmatched"></div>
+      <h2>Historia importów</h2>
+      <table id="impTable"><thead><tr><th>Kiedy</th><th>Bank</th><th>Plik</th><th class="num">+</th><th class="num">dup</th><th class="num">błędy</th><th>Kto</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- PARAGON (OCR) -->
+  <section id="view-paragon" hidden>
+    <div class="card">
+      <div id="rc-start">
+        <h2>Zeskanuj paragon</h2>
+        <p class="msg">Zrób zdjęcie — obróbka (kadr, czerń-biel, kontrast) dzieje się na telefonie, wysyłamy mały plik.</p>
+        <input type="file" id="rcFile" accept="image/*" capture="environment">
+      </div>
+      <div id="rc-kadr" hidden>
+        <p class="msg">Złap zielone rogi i dopasuj do brzegów paragonu (auto-propozycja już ustawiona).</p>
+        <canvas id="rcCanvas" class="rcv"></canvas>
+        <button class="btn primary" id="rcApply">Przytnij i wyprostuj</button>
+      </div>
+      <div id="rc-podglad" hidden>
+        <canvas id="rcOut" class="rcv"></canvas>
+        <div class="row wrap">
+          <label>Jasność <input type="range" id="rcBright" min="-60" max="60" value="0"></label>
+          <label><input type="checkbox" id="rcBW" checked> Czerń-biel (binaryzacja)</label>
+          <span id="rcSize" class="pill"></span>
+        </div>
+        <div class="row">
+          <button class="btn" id="rcBack">← Popraw kadr</button>
+          <button class="btn primary" id="rcSend">Odczytaj (OCR)</button>
+        </div>
+        <p id="rcMsg" class="msg"></p>
+      </div>
+      <div id="rc-wynik" hidden><div id="rcResult"></div></div>
+    </div>
+  </section>
+
+  <!-- RAPORTY -->
+  <section id="view-raporty" hidden>
+    <div class="card">
+      <div class="row">
+        <select id="rLedger"></select>
+        <input id="rMonth" type="month">
+      </div>
+      <div id="kpi" class="kpi"></div>
+      <h2>Wydatki wg kategorii</h2>
+      <div id="byCat"></div>
+      <h2>Trend 6 miesięcy</h2>
+      <table id="trend"><thead><tr><th>Miesiąc</th><th class="num">Przychody</th><th class="num">Wydatki</th><th class="num">Bilans</th></tr></thead><tbody></tbody></table>
+      <div id="fvp"></div>
+      <div id="telemetria"></div>
+    </div>
+  </section>
+
+  <!-- ADMIN (tylko rola admin; treść renderowana z js/admin.js) -->
+  <section id="view-admin" hidden>
+    <div class="card"><div id="adminBox"></div></div>
+  </section>
+</main>
+<script type="module" src="main.js"></script>
+</body>
+</html>
