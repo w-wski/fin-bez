@@ -35,6 +35,9 @@ export async function loadReport() {
       el('td', { class: 'num exp' }, zl(exp)), el('td', { class: 'num' }, zl(inc - exp)));
     tb.append(tr);
   }
+  await loadTransfery(s);
+  if (String(ledger) === '1') { await loadBartus(month); await loadNajem(month); }
+  else { sekcja('bartus'); sekcja('najem'); }
   // admin: rodzina vs spółka + telemetria
   if (state.me.role === 'admin') {
     const { rows } = await api('/api/v1/reports/family-vs-persevera?month=' + month);
@@ -51,6 +54,93 @@ export async function loadReport() {
     t.append(tb2); f.append(t);
     loadTelemetry();
   } else $('#telemetria').innerHTML = '';
+}
+
+// Sekcje raportu dokładane z JS — index.html należy do innego zlecenia, więc go nie ruszamy.
+// Wstawiane przed #fvp (blok admina), w kolejności wywołań: transfery → Bartuś → najem.
+function sekcja(id) {
+  let n = document.getElementById(id);
+  if (!n) {
+    n = el('div', { id });
+    const f = $('#fvp');                       // kotwica; gdyby zniknęła — dokładamy na koniec karty
+    if (f && f.parentNode) f.parentNode.insertBefore(n, f);
+    else ($('#view-raporty .card') || document.body).append(n);
+  }
+  n.innerHTML = '';
+  return n;
+}
+
+// Tabela z nagłówkami; `rows` to tablice komórek [{v, num}] lub gołych wartości.
+function tabela(headers, rows) {
+  const t = el('table');
+  t.innerHTML = '<thead><tr>' + headers.map((h, i) => `<th${i ? ' class="num"' : ''}>${h}</th>`).join('') + '</tr></thead>';
+  const tb = el('tbody');
+  for (const r of rows) {
+    const tr = el('tr');
+    r.forEach((v, i) => tr.append(el('td', { class: i ? 'num' : '' }, String(v))));
+    tb.append(tr);
+  }
+  t.append(tb);
+  return t;
+}
+
+// K7/E4: „Zobowiązania i cele" — TRANSFER poza konsumpcją (nie wchodzi w wydatki ani bilans).
+function loadTransfery(s) {
+  const box = sekcja('transfery');
+  if (!s.transfers || !s.transfers.length) return;
+  box.append(el('h2', {}, 'Zobowiązania i cele'));
+  box.append(tabela(['Grupa', 'Pozycja', 'Kwota', 'Wpisy'],
+    s.transfers.map((r) => [r.grupa, r.category, zl(r.total), r.n])
+      .concat([['Razem', '', zl(s.transfers_total), '']])));
+  box.append(el('p', { class: 'msg' }, 'Transfery to przesunięcia własnych pieniędzy (spłaty, cele) — nie liczą się jako wydatki.'));
+}
+
+// K8 (§7.5): Konto Bartusia — otrzymane kieszonkowe (wydatek rodzica) vs wydatki
+// zaksięgowane przez Bartka, saldo narastająco. Wydatki rodziców na dziecko: poza saldem.
+async function loadBartus(month) {
+  const box = sekcja('bartus');
+  let b;
+  try { b = await api('/api/v1/reports/bartus?month=' + month); } catch { return; } // brak dostępu = brak sekcji
+  if (b.brak_kategorii) return;
+  box.append(el('h2', {}, 'Konto Bartusia'));
+  const kpi = el('div', { class: 'kpi' });
+  // §7.5: kieszonkowe (WYDATEK rodzica w „Bartuś > Kieszonkowe") minus wydatki zaksięgowane
+  // przez Bartka. „Inne wpływy" = przychody w drzewie Bartusia poza kieszonkowym (np. zwrot),
+  // też na plus. Wydatki rodziców na dziecko są POZA saldem — kafel niżej mówi to wprost.
+  const kafle = [['Kieszonkowe', zl(b.kieszonkowe)]];
+  if (b.wplywy) kafle.push(['Inne wpływy', zl(b.wplywy)]);
+  kafle.push(['Wydatki Bartka', zl(b.wydatki)], ['Saldo narastająco', zl(b.saldo)]);
+  for (const [label, val] of kafle) {
+    const t = el('div', { class: 'tile' });
+    t.append(el('b', {}, val), el('span', {}, label));
+    kpi.append(t);
+  }
+  box.append(kpi);
+  if (b.months.length) {
+    const maWpl = b.months.some((m) => m.wplywy);
+    box.append(tabela(['Miesiąc', 'Kieszonkowe'].concat(maWpl ? ['Inne wpływy'] : [], ['Wydatki Bartka', 'Rodzice (poza saldem)', 'Saldo']),
+      b.months.slice(-6).map((m) => [m.month, zl(m.kieszonkowe)]
+        .concat(maWpl ? [zl(m.wplywy)] : [], [zl(m.wydatki), zl(m.rodzice), zl(m.saldo)]))));
+  }
+  box.append(el('p', { class: 'msg' }, b.rodzice
+    ? `Wydatki rodziców na Bartusia w tym miesiącu: ${zl(b.rodzice)} — poza saldem konta (§7.5: `
+      + 'saldo to kieszonkowe minus wydatki zaksięgowane przez Bartka).'
+    : 'Saldo to kieszonkowe (wydatek rodzica) minus wydatki zaksięgowane przez Bartka — §7.5.'));
+}
+
+// K9 (§7.3): para najmu — wpływ od Kamila i czynsz do Darka obok siebie, z różnicą.
+async function loadNajem(month) {
+  const box = sekcja('najem');
+  let n;
+  try { n = await api('/api/v1/reports/najem?month=' + month); } catch { return; }
+  if (!n.od_kamila.n && !n.do_darka.n) return;
+  box.append(el('h2', {}, 'Najem: Kamil → Szymon → Darek'));
+  box.append(tabela(['Strona', 'Kwota', 'Wpisy'], [
+    ['Najem (od Kamila)', zl(n.od_kamila.total), n.od_kamila.n],
+    ['Czynsz do Darka', zl(n.do_darka.total), n.do_darka.n],
+    ['Różnica', zl(n.roznica), ''],
+  ]));
+  box.append(el('p', { class: 'msg' }, 'To przepływ (pass-through), nie dochód — liczy się różnica.'));
 }
 
 async function loadTelemetry() {
