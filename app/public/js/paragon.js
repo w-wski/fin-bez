@@ -1,11 +1,14 @@
 // Karta „Paragon": obróbka zdjęcia W PRZEGLĄDARCE (kadr 4 rogami + auto-propozycja,
 // skala do 1200px, B&W, kontrast/jasność) → upload małego JPG → wynik OCR do edycji.
 // Decyzje Szymona 07-24: hybryda (przycisk „Popraw AI"), kadr ręczny z propozycją auto.
+// Ten plik kończy się na wysłaniu zdjęcia; ręczna poprawa odczytu żyje w paragon-edit.js,
+// a lista zapisanych paragonów (droga powrotu do niedokończonego odczytu) w paragon-lista.js.
 
-import { $, el, zl, api, track } from './core.js';
-import { getCats } from './kategorie.js';
+import { $, track } from './core.js';
+import { renderReceipt } from './paragon-edit.js';
+import { initLista, odswiezListe, otworz } from './paragon-lista.js';
 
-const deps = { $, el, zl, api, track, getCats };
+const deps = { $, track };            // kategorie, kwoty i wywołania API zostały w paragon-edit.js
 let img = null;            // źródłowy obraz
 let corners = null;        // 4 rogi [{x,y}] w układzie canvasa edycji
 let dragIdx = -1;
@@ -15,6 +18,7 @@ let currentReceipt = null;
 const W_EDIT = 900;        // szerokość robocza edytora
 
 export function initParagon() {
+  initLista({ onOpen: pokazWynik });   // lista paragonów w kroku „start" + odświeżanie przy wejściu na kartę
   $('#rcFile').onchange = onFile;
   $('#rcApply').onclick = applyCrop;
   $('#rcBack').onclick = () => step('kadr');
@@ -203,65 +207,42 @@ async function send() {
   try {
     const res = await fetch('/api/v1/receipts', { method: 'POST', body: fd });
     const data = await res.json();
-    if (res.status === 409) { msg.textContent = 'Ten paragon już jest w bazie (duplikat).'; msg.className = 'msg err'; return; }
+    // DUPLIKAT: ten sam paragon już jest w bazie — otwieramy TAMTEN zamiast zostawiać człowieka
+    // z komunikatem. Wcześniej to była ślepa uliczka: do zapisanego paragonu nie było wejścia.
+    if (res.status === 409 && data.existing_id) {
+      msg.textContent = 'Ten paragon już był wgrany — otwieram zapisany odczyt.';
+      msg.className = 'msg';
+      $('#rcFile').value = '';
+      return otworz(data.existing_id);
+    }
     if (!res.ok) throw new Error(data.error || res.status);
     track('Paragon: OCR', 'paragon', { detail: `pozycje=${data.items.length}; conf=${data.ocr_confidence ?? '?'}` });
     msg.textContent = '';
-    renderResult(data);
-    step('wynik');
+    pokazWynik(data);
   } catch (e) {
     track('Paragon: błąd OCR', 'paragon', { detail: String(e.message).slice(0, 80) });
-    msg.textContent = 'Błąd OCR: ' + e.message; msg.className = 'msg err';
+    // po polsku i konkretnie: TypeError = fetch w ogóle nie doszedł (offline/serwer milczy)
+    msg.textContent = e instanceof TypeError
+      ? (navigator.onLine
+        ? 'Nie udało się wysłać zdjęcia — serwer nie odpowiada. Zdjęcie NIE zostało zapisane, spróbuj jeszcze raz.'
+        : 'Jesteś offline — zdjęcie NIE zostało wysłane. Spróbuj, gdy wróci połączenie.')
+      : 'Nie udało się odczytać paragonu: ' + e.message;
+    msg.className = 'msg err';
   }
 }
 
-function renderResult(rc) {
-  const { $, el, zl, api, track } = deps;
-  currentReceipt = rc;
-  const box = $('#rcResult'); box.innerHTML = '';
-  box.append(el('h2', {}, `${rc.shop_name || 'Sklep?'} · ${rc.receipt_date || 'data?'} · SUMA: ${rc.total !== null ? zl(rc.total) : '—'}`));
-  for (const w of rc.warnings || []) box.append(el('p', { class: 'msg err' }, w));
-  const cats = deps.getCats();
-  const flat = [];
-  for (const c of cats) { flat.push(c); for (const k of c.children || []) flat.push({ ...k, name: c.name + ' > ' + k.name }); }
-  const tb = el('table');
-  tb.innerHTML = '<thead><tr><th>Pozycja</th><th class="num">Wartość</th><th>Kategoria</th></tr></thead>';
-  const body = el('tbody');
-  for (const it of rc.items) {
-    const tr = el('tr', { class: it.low_confidence ? 'lowconf' : '' });
-    tr.append(el('td', {}, (it.name || it.ocr_name) + (it.quantity && it.quantity !== 1 ? ` (${it.quantity}×)` : '')),
-      el('td', { class: 'num' }, it.value !== null ? zl(it.value) : '—'));
-    const sel = el('select');
-    sel.innerHTML = '<option value="">kategoria…</option>' +
-      flat.map((c) => `<option value="${c.id}" ${c.id === it.category_id ? 'selected' : ''}>${c.name}</option>`).join('');
-    sel.onchange = async () => {
-      await api(`/api/v1/receipts/${rc.id}/items/${it.id}`, { method: 'PATCH', body: JSON.stringify({ category_id: sel.value || null }) });
-      track('Paragon: korekta kategorii', 'paragon'); // samouczenie po stronie serwera
-    };
-    const td = el('td'); td.append(sel); tr.append(td); body.append(tr);
-  }
-  tb.append(body); box.append(tb);
-  const row = el('div', { class: 'row wrap' });
-  if (rc.ai_available) {
-    const ai = el('button', { class: 'btn' }, '✨ Popraw AI (nieczytelny?)');
-    ai.onclick = async () => {
-      ai.disabled = true; ai.textContent = 'AI czyta…';
-      try { const better = await api(`/api/v1/receipts/${rc.id}/ai-fix`, { method: 'POST' });
-        track('Paragon: ai-fix', 'paragon', { detail: `pozycje=${better.items.length}` });
-        renderResult({ ...better, ai_available: true });
-      } catch (e) { ai.textContent = 'AI nie pomogło: ' + e.message; }
-    };
-    row.append(ai);
-  }
-  const ok = el('button', { class: 'btn primary' }, `Potwierdź → wpis ${rc.total !== null ? zl(rc.total) : ''} w księdze`);
-  ok.onclick = async () => {
-    try {
-      const r = await api(`/api/v1/receipts/${rc.id}/confirm`, { method: 'POST', body: JSON.stringify({}) });
-      track('Paragon: potwierdzony', 'paragon');
-      box.innerHTML = ''; box.append(el('p', { class: 'msg ok' }, `Zapisano w księdze (wpis #${r.transaction_id}). Pozycje produktowe w bazie paragonów.`));
+// Wynik OCR to materiał do RĘCZNEJ POPRAWKI — cały edytor (nagłówek, pozycje, słownik,
+// potwierdzenie) siedzi w paragon-edit.js. Tutaj zostaje tylko przełączenie kroku
+// i sprzątanie po zaksięgowaniu paragonu.
+function pokazWynik(dane) {
+  currentReceipt = dane;
+  renderReceipt(dane, {
+    onDone: () => {
       deps.$('#rcFile').value = '';
-      setTimeout(() => step('start'), 1500);
-    } catch (e) { box.append(el('p', { class: 'msg err' }, 'Błąd: ' + (e.data?.error || e.message))); }
-  };
-  row.append(ok); box.append(row);
+      setTimeout(() => { step('start'); odswiezListe(); }, 2500);
+    },
+    // powrót do listy: paragon zostaje w bazie w takim stanie, w jakim jest — wraca się do niego
+    onBack: () => { deps.$('#rcFile').value = ''; step('start'); odswiezListe(); },
+  });
+  step('wynik');
 }

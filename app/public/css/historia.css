@@ -1,1 +1,51 @@
 /* Style widoku historia — właściciel: zlecenie odpowiedzialne za ten widok. */
+
+/* Pasek narzędzi: kontrolka „Kosz" dorenderowana z JS do #histTools. */
+#histTools { display: flex; align-items: center; }
+#histTools .kosz-filtr { gap: .4rem; white-space: nowrap; cursor: pointer; }
+#histTools .kosz-filtr input { width: auto; flex: 0 0 auto; }
+
+/* Wiersz jest klikalny — otwiera edycję w miejscu. */
+#txTable tbody tr { cursor: pointer; }
+#txTable tr.del { cursor: default; }                /* wpis z Kosza: bez edycji w miejscu */
+#txTable tr.del td { opacity: .7; }
+#txTable td.opis { overflow-wrap: anywhere; }       /* długi opis zawija się, nie rozpycha tabeli */
+#txTable td.akcje { cursor: default; white-space: nowrap; }
+#txTable td.akcje button + button { margin-left: .3rem; }
+
+/* „z banku": wpis uzgodniony z wierszem wyciągu — zmiana kwoty/daty rozjeżdża uzgodnienie. */
+#txTable .pill.bank { margin-left: .4rem; font-size: .75rem; white-space: nowrap; }
+
+/* Formularz edycji zajmuje cały wiersz. */
+#txTable td.edycja { cursor: default; padding: .6rem .5rem; }
+#txTable td.edycja .row { margin-bottom: .4rem; }
+#txTable td.edycja .row:last-child { margin-bottom: 0; }
+
+/* ≤640 px: każdy wpis to karta — bez poziomego przewijania i bez ucinania treści.
+   Nagłówki tabeli zastępuje etykieta z data-label (dokładana w historia.js). */
+@media (max-width: 640px) {
+  #txTable { font-size: 1rem; }
+  #txTable, #txTable tbody, #txTable tr { display: block; width: 100%; }
+  #txTable thead { display: none; }
+  #txTable tr { background: var(--card); border: 1px solid var(--line); border-radius: .6rem;
+    padding: .5rem .7rem; margin: .6rem 0; }
+  #txTable td { display: flex; gap: .8rem; justify-content: space-between; align-items: baseline;
+    width: 100%; border: 0; padding: .15rem 0; }
+  #txTable td::before { content: attr(data-label); flex: 0 0 5.5rem;
+    color: var(--muted); font-size: .85rem; }
+  #txTable td[data-label="Kwota"] { font-size: 1.3rem; font-weight: 600; }
+  #txTable td[data-label="Opis"] { display: block; }
+  #txTable td[data-label="Opis"]::before { display: block; }
+  /* Pusta komórka znika razem z etykietą (wpis bez opisu nie dostaje pustej linii „Opis").
+     Reguła MUSI stać PO regułach td[data-label=...]: ma tę samą specyficzność, więc decyduje
+     kolejność — wcześniej przegrywała i etykieta zostawała. */
+  #txTable td:empty { display: none; }
+  /* Akcje: pełnowymiarowe przyciski pod treścią karty (cel dotyku ≥ 44 px). */
+  #txTable td.akcje { gap: .5rem; margin-top: .5rem; }
+  #txTable td.akcje::before { display: none; }
+  #txTable td.akcje button { flex: 1; min-height: 44px; padding: .6rem .8rem; font-size: 1rem;
+    margin-left: 0; }
+  #txTable td.edycja { display: block; padding: .2rem 0; }
+  #txTable td.edycja::before { display: none; }
+  #txTable td.edycja input, #txTable td.edycja select, #txTable td.edycja .btn { min-height: 44px; }
+}

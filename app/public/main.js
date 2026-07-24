@@ -15,6 +15,8 @@ const OPEN = {
   import: () => { loadImports(); loadUnmatched(); },
   raporty: () => loadReport(),
   admin: () => refreshers.admin?.(),
+  // 'paragon' celowo nie ma wpisu: js/paragon-lista.js sam nasłuchuje kliknięcia w kartę.
+  // Wpis tutaj powodowałby drugie, identyczne pobranie listy przy każdym wejściu.
 };
 
 async function init() {

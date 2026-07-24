@@ -1,1 +1,84 @@
-/* Style widoku kategorie — właściciel: zlecenie odpowiedzialne za ten widok. */
+/* Style widoku kategorie — właściciel: zlecenie odpowiedzialne za ten widok.
+   Zakres: formularz „➕ DODAJ…" w karcie Wpis (#catAddBox) oraz drzewo kategorii
+   w karcie Admin (#adminBox). Kolory wyłącznie ze zmiennych z :root (styles.css),
+   żeby oba motywy działały bez osobnych reguł. */
+
+:root {
+  --cat-dot: 1rem;                 /* średnica kropki koloru kategorii */
+  --cat-wciecie: 1.6rem;           /* wcięcie podkategorii w drzewie admina */
+  --cat-uwaga: #b7791f;            /* obwódka kategorii „do naprawy" (zepsuty rodzic) */
+}
+
+/* ---------- Wpis: formularz dodawania kategorii (pusty, dopóki nie wybrano „➕ DODAJ…") ---------- */
+
+#catAddBox:empty { display: none; }
+
+#catAddBox .catadd {
+  flex-wrap: wrap;
+  align-items: center;
+  padding: .6rem;
+  border: 1px dashed var(--primary);
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+}
+#catAddBox .catadd > .catadd-nazwa { flex: 1 1 11rem; min-width: 8rem; }
+#catAddBox .catadd > .btn { flex: 0 0 auto; min-width: 5.5rem; }
+
+/* ---------- Admin: drzewo kategorii ---------- */
+
+.admin-tools { align-items: center; margin-bottom: .2rem; }
+.admin-tools > label { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
+.admin-tools > label input { width: auto; flex: 0 0 auto; }
+.admin-tools > .btn { flex: 0 0 auto; min-width: 0; }
+
+.cat-tree { display: flex; flex-direction: column; gap: .3rem; }
+
+.cat-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  padding: .35rem .5rem;
+  border: 1px solid var(--line);
+  border-radius: .5rem;
+  background: var(--card);
+}
+.cat-row.pod { margin-left: var(--cat-wciecie); font-size: .95rem; }
+.cat-row.arch { opacity: .6; background: color-mix(in srgb, var(--muted) 10%, var(--card)); }
+.cat-row.arch .catname { text-decoration: line-through; }
+
+/* Kategoria z zepsutym rodzicem (archiwum / brak / zapętlenie) — serwer oddaje ją jako
+   główną z flagą `orphan`, żeby nie zniknęła z księgi. Tu tylko widoczny znak „do naprawy". */
+.cat-row.orphan { border-color: var(--cat-uwaga); border-style: dashed; }
+.cat-row .catwarn { flex: 0 0 auto; cursor: help; font-size: .95rem; }
+
+.catdot {
+  flex: 0 0 auto;
+  width: var(--cat-dot); height: var(--cat-dot);
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+}
+.catdot.pusta { border-style: dashed; border-color: var(--muted); }
+
+.cat-row .catcolor {
+  flex: 0 0 auto;
+  width: 2.4rem; height: 2rem;
+  padding: .1rem; cursor: pointer;
+}
+.cat-row .catname { flex: 1 1 9rem; min-width: 6rem; }
+.cat-row .catparent { flex: 0 1 11rem; min-width: 7rem; font-size: .9rem; }
+.cat-row .catparent:disabled { opacity: .5; cursor: not-allowed; }
+.cat-row .btn.small { flex: 0 0 auto; }
+
+@media (max-width: 560px) {
+  .cat-row .catname { flex: 1 1 100%; order: -1; }   /* nazwa w osobnej linii, nad sterowaniem */
+  .cat-row.pod { margin-left: .8rem; }
+}
+
+@media (prefers-color-scheme: dark) {
+  /* kropka na ciemnym tle potrzebuje jaśniejszej obwódki, żeby nie zlewała się z kartą */
+  :root { --cat-uwaga: #e0b050; }
+  .catdot { border-color: color-mix(in srgb, var(--fg) 35%, transparent); }
+  #catAddBox .catadd { background: color-mix(in srgb, var(--primary) 12%, var(--card)); }
+}

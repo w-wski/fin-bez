@@ -1,1 +1,92 @@
-/* Style widoku paragon — właściciel: zlecenie odpowiedzialne za ten widok. */
+/* Style widoku paragon — właściciel: zlecenie odpowiedzialne za ten widok.
+   Edytor odczytu OCR (paragon-edit.js). Założenie: poprawka robiona jednym kciukiem,
+   na telefonie, przy kasie — cele dotyku ≥ 44 px, pola nie mniejsze niż 16 px
+   (poniżej iOS sam przybliża stronę przy wejściu w input). */
+
+/* ---------- LISTA PARAGONÓW (droga powrotu do niedokończonego odczytu) ---------- */
+#rc-start .rc-lista-tytul { margin: 1rem 0 .3rem; font-size: 1rem; }
+#rc-start .rc-lista-paragonow { display: flex; flex-direction: column; gap: .4rem; }
+#rc-start .rc-wiersz {
+  display: grid; grid-template-columns: auto 1fr auto; gap: .2rem .6rem; align-items: center;
+  min-height: 44px; text-align: left; padding: .5rem .7rem;
+}
+#rc-start .rc-w-data { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+#rc-start .rc-w-sklep { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#rc-start .rc-w-suma { font-variant-numeric: tabular-nums; }
+#rc-start .rc-w-status { grid-column: 1 / -1; justify-self: start; font-size: .75rem; }
+
+/* ---------- NAGŁÓWEK PARAGONU ---------- */
+#rcResult .rc-wroc { margin-bottom: .5rem; }
+#rcResult .rc-status { margin-bottom: .5rem; }
+#rcResult .rc-naglowek {
+  display: grid; grid-template-columns: 1fr; gap: .5rem;
+  border: 1px solid var(--line); border-radius: .6rem; padding: .6rem .7rem; margin-bottom: .6rem;
+}
+#rcResult .rc-pole { display: flex; flex-direction: column; align-items: stretch; gap: .15rem; font-size: .9rem; }
+#rcResult .rc-pole > span { color: var(--muted); font-size: .78rem; }
+#rcResult .rc-naglowek .rc-suma { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+
+/* ---------- POZYCJA JAKO KARTA ---------- */
+#rcResult .rc-lista { display: flex; flex-direction: column; gap: .6rem; }
+#rcResult .rc-poz {
+  border: 1px solid var(--line); border-radius: .6rem; padding: .6rem .7rem;
+  display: flex; flex-direction: column; gap: .4rem;
+}
+/* K6: pozycja niespójna (ilość × cena ≠ wartość) — widoczna, ale nadal w pełni edytowalna */
+#rcResult .rc-poz.lowconf { border-color: var(--expense); background: color-mix(in srgb, var(--expense) 8%, transparent); }
+
+#rcResult .rc-l1 { display: flex; align-items: center; gap: .4rem; }
+#rcResult .rc-nr { color: var(--muted); font-size: .8rem; min-width: 1.4rem; text-align: right; }
+#rcResult .rc-l1 .rc-kod { flex: 1; font-weight: 600; }
+#rcResult .rc-kosz { flex: 0 0 auto; min-width: 44px; min-height: 44px; color: var(--danger); }
+
+#rcResult .rc-siatka { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+#rcResult .rc-siatka input { font-variant-numeric: tabular-nums; }
+
+#rcResult input, #rcResult select { min-height: 44px; font-size: 1rem; }
+#rcResult .rc-hint .btn, #rcResult .rc-blad .btn { min-height: 36px; }   /* drugoplanowe, w linii tekstu */
+
+/* ---------- PODPOWIEDŹ ZE SŁOWNIKA I ORYGINAŁ OCR (K3) ---------- */
+#rcResult .rc-hint { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; font-size: .82rem; }
+#rcResult .rc-hint:empty { display: none; }
+#rcResult .rc-znak { color: var(--muted); }
+#rcResult .rc-uzyj { background: var(--bar); border-color: var(--bar); }
+#rcResult .rc-hint .btn { font-size: .82rem; padding: .3rem .55rem; text-align: left; }
+
+/* ---------- OSTRZEŻENIA (K6/K7): informują, nie blokują ---------- */
+#rcResult .rc-blad {
+  display: flex; flex-wrap: wrap; gap: .4rem; align-items: center;
+  font-size: .82rem; color: var(--danger);
+}
+#rcResult .rc-blad[hidden] { display: none; }
+#rcResult .rc-sumy {
+  display: flex; flex-wrap: wrap; gap: .3rem 1rem; align-items: baseline;
+  margin: .7rem 0 .3rem; font-size: .9rem; font-variant-numeric: tabular-nums;
+}
+#rcResult .rc-roznica { color: var(--danger); font-weight: 600; }
+#rcResult .rc-akcje { gap: .5rem; }
+#rcResult .rc-akcje .btn { min-height: 44px; }
+
+/* ---------- WARTOŚĆ, KTÓREJ SERWER NIE PRZYJĄŁ ---------- */
+/* Zielone mrugnięcie należy się WYŁĄCZNIE wartości zapisanej w bazie. Kwota nie do odczytania
+   („l2,50") zostaje w polu na czerwono, z komunikatem tuż pod nim — żeby nie zniknęła po cichu. */
+#rcResult .nie-zapisane { border-color: var(--danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 25%, transparent); }
+#rcResult .rc-blad-pola { color: var(--danger); font-size: .78rem; }
+#rcResult .rc-blad-pola:empty { display: none; }
+
+/* ---------- POTWIERDZENIE ZAPISU ---------- */
+/* Zapis idzie polem-po-polu, więc każde pole musi samo powiedzieć „zapisane". */
+#rcResult .zapisane { animation: rc-zapis 1s ease-out; }
+@keyframes rc-zapis {
+  from { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
+  to { border-color: var(--line); box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #rcResult .zapisane { animation: none; border-color: var(--primary); }
+}
+
+/* ---------- SZEROKI EKRAN ---------- */
+@media (min-width: 641px) {
+  #rcResult .rc-naglowek { grid-template-columns: 2fr 1fr 1fr; align-items: end; }
+  #rcResult .rc-siatka { grid-template-columns: repeat(4, 1fr); }
+}

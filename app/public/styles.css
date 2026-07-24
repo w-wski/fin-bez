@@ -40,6 +40,8 @@ input#amount { font-size: 1.6rem; text-align: center; }
 .seg button:last-child { border-radius: 0 .5rem .5rem 0; }
 .seg button.active[data-type="WYDATEK"] { background: var(--expense); color: #fff; border-color: var(--expense); }
 .seg button.active[data-type="PRZYCHÓD"] { background: var(--income); color: #fff; border-color: var(--income); }
+.seg button.active[data-type="TRANSFER"] { background: var(--muted); color: var(--card); border-color: var(--muted); }
+.seg button:not(:first-child):not(:last-child) { border-radius: 0; }
 .msg { min-height: 1.2em; margin: 0; font-size: .9rem; color: var(--muted); }
 .msg.ok { color: var(--income); } .msg.err { color: var(--danger); }
 table { width: 100%; border-collapse: collapse; font-size: .92rem; }
@@ -67,3 +69,14 @@ a.small, button.small { font-size: .8rem; padding: .25rem .5rem; }
 .rcv { width: 100%; height: auto; border: 1px solid var(--line); border-radius: .5rem; touch-action: none; }
 tr.lowconf td { background: color-mix(in srgb, var(--expense) 12%, transparent); }
 label { font-size: .9rem; display: flex; align-items: center; gap: .4rem; }
+
+/* Toast: krótki komunikat u dołu ekranu, opcjonalnie z akcją („Cofnij").
+   Tworzony z core.js, jeden naraz. Na wąskim ekranie ciągnie się na całą szerokość. */
+.toast { position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%);
+  display: flex; align-items: center; gap: .8rem; max-width: min(34rem, calc(100vw - 1.6rem));
+  background: var(--fg); color: var(--bg); padding: .6rem .9rem; border-radius: .6rem;
+  box-shadow: 0 .4rem 1.2rem rgb(0 0 0 / .28); font-size: .92rem; z-index: 50; }
+.toast[hidden] { display: none; }
+.toast span { overflow-wrap: anywhere; }
+.toast .btn { background: transparent; color: var(--bg); border-color: currentColor;
+  white-space: nowrap; }

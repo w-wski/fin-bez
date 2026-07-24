@@ -115,12 +115,14 @@ router.get('/unmatched', async (req, res, next) => {
        ORDER BY transaction_date DESC LIMIT 200`, { l: ledger });
     for (const bt of bts) {
       bt.suggestion = await suggestCategory(bt); // samouczenie: kategoria z wcześniejszych decyzji
-      // kandydat MUSI mieć zgodny typ: bank -100 (wydatek) nie może proponować księgowego PRZYCHODU +100
+      // Kandydat musi mieć zgodny KIERUNEK: bank -100 nie proponuje księgowego PRZYCHODU +100.
+      // TRANSFER (rata, wpłata na cel) idzie w obie strony, więc pasuje do obu znaków — bez tego
+      // wiersz bankowy raty nigdy nie dostałby kandydata i wisiałby „do uzgodnienia" na zawsze.
       bt.candidates = await q(
         `SELECT t.id, t.tx_date, t.type, t.amount, t.description, u.name AS user_name
          FROM transactions t JOIN users u ON u.id = t.user_id
          WHERE t.ledger_id = :l AND t.deleted_at IS NULL AND t.bank_tx_id IS NULL
-           AND t.type = IF(:a < 0, 'WYDATEK', 'PRZYCHÓD')
+           AND t.type IN (IF(:a < 0, 'WYDATEK', 'PRZYCHÓD'), 'TRANSFER')
            AND ABS(t.amount - ABS(:a)) < 0.011
            AND ABS(DATEDIFF(t.tx_date, :d)) <= 3
          LIMIT 5`, { l: ledger, a: bt.amount, d: bt.transaction_date });
@@ -146,6 +148,17 @@ router.post('/match', async (req, res, next) => {
       'SELECT id FROM transactions WHERE id = :t AND ledger_id = :l AND deleted_at IS NULL AND bank_tx_id IS NULL',
       { t: txId, l: bt[0].ledger_id });
     if (!tx.length) return res.status(404).json({ error: 'transaction_not_matchable' });
+    // Typ wpisu: kierunek bierzemy ze znaku kwoty, ale gdy w tej kategorii dotychczasowe wpisy
+    // to w większości TRANSFER (spłaty, cele), księgujemy TRANSFER — inaczej każda rata wpadałaby
+    // do wydatków i psuła raport konsumpcji. To ta sama zasada, co przy kategoriach: uczymy się
+    // z decyzji człowieka, zamiast trzymać osobną listę „kategorii transferowych".
+    let typ = bt.amount < 0 ? 'WYDATEK' : 'PRZYCHÓD';
+    if (effectiveCategory) {
+      const dom = await q(
+        `SELECT type FROM transactions WHERE category_id = :c AND deleted_at IS NULL
+         GROUP BY type ORDER BY COUNT(*) DESC LIMIT 1`, { c: effectiveCategory });
+      if (dom[0]?.type === 'TRANSFER') typ = 'TRANSFER';
+    }
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -186,7 +199,7 @@ router.post('/book', async (req, res, next) => {
         `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, currency, category_id, description, source, bank_tx_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CSV', ?)`,
         [bt.ledger_id, req.user.uid, bt.transaction_date,
-         bt.amount < 0 ? 'WYDATEK' : 'PRZYCHÓD', Math.abs(bt.amount), bt.currency,
+         typ, Math.abs(bt.amount), bt.currency,
          effectiveCategory,
          [bt.counterparty, bt.title].filter(Boolean).join(' — ').slice(0, 512) || null,
          bt.id]);

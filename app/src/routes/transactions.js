@@ -1,22 +1,40 @@
 const express = require('express');
 const { q } = require('../db');
 const { ledgerScope } = require('../auth');
+const { parseKwota } = require('../kwota');   // jedyne miejsce, gdzie napis staje się kwotą
 
 const router = express.Router();
 
-function scopeWhere(user, params) {
+// TRANSFER = przesunięcie własnych pieniędzy (rata kredytu, wpłata na cel). Nie jest
+// konsumpcją, więc raporty trzymają go poza wydatkami — ale wpisać go musi się dać,
+// inaczej każda ręcznie wpisana rata wpada do wydatków i psuje raport miesiąca.
+const TYPY = ['WYDATEK', 'PRZYCHÓD', 'TRANSFER'];
+
+// Zasięg wierszy księgi. Księgi bierzemy z ledgerScope(), ale WŁASNOŚĆ liczymy tutaj lokalnie:
+// w Historii każdy widzi wyłącznie swoje wpisy, tylko admin widzi cudze. ledgerScope().ownOnly
+// zostaje nietknięte — steruje też raportami i uzgadnianiem importów.
+// deleted=true odwraca filtr kosza: zamiast wpisów żywych zwraca wyłącznie usunięte miękko.
+function scopeWhere(user, params, deleted = false) {
   const scope = ledgerScope(user);
   if (!scope.ledgers.length) return null;
-  let where = `t.ledger_id IN (${scope.ledgers.join(',')}) AND t.deleted_at IS NULL`;
-  if (scope.ownOnly) { where += ' AND t.user_id = :uid'; params.uid = user.uid; }
+  let where = `t.ledger_id IN (${scope.ledgers.join(',')})`;
+  where += deleted ? ' AND t.deleted_at IS NOT NULL' : ' AND t.deleted_at IS NULL';
+  if (user.role !== 'admin') { where += ' AND t.user_id = :uid'; params.uid = user.uid; }
   return where;
 }
 
-// GET /api/v1/transactions?ledger=&from=&to=&category=&user=&type=&limit=&offset=
+// Kategoria musi należeć do TEJ SAMEJ księgi co wpis. Bez tego junior z RODZINY podpina wpisowi
+// kategorię PERSEVERY, a `LEFT JOIN categories` w Historii i w raportach pokazuje jej nazwę.
+async function kategoriaWKsiedze(catId, ledgerId) {
+  const rows = await q('SELECT id FROM categories WHERE id = :c AND ledger_id = :l', { c: catId, l: ledgerId });
+  return rows.length > 0;
+}
+
+// GET /api/v1/transactions?ledger=&from=&to=&category=&user=&type=&deleted=&limit=&offset=
 router.get('/', async (req, res, next) => {
   try {
     const params = {};
-    let where = scopeWhere(req.user, params);
+    let where = scopeWhere(req.user, params, req.query.deleted === '1');
     if (!where) return res.json({ rows: [], total: 0 });
     const { ledger, from, to, category, user, type } = req.query;
     if (ledger) { where += ' AND t.ledger_id = :ledger'; params.ledger = parseInt(ledger, 10); }
@@ -27,12 +45,14 @@ router.get('/', async (req, res, next) => {
     if (type) { where += ' AND t.type = :type'; params.type = type; }
     const limit = Math.min(parseInt(req.query.limit || '100', 10), 500);
     const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
+    // Nazwę kategorii pokazujemy tylko wtedy, gdy kategoria jest z tej samej księgi co wpis —
+    // stary wpis z kategorią cudzej księgi (dane sprzed walidacji w PATCH) ma pokazać „—", nie nazwę.
     const rows = await q(
       `SELECT t.id, t.ledger_id, t.tx_date, t.type, t.amount, t.currency, t.description,
-              t.source, t.bank_tx_id, c.name AS category, u.name AS user_name
+              t.source, t.bank_tx_id, t.category_id, c.name AS category, u.name AS user_name
        FROM transactions t
        JOIN users u ON u.id = t.user_id
-       LEFT JOIN categories c ON c.id = t.category_id
+       LEFT JOIN categories c ON c.id = t.category_id AND c.ledger_id = t.ledger_id
        WHERE ${where}
        ORDER BY t.tx_date DESC, t.id DESC
        LIMIT ${limit} OFFSET ${offset}`, params);
@@ -49,8 +69,8 @@ router.post('/', async (req, res, next) => {
     const b = req.body || {};
     const ledgerId = parseInt(b.ledger_id || 1, 10);
     if (!scope.ledgers.includes(ledgerId)) return res.status(403).json({ error: 'ledger_forbidden' });
-    const amount = Math.abs(parseFloat(String(b.amount).replace(',', '.')));
-    if (!b.tx_date || !['WYDATEK', 'PRZYCHÓD'].includes(b.type) || !Number.isFinite(amount) || amount <= 0) {
+    const amount = parseKwota(b.amount);
+    if (!b.tx_date || !TYPY.includes(b.type) || amount === null || amount <= 0) {
       return res.status(400).json({ error: 'bad_input', fields: ['tx_date', 'type', 'amount'] });
     }
     // Idempotencja kolejki offline: client_ref (legacy_id) — ponowna wysyłka tego samego
@@ -61,7 +81,11 @@ router.post('/', async (req, res, next) => {
         { r: clientRef, u: req.user.uid });
       if (dupe.length) return res.status(200).json({ id: dupe[0].id, deduped: true });
     }
-    let categoryId = b.category_id ? parseInt(b.category_id, 10) : null;
+    let categoryId = b.category_id ? Number(b.category_id) : null;
+    if (categoryId !== null && (!Number.isInteger(categoryId) || categoryId <= 0
+        || !(await kategoriaWKsiedze(categoryId, ledgerId)))) {
+      return res.status(400).json({ error: 'bad_category' });
+    }
     // tworzenie kategorii w locie — sprawdzony wzorzec z prototypu
     if (!categoryId && b.category_name) {
       const name = String(b.category_name).trim().slice(0, 96);
@@ -83,37 +107,77 @@ router.post('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// PATCH /api/v1/transactions/:id — edycja własnych (junior) / w zasięgu księgi
+// PATCH /api/v1/transactions/:id — edycja własnego wpisu (admin: dowolnego w swoich księgach).
+// Cudzy wpis = 404, nie 403 — nie zdradzamy, że taki wpis w ogóle istnieje.
+// Pole nie do przyjęcia = 400 z nazwą pola. Ciche „ok" przy odrzuconej wartości było gorsze niż
+// błąd: front robi Object.assign(wpis, body) i pokazywał kwotę, której w bazie nigdy nie było.
 router.patch('/:id', async (req, res, next) => {
   try {
     const params = { id: parseInt(req.params.id, 10) };
     const where = scopeWhere(req.user, params);
     if (!where) return res.status(403).json({ error: 'forbidden' });
-    const cur = await q(`SELECT t.id FROM transactions t WHERE t.id = :id AND ${where}`, params);
+    const cur = await q(`SELECT t.id, t.ledger_id FROM transactions t WHERE t.id = :id AND ${where}`, params);
     if (!cur.length) return res.status(404).json({ error: 'not_found' });
     const b = req.body || {};
-    const sets = [], p2 = { id: params.id };
-    if (b.tx_date) { sets.push('tx_date = :d'); p2.d = b.tx_date; }
-    if (b.type && ['WYDATEK', 'PRZYCHÓD'].includes(b.type)) { sets.push('type = :t'); p2.t = b.type; }
-    if (b.amount !== undefined) {
-      const a = Math.abs(parseFloat(String(b.amount).replace(',', '.')));
-      if (Number.isFinite(a) && a > 0) { sets.push('amount = :a'); p2.a = a; }
+    const sets = [], p2 = { ...params };
+    if (b.tx_date !== undefined) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.tx_date))) return res.status(400).json({ error: 'bad_date' });
+      sets.push('t.tx_date = :d'); p2.d = b.tx_date;
     }
-    if (b.category_id !== undefined) { sets.push('category_id = :c'); p2.c = b.category_id || null; }
-    if (b.description !== undefined) { sets.push('description = :desc'); p2.desc = String(b.description).slice(0, 512) || null; }
+    if (b.type !== undefined) {
+      if (!TYPY.includes(b.type)) return res.status(400).json({ error: 'bad_type' });
+      sets.push('t.type = :t'); p2.t = b.type;
+    }
+    if (b.amount !== undefined) {
+      const a = parseKwota(b.amount);
+      if (a === null || a <= 0) return res.status(400).json({ error: 'bad_amount' });
+      sets.push('t.amount = :a'); p2.a = a;
+    }
+    if (b.category_id !== undefined) {
+      const c = (b.category_id === null || b.category_id === '') ? null : Number(b.category_id);
+      if (c !== null && (!Number.isInteger(c) || c <= 0 || !(await kategoriaWKsiedze(c, cur[0].ledger_id)))) {
+        return res.status(400).json({ error: 'bad_category' });
+      }
+      sets.push('t.category_id = :c'); p2.c = c;
+    }
+    if (b.description !== undefined) {
+      sets.push('t.description = :desc');
+      p2.desc = (b.description === null ? '' : String(b.description)).slice(0, 512) || null;
+    }
     if (!sets.length) return res.status(400).json({ error: 'nothing_to_update' });
-    await q(`UPDATE transactions SET ${sets.join(', ')} WHERE id = :id`, p2);
+    // Warunek zasięgu wchodzi TAKŻE do UPDATE: między SELECT-em a zapisem wpis mógł trafić do Kosza
+    // (admin, druga karta) — bez tego zapis lądowałby na rekordzie usuniętym albo cudzym.
+    // affectedRows liczy wiersze DOPASOWANE (mysql2 łączy się z FOUND_ROWS), więc zapis wartością
+    // identyczną z obecną nie udaje 404.
+    const r = await q(`UPDATE transactions t SET ${sets.join(', ')} WHERE t.id = :id AND ${where}`, p2);
+    if (!r.affectedRows) return res.status(404).json({ error: 'not_found' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
 
-// DELETE — soft delete
+// DELETE — soft delete z audytem (deleted_by: kto usunął, kolumna z migracji 006)
 router.delete('/:id', async (req, res, next) => {
   try {
     const params = { id: parseInt(req.params.id, 10) };
     const where = scopeWhere(req.user, params);
     if (!where) return res.status(403).json({ error: 'forbidden' });
-    const r = await q(`UPDATE transactions t SET t.deleted_at = NOW() WHERE t.id = :id AND ${where}`, params);
+    params.by = req.user.uid;
+    const r = await q(
+      `UPDATE transactions t SET t.deleted_at = NOW(), t.deleted_by = :by WHERE t.id = :id AND ${where}`, params);
+    if (!r.affectedRows) return res.status(404).json({ error: 'not_found' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// POST /api/v1/transactions/:id/restore — cofnięcie usunięcia („Cofnij" w Historii i Kosz).
+// 404, gdy wpisu nie ma, nie jest usunięty albo należy do kogoś innego (jak w PATCH).
+router.post('/:id/restore', async (req, res, next) => {
+  try {
+    const params = { id: parseInt(req.params.id, 10) };
+    const where = scopeWhere(req.user, params, true);
+    if (!where) return res.status(403).json({ error: 'forbidden' });
+    const r = await q(
+      `UPDATE transactions t SET t.deleted_at = NULL, t.deleted_by = NULL WHERE t.id = :id AND ${where}`, params);
     if (!r.affectedRows) return res.status(404).json({ error: 'not_found' });
     res.json({ ok: true });
   } catch (e) { next(e); }

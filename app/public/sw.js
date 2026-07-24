@@ -1,11 +1,13 @@
 // Service worker „finansowej" — offline-ready (app shell w cache, API zawsze z sieci).
 // Po każdym deployu podbij CACHE_VERSION (RUNBOOK) — stary cache zostanie usunięty.
-const CACHE_VERSION = 'finansowa-v5';
+const CACHE_VERSION = 'finansowa-v6';
 const SHELL = [
   '/', '/index.html', '/manifest.webmanifest', '/icon.svg',
   '/styles.css', '/css/historia.css', '/css/kategorie.css', '/css/paragon.css',
-  '/main.js', '/js/core.js', '/js/kategorie.js', '/js/wpis.js', '/js/historia.js',
-  '/js/import.js', '/js/raporty.js', '/js/paragon.js', '/js/admin.js',
+  '/main.js',
+  '/js/core.js', '/js/kwota.js', '/js/kategorie.js', '/js/wpis.js', '/js/historia.js',
+  '/js/import.js', '/js/raporty.js', '/js/admin.js', '/js/paleta.js',
+  '/js/paragon.js', '/js/paragon-edit.js', '/js/paragon-poz.js', '/js/paragon-lista.js',
 ];
 
 self.addEventListener('install', (e) => {

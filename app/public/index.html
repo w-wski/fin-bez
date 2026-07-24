@@ -42,6 +42,8 @@
       <div class="row seg" id="segType">
         <button type="button" data-type="WYDATEK" class="active">Wydatek</button>
         <button type="button" data-type="PRZYCHÓD">Przychód</button>
+        <!-- TRANSFER: rata, wpłata na cel — własne pieniądze, nie konsumpcja (poza raportem wydatków) -->
+        <button type="button" data-type="TRANSFER" title="Przesunięcie własnych pieniędzy: rata kredytu, wpłata na cel. Nie liczy się jako wydatek.">Transfer</button>
       </div>
       <input id="amount" type="text" inputmode="decimal" placeholder="Kwota (zł)" required autofocus>
       <div class="row">
@@ -64,7 +66,7 @@
       <div class="row wrap">
         <select id="fLedger"></select>
         <input id="fFrom" type="date"><input id="fTo" type="date">
-        <select id="fType"><option value="">Typ: wszystkie</option><option>WYDATEK</option><option>PRZYCHÓD</option></select>
+        <select id="fType"><option value="">Typ: wszystkie</option><option>WYDATEK</option><option>PRZYCHÓD</option><option>TRANSFER</option></select>
         <span id="histTools"></span>
         <button class="btn" id="fGo">Filtruj</button>
       </div>
