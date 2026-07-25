@@ -534,6 +534,9 @@ label { font-size: var(--text-sm); display: flex; align-items: center; gap: var(
   nav button { white-space: nowrap; flex: none; min-height: 44px; }
 
   #who { display: none; }
+  /* Wyloguj zostaje także na telefonie — tam jest najpotrzebniejszy. Bez `margin-left: auto`:
+     przełącznik motywu już odpycha grupę w prawo, dwa auto dzieliłyby wolne miejsce po połowie. */
+  #logout { min-height: 44px; }
   main { padding: 0 var(--space-4); margin-top: var(--space-5); }
   .card { padding: var(--space-5); border-radius: var(--r-md); gap: var(--space-3); }
 }
@@ -579,3 +582,8 @@ label { font-size: var(--text-sm); display: flex; align-items: center; gap: var(
 /* Kosz: wpis usunięty — wyciszony, kwota przekreślona, „Przywróć" zostaje pełnosprawne */
 tr.del td { color: var(--muted); }
 tr.del td[data-label="Kwota"], tr.del td.num { text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--muted) 60%, transparent); }
+
+/* Wyloguj — na końcu nagłówka, za informacją o zalogowanej osobie. Wyciszony:
+   to wyjście awaryjne („to nie mój telefon"), nie jedna z głównych akcji. */
+#logout { flex: none; margin-left: var(--space-3); color: var(--muted); }
+#logout:hover, #logout:focus-visible { color: var(--fg); border-color: var(--line-strong); }

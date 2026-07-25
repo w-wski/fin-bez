@@ -124,6 +124,9 @@ export function show(view) {
   document.querySelectorAll('main > section').forEach((s) => { s.hidden = s.id !== `view-${view}`; });
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   $('#nav').hidden = view === 'login';
+  // Na ekranie logowania nie ma z czego się wylogowywać — inaczej przycisk zostaje po wygaśnięciu sesji.
+  const wyl = document.getElementById('logout');
+  if (wyl) wyl.hidden = view === 'login';
 }
 
 export function fillLedgerSelects() {
@@ -151,4 +154,48 @@ export function toast(text, action) {
   box.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { box.hidden = true; }, action ? 12000 : 4000);
+}
+
+// ---------- WYLOGOWANIE ----------
+// Dwa scenariusze: (a) chcę wejść jako ktoś inny, (b) siedzę na cudzym telefonie i chcę po sobie
+// posprzątać. W obu wypadkach nie wystarczy skasować ciasteczka: na urządzeniu zostaje cache
+// tożsamości i kategorii, a w localStorage może wisieć kolejka wpisów dodanych offline.
+//
+// Kolejka jest tu najważniejsza i dlatego NIE kasujemy jej po cichu. Gdyby została, po
+// zalogowaniu następnej osoby wysłałaby się jako JEJ wpisy (serwer bierze użytkownika z sesji) —
+// czyli cudze pieniądze w cudzej historii. Gdyby zniknęła bez słowa, przepadłyby wpisy, których
+// nikt jeszcze nie widział w księdze. Więc: mówimy wprost i pytamy.
+// Polska liczba mnoga: 1 wpis · 2-4 wpisy · 5+ wpisów, z wyjątkiem 12-14 („12 wpisów").
+export function odmien(n, jeden, kilka, wiele) {
+  const d = n % 10, s = n % 100;
+  if (n === 1) return jeden;
+  if (d >= 2 && d <= 4 && !(s >= 12 && s <= 14)) return kilka;
+  return wiele;
+}
+
+export async function wyloguj() {
+  const n = getQueue().length;
+  if (n) {
+    const co = odmien(n, 'wpis', 'wpisy', 'wpisów');
+    const dodane = odmien(n, 'dodany', 'dodane', 'dodanych');
+    const wyslane = odmien(n, 'wysłany', 'wysłane', 'wysłanych');
+    const pytanie = `Masz ${n} ${co} ${dodane} bez internetu i jeszcze nie ${wyslane}.\n\n`
+      + 'Najlepiej połącz się z internetem i poczekaj, aż kolejka się opróżni (odznaka w nagłówku '
+      + 'zniknie), a potem się wyloguj.\n\n'
+      + `Wylogować teraz i PORZUCIĆ ${odmien(n, 'ten wpis', 'te wpisy', 'te wpisy')}? Nie da się ${odmien(n, 'go', 'ich', 'ich')} odzyskać.`;
+    if (!confirm(pytanie)) return false;
+  }
+  track('Wylogowanie', state.view, { detail: n ? `porzucona kolejka: ${n}` : 'kolejka pusta' });
+  await flushTelemetry();                        // póki sesja żyje — inaczej zdarzenia przepadną
+  try {
+    await fetch('/auth/logout', { method: 'POST' });
+  } catch { /* brak sieci: ciasteczko zostaje po stronie serwera, ale urządzenie czyścimy tak samo */ }
+  // Czyścimy WSZYSTKO nasze: tożsamość, kategorie per księga, telemetrię i kolejkę.
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('f_')) localStorage.removeItem(k);
+  } catch { /* prywatny tryb przeglądarki — nie ma czego czyścić */ }
+  // Przeładowanie zeruje stan wszystkich modułów naraz (kategorie, historia, paragony).
+  // Bez sesji `/api/v1/me` odpowie 401, więc aplikacja pokaże ekran logowania.
+  location.reload();
+  return true;
 }

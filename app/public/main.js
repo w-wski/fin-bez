@@ -1,7 +1,7 @@
 // Finansowa — punkt startowy frontendu (bez build stepu; ES modules).
 // Ten plik TYLKO spina moduły widoków. Logika widoku należy do js/<widok>.js.
 import { $, api, show, track, state, cacheMe, cachedMe, fillLedgerSelects,
-         updateNetBadge, syncQueue, flushTelemetry, refreshers } from './js/core.js';
+         updateNetBadge, syncQueue, flushTelemetry, refreshers, wyloguj } from './js/core.js';
 import { loadCats, onCatMain } from './js/kategorie.js';
 import { initWpis } from './js/wpis.js';
 import { initHistoria, loadHist } from './js/historia.js';
@@ -25,6 +25,7 @@ async function init() {
   document.querySelectorAll('nav button').forEach((b) => {
     b.onclick = () => { show(b.dataset.view); OPEN[b.dataset.view]?.(); };
   });
+  $('#logout').onclick = () => wyloguj();
   initWpis();
   initHistoria();
   initImport();
@@ -42,6 +43,7 @@ async function init() {
     state.me = await api('/api/v1/me');
     cacheMe(state.me);
     $('#who').textContent = `${state.me.name} (${state.me.role})`;
+    $('#logout').hidden = false;
     document.querySelectorAll('nav button[data-admin]').forEach((b) => { b.hidden = state.me.role !== 'admin'; });
     fillLedgerSelects();
     await loadCats();
@@ -55,6 +57,7 @@ async function init() {
       state.me = cachedMe();
       if (state.me) {
         $('#who').textContent = `${state.me.name} (offline)`;
+        $('#logout').hidden = false;
         fillLedgerSelects();
         await loadCats(); // spadnie na cache kategorii
         show('wpis');
@@ -63,7 +66,10 @@ async function init() {
         return;
       }
     }
-    /* w innych przypadkach show('login') już wywołane przez api() */
+    // Zostaje ekran logowania. api() woła show('login') samo tylko przy 401 — przy padniętej
+    // sieci (TypeError) nikt tego nie zrobi, a bez tego użytkownik zobaczyłby pustą stronę
+    // (ścieżka realna po wylogowaniu się bez internetu: cache tożsamości jest już wyczyszczony).
+    show('login');
   }
 }
 init();
