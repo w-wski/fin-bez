@@ -212,7 +212,18 @@ header h1 {
 
 #who { color: var(--muted); font-size: var(--text-xs); }
 
-nav { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+/* Nawigacja = szklana pigułka jak segment kitu z referencji (nie luźne guziki):
+   jedna tafla, w niej zakładki, aktywna wypełniona szałwią. */
+nav {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  padding: 3px;
+  background: var(--glass-fill);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 0 0 .5px var(--glass-hairline), inset 0 1px 2px var(--glass-drop);
+}
 
 nav button {
   position: relative;
@@ -239,8 +250,20 @@ nav button.active {
 
 main {
   max-width: 660px;
-  margin: var(--space-7) auto var(--space-8);
+  margin: var(--space-6) auto var(--space-8);
   padding: 0 var(--space-5);
+}
+
+/* Wielki tytuł widoku (iOS large title): mocny, ciasny, na scenie — nie w karcie.
+   To on niesie „gdzie jestem"; nagłówki h2 w kartach zostają cichymi etykietami. */
+.page-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 2.6vw + .8rem, 2.15rem);
+  font-weight: 700;
+  letter-spacing: var(--track-display);
+  line-height: 1.15;
+  text-wrap: balance;
+  margin: 0 0 var(--space-4);
 }
 /* Widoki danych są tabelaryczne — na szerokim ekranie dostają szerszą scenę niż
    formularz Wpisu (660 px dusiło 7 kolumn Historii niezależnie od stylów tabeli). */
@@ -348,6 +371,19 @@ input, select {
   min-height: 44px;
   box-shadow: inset 0 1px 2px var(--glass-rim-a), inset 0 0 0 .5px var(--glass-hairline);
   transition: border-color var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
+}
+/* Select bez natywnego chromu + własny chevron (dwa gradienty = strzałka w barwie
+   tokenu, działa w obu motywach bez osobnych ikon). */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 19px) calc(50% - 1px), calc(100% - 14px) calc(50% - 1px);
+  background-size: 5px 6px, 5px 6px;
+  background-repeat: no-repeat;
+  padding-right: var(--space-6);
 }
 input:hover, select:hover { border-color: var(--muted); }
 /* Fokus = przyjemna poświata, nie sama zmiana ramki: widać, GDZIE się wpisuje. */
@@ -457,18 +493,26 @@ h2 { font-size: var(--text-xs); margin: var(--space-6) 0 var(--space-2); color: 
 
 table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
 th, td { text-align: left; padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--line-soft); }
-th { font-size: var(--text-sm); text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 500; }
+th { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
 tbody tr:last-child td { border-bottom: 0; }
+/* Wiersz pod kursorem delikatnie łapie światło — czytanie szerokich tabel po linii. */
+tbody tr:hover td { background: color-mix(in oklch, var(--accent) 5%, transparent); }
 th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.exp { color: var(--expense); } td.inc { color: var(--income); } td.trf { color: var(--transfer); }
 /* Szerokie tabele przewijają się WEWNĄTRZ karty — strona nigdy nie jedzie w bok. */
 .overflow { overflow-x: auto; max-width: 100%; overscroll-behavior-x: contain; }
 .overflow table { min-width: max-content; }
 
-.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); }
-.kpi .tile { position: relative; border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--space-4);
-  background: var(--bg-sunk);
-  box-shadow: inset 0 1px 0 var(--glass-rim-a); }
+.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); }
+/* Kafel KPI = mała mleczna tafla (jak karta, ciszej): bez twardej ramki,
+   włoskowaty rant + rozświetlenie u góry, liczba na pierwszym planie. */
+.kpi .tile { position: relative; border: 0; border-radius: var(--r-md); padding: var(--space-4);
+  background: var(--surface);
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim-a),
+    inset 0 0 0 .5px var(--glass-hairline),
+    0 1px 2px -1px var(--glass-drop),
+    0 10px 26px -22px var(--glass-drop); }
 .kpi .tile b {
   display: block;
   font-family: var(--font-display);
@@ -482,7 +526,8 @@ td.exp { color: var(--expense); } td.inc { color: var(--income); } td.trf { colo
 
 .barrow { display: grid; grid-template-columns: minmax(7rem, 14rem) 1fr auto; gap: var(--space-3);
   align-items: center; font-size: var(--text-sm); padding: var(--space-1) 0; }
-.barrow .bar { height: 8px; background: var(--bar); border-radius: var(--r-pill); min-width: 2px; }
+.barrow .bar { height: 8px; background: var(--accent); border-radius: var(--r-pill); min-width: 2px;
+  box-shadow: inset 0 1px 0 var(--glass-rim-a); }
 .barrow .val { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .pill { background: var(--glass-fill); border: 1px solid var(--line); border-radius: var(--r-pill);

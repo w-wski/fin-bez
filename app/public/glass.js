@@ -4,7 +4,7 @@
  * bąbelków, napisy zniekształcają się pod szkłem); zjazd w dół = droga powrotna.
  * Pion soczewki JEST postępem: p = f(y), plateau p=1 u góry; reszta z klatek glass-mapa.js. */
 
-import { LENS_BASE, LENS_M, installLensMap, clamp01, trackPoint, anchorCenter, emitBubble, keepActiveTabVisible } from './glass-mapa.js';
+import { LENS_BASE, installLensMap, clamp01, trackPoint, anchorCenter, emitBubble, keepActiveTabVisible, collectFx, applyFx } from './glass-mapa.js';
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const K_DRAG = 0.34;   // podążanie za wskaźnikiem: żwawe, ale z masą
 const K_SNAP = 0.06;   // dojazd po puszczeniu: powolny, „estetyczny" (~1 s)
@@ -17,6 +17,7 @@ class LoginStage {
     this.world = root.querySelector('.lens__world');
     this.title = root.querySelector('.login__inner .login__title');
     this.bubbles = root.querySelector('.login__bubbles');
+    this.fx = collectFx(root);
 
     this.p = 0;
     this.pTarget = 0;
@@ -57,23 +58,14 @@ class LoginStage {
     // na .login unieważniała style całej sceny co klatkę — główny powód klatkowania.
     this.lens.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${tp.s.toFixed(4)})`;
     if (this.world) {
-      // Prawdziwa wypukła soczewka = ODBICIE świata przez środek szkła × LENS_M:
-      // punkt C+d widać w C−M·d (na dole → u góry tafli). Czysty transform (GPU),
-      // działa też na iOS — WebKit nie realizował tego w mapie displacement.
-      const ux = (this.x * LENS_M) / tp.s + LENS_BASE / 2;
-      const uy = (this.y * LENS_M) / tp.s + LENS_BASE / 2;
-      this.world.style.transform = `translate(${ux.toFixed(2)}px, ${uy.toFixed(2)}px) scale(${(-LENS_M / tp.s).toFixed(5)})`;
+      // Kontrtransform 1:1 (bez odbicia — Szymon 07-26: zbędne, obciążało animację):
+      // kopia sceny pokrywa się z oryginałem, zniekształca ją wyłącznie filtr mapy.
+      this.world.style.transform = `scale(${(1 / tp.s).toFixed(5)}) translate(${(-tx).toFixed(2)}px, ${(-ty).toFixed(2)}px)`;
     }
-    // Wszystkie widoczności wprost z toru (czysta funkcja p — zero zatrzasków,
-    // więc zjazd w dół jest z definicji tą samą drogą wstecz): --dest-lens to
-    // słowo w kopii pod szkłem (smuga w soczewce), --dest-a — prawdziwy tytuł,
-    // który istnieje dopiero przy samej górze (wysuwa się spod kamyka).
-    const st = this.root.style;
-    st.setProperty('--hero-a', tp.hero.toFixed(3));
-    st.setProperty('--dest-a', tp.dest.toFixed(3));
-    st.setProperty('--dest-lens', tp.dlens.toFixed(3));
-    st.setProperty('--dest-s', tp.dsl.toFixed(3));
-    st.setProperty('--cta-a', tp.cta.toFixed(3));
+    // Widoczności napisów wprost z toru (czysta funkcja p — zjazd to ta sama
+    // droga wstecz), pisane INLINE do konkretnych elementów (applyFx) — zero
+    // zapisów zmiennych CSS na klatkę, zero unieważniania stylów całej sceny.
+    applyFx(this.fx, tp, window.innerHeight);
 
     // Refrakcja jest droga: włączona w ruchu i w chwycie, wyłączona po osiadnięciu.
     const moving = !!this.grab || !!this.raf;

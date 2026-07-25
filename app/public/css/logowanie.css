@@ -13,15 +13,12 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 #view-login { animation: none; }
 
 .login {
+  /* --ls/--lx/--ly: tylko stan PRZED startem JS (potem transformy idą inline).
+     Widoczności napisów też pisze JS inline (applyFx) — celowo ZERO zmiennych
+     per-klatka: ich zmiana unieważniała style całej sceny (klatkowanie na iOS). */
   --ls: 1;
   --lx: 0px;
   --ly: 0px;
-  --p: 0;
-  --hero-a: 1;
-  --dest-a: 0;
-  --dest-lens: 0;
-  --dest-s: 0;
-  --cta-a: 0;
 
   position: fixed;
   inset: 0;
@@ -52,7 +49,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 /* Typografia sceny: systemowy sans (SF na Apple), semibold, ciasny tracking —
    dokładnie rejestr referencji Wabi („Meet Wabi. The first personal software platform."). */
 .login__hero {
-  opacity: var(--hero-a);
+  opacity: 1;
   margin: 0;
   max-width: 16ch;
   font-family: var(--font-display);
@@ -72,20 +69,17 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
    osiądzie, i dopiero wtedy pojawia się razem z przyciskami (--cta-a). */
 .login__title, .login__sub { margin: 0; text-wrap: balance; }
 .login__title {
-  opacity: var(--dest-a);
-  /* 30vh poślizgu; --dest-s > 1 = słowo schowane ZA kamykiem, lekko powyżej celu.
-     Przez wspinaczkę jedzie tuż pod środkiem soczewki — widać je wyłącznie jako
-     odwróconą smugę w tafli; na samej górze wysuwa się spod kamyka na miejsce. */
-  transform: translateY(calc((1 - var(--dest-s)) * 30vh));
+  /* Stan wyjściowy; w ruchu opacity/transform pisze JS inline (30vh poślizgu,
+     wartości >1 toru = słowo schowane ZA kamykiem, lekko powyżej celu). Kopia
+     pod szkłem (.lens__world) dostaje własne opacity — widać ją tylko przez
+     wycięte koło soczewki, jako smugę wędrującą z szybą. */
+  opacity: 0;
+  transform: translateY(30vh);
 }
-/* Kopia słowa POD SZKŁEM żyje własnym życiem: widoczna przez całą jazdę (smuga
-   w soczewce), niezależnie od prawdziwego tytułu — kopię i tak widać tylko
-   przez wycięte koło soczewki. */
-.lens__world .login__title { opacity: var(--dest-lens); }
 .login__sub {
-  opacity: var(--cta-a);
+  opacity: 0;
   /* Bez ruchu: element stoi na miejscu i tylko blaknie do widoczności — żadnego
-     „dosuwania" na końcu (uwaga Szymona). --cta-a skacze 0→1 po pełnym osadzeniu. */
+     „dosuwania" na końcu (uwaga Szymona). Wartość skacze 0→1 po pełnym osadzeniu. */
   transition: opacity var(--t-slow) var(--ease-soft);
 }
 .login__title {
@@ -107,13 +101,13 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   max-width: 24ch;
 }
 
-/* Hero gaśnie jak w referencji: delikatny slide W GÓRĘ + blur + fade, wszystkie trzy
-   z jednej zmiennej --hero-a — są więc z definicji współmierne z ruchem soczewki. */
+/* Hero gaśnie jak w referencji: delikatny slide W GÓRĘ + fade (JS inline, wspólna
+   wartość toru). Blur WYCOFANY 07-26: animowany filtr na tekście przeliczał się
+   co klatkę gestu — realny koszt na iOS, efekt ledwo widoczny przy fade. */
 .login__hero {
   position: absolute;
   top: 50%;
-  transform: translateY(calc(-50% - (1 - var(--hero-a)) * 52px));
-  filter: blur(calc((1 - var(--hero-a)) * 9px));
+  transform: translateY(-50%);
 }
 .login:not(.is-open) .login__title, .login:not(.is-open) .login__sub { pointer-events: none; }
 .login__hero[aria-hidden="true"] { pointer-events: none; }
@@ -128,7 +122,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   font-size: var(--text-xs);
   letter-spacing: .04em;
   color: var(--muted);
-  opacity: var(--hero-a);
+  opacity: 1;
   z-index: 4;
 }
 
@@ -143,7 +137,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   gap: var(--space-3);
   padding: 0 var(--space-5);
   z-index: 5;
-  opacity: var(--cta-a);
+  opacity: 0;
   transition: opacity var(--t-slow) var(--ease-soft);
   pointer-events: none;
 }
@@ -154,7 +148,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   top: calc(var(--space-4) + env(safe-area-inset-top, 0px));
   right: var(--space-4);
   z-index: 6;
-  opacity: var(--cta-a);
+  opacity: 0;
   transition: opacity var(--t-slow) var(--ease-soft);
   pointer-events: none;
 }

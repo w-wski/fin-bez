@@ -142,6 +142,45 @@ export function sampleTrack(p) {
   return { a, b, t };
 }
 
+/* ---------- 2a. Warstwy napisów — zapisy INLINE, nie zmienne CSS ----------
+   Zmiana custom property na .login unieważnia style całej sceny co klatkę (główne
+   źródło klatkowania na iOS). Zamiast tego trzymamy uchwyty i piszemy opacity/
+   transform wprost, wyłącznie gdy wartość faktycznie się zmieniła. */
+export function collectFx(root) {
+  const q = (s) => root.querySelector(s);
+  return {
+    heroR: q('.login__inner .login__hero'), heroC: q('.lens__world .login__hero'),
+    hint: q('.login__hint'),
+    titleR: q('.login__inner .login__title'), titleC: q('.lens__world .login__title'),
+    subR: q('.login__inner .login__sub'), subC: q('.lens__world .login__sub'),
+    acts: q('.login__actions'), sw: q('.login__switch'),
+    hero: -1, dsl: -1, dest: -1, dlens: -1, cta: -1,
+  };
+}
+
+export function applyFx(fx, tp, vh) {
+  if (Math.abs(fx.hero - tp.hero) > 0.001) {
+    fx.hero = tp.hero;
+    const o = tp.hero.toFixed(3);
+    const t = `translateY(calc(-50% - ${((1 - tp.hero) * 52).toFixed(1)}px))`;
+    for (const h of [fx.heroR, fx.heroC]) if (h) { h.style.opacity = o; h.style.transform = t; }
+    if (fx.hint) fx.hint.style.opacity = o;
+  }
+  if (Math.abs(fx.dsl - tp.dsl) > 0.0005) {
+    fx.dsl = tp.dsl;
+    const t = `translateY(${((1 - tp.dsl) * 0.30 * vh).toFixed(1)}px)`;
+    if (fx.titleR) fx.titleR.style.transform = t;
+    if (fx.titleC) fx.titleC.style.transform = t;
+  }
+  if (fx.titleR && Math.abs(fx.dest - tp.dest) > 0.001) { fx.dest = tp.dest; fx.titleR.style.opacity = tp.dest.toFixed(3); }
+  if (fx.titleC && Math.abs(fx.dlens - tp.dlens) > 0.001) { fx.dlens = tp.dlens; fx.titleC.style.opacity = tp.dlens.toFixed(3); }
+  if (Math.abs(fx.cta - tp.cta) > 0.001) {
+    fx.cta = tp.cta;
+    const o = tp.cta.toFixed(3);
+    for (const n of [fx.subR, fx.subC, fx.acts, fx.sw]) if (n) n.style.opacity = o;
+  }
+}
+
 /* ---------- 3. Bąbelki ---------- */
 
 /* Bąbelki = EMITER, nie statyczna kolumna. Każdy bąbelek rodzi się przy soczewce
