@@ -21,27 +21,27 @@
 #txTable td.edycja .row { margin-bottom: .4rem; }
 #txTable td.edycja .row:last-child { margin-bottom: 0; }
 
-/* >640 px: tabela ma się mieścić w karcie, nie rozpychać jej w poziomie.
+/* >900 px: tabela ma się mieścić w karcie, nie rozpychać jej w poziomie.
    Globalne `.overflow table { min-width: max-content }` każe tabeli NIGDY nie zawijać
-   treści — długi opis wypychał Historię poza ekran nawet na komputerze. Tu nadpisujemy:
-   stałe szerokości wąskich kolumn, Opis bierze resztę i się zawija (table-layout: fixed,
-   bez niego przeglądarka ignoruje szerokości i wraca do rozpychania). */
-@media (min-width: 641px) {
-  #txTable { min-width: 100%; table-layout: fixed; }
-  #txTable th:nth-child(1) { width: 6.8rem; }   /* Data (+pill „z banku" łamie się pod datą) */
-  #txTable th:nth-child(2) { width: 2.6rem; }   /* Typ (znak) */
-  #txTable th:nth-child(3) { width: 19%; }      /* Kategoria (ścieżka się zawija) */
-  #txTable th:nth-child(4) { width: 6.5rem; }   /* Kwota */
-  /* Opis: cała reszta szerokości */
-  #txTable th:nth-child(6) { width: 5.5rem; }   /* Kto */
-  #txTable th:nth-child(7) { width: 6.8rem; }   /* Akcje */
-  #txTable td { overflow-wrap: anywhere; }
-  #txTable .pill.bank { display: inline-block; margin-left: 0; }
+   treści — długi opis wypychał Historię poza ekran nawet na komputerze. Tu nadpisujemy
+   sam min-width i pozwalamy zawijać opis/kategorię: auto layout rozdziela wtedy
+   szerokości po zawartości. ŻADNEGO table-layout: fixed — sztywne kolumny potrafiły
+   zdusić Opis do zera na średnich szerokościach (opis pionowo, litera pod literą). */
+@media (min-width: 901px) {
+  #txTable { min-width: 100%; }
+  #txTable th:nth-child(5) { width: 38%; }        /* Opis: wskazówka, nie sztywna szerokość */
+  #txTable td[data-label="Data"], #txTable td[data-label="Kwota"],
+  #txTable td[data-label="Kto"] { white-space: nowrap; }  /* data łamałaby się na myślnikach */
+  #txTable td[data-label="Kategoria"] { overflow-wrap: anywhere; }
+  /* pill jako block: przy nowrap na komórce schodzi POD datę, zamiast ją rozszerzać */
+  #txTable .pill.bank { display: block; width: max-content; margin: .2rem 0 0; }
 }
 
-/* ≤640 px: każdy wpis to karta — bez poziomego przewijania i bez ucinania treści.
-   Nagłówki tabeli zastępuje etykieta z data-label (dokładana w historia.js). */
-@media (max-width: 640px) {
+/* ≤900 px: każdy wpis to karta — bez poziomego przewijania i bez ucinania treści.
+   Telefon i tablet (mobile-first, tablet-second): iPad też dostaje karty, bo tabela
+   robi się użyteczna dopiero na szerokim ekranie. Nagłówki tabeli zastępuje etykieta
+   z data-label (dokładana w historia.js). */
+@media (max-width: 900px) {
   #txTable { font-size: 1rem; }
   #txTable, #txTable tbody, #txTable tr { display: block; width: 100%; }
   #txTable thead { display: none; }

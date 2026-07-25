@@ -214,7 +214,14 @@ export async function wyloguj() {
   track('Wylogowanie', state.view, { detail: n ? `porzucona kolejka: ${n}` : 'kolejka pusta' });
   await flushTelemetry();                        // póki sesja żyje — inaczej zdarzenia przepadną
   try {
-    const res = await fetch('/auth/logout', { method: 'POST' });
+    // Jawny Content-Type i puste ciało JSON: POST bez ciała i bez typu bywa ucinany
+    // przez WAF hostingu (ModSecurity/LiteSpeed) błędem 400, zanim dotrze do aplikacji.
+    let res = await fetch('/auth/logout', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    // Zapasowe wyjście: gdy WAF mimo to utnie POST, ta sama trasa istnieje jako GET
+    // (app.js) — GET-a filtry przepuszczają. Service worker nie cachuje ścieżek /auth/.
+    if (!res.ok) res = await fetch('/auth/logout?fallback=1');
     // Serwer odpowiedział, ale sesji nie zakończył (np. stary proces bez tej trasy — 404).
     // Czyszczenie urządzenia i przeładowanie NIC by nie dało: ciasteczko httpOnly zostaje
     // i strona zalogowałaby się z powrotem, udając, że przycisk nie działa. Mówimy wprost.

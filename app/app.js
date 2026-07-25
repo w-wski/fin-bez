@@ -29,7 +29,12 @@ app.get('/auth/callback', async (req, res) => {
     res.status(500).send('Błąd logowania Google. Spróbuj ponownie.');
   }
 });
-app.post('/auth/logout', (req, res) => { auth.clearCookie(res); res.json({ ok: true }); });
+const wylogowanie = (req, res) => { auth.clearCookie(res); res.json({ ok: true }); };
+app.post('/auth/logout', wylogowanie);
+// GET jako zapasowe wyjście: WAF hostingu (ModSecurity/LiteSpeed) potrafi uciąć POST
+// błędem 400, zanim dotrze do aplikacji. Skutek podrobionego GET-a to co najwyżej
+// wylogowanie kogoś — nic nie ginie, więc wygoda wygrywa z purystycznym POST-only.
+app.get('/auth/logout', wylogowanie);
 app.get('/api/v1/me', (req, res) => {
   const s = auth.readSession(req);
   if (!s) return res.status(401).json({ error: 'auth_required' });
