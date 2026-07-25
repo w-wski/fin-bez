@@ -77,6 +77,8 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 .login__sub {
   opacity: var(--cta-a);
   transform: translateY(calc((1 - var(--cta-a)) * 12px));
+  /* --cta-a skacze 0→1 dopiero po pełnym osadzeniu — płynne wejście robi transition */
+  transition: opacity var(--t-slow) var(--ease-soft), transform var(--t-slow) var(--ease-soft);
 }
 .login__title {
   font-family: var(--font-display);
@@ -135,6 +137,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   z-index: 5;
   opacity: var(--cta-a);
   transform: translateY(calc((1 - var(--cta-a)) * 22px));
+  transition: opacity var(--t-slow) var(--ease-soft), transform var(--t-slow) var(--ease-soft);
   pointer-events: none;
 }
 .login.is-open .login__actions { pointer-events: auto; }
@@ -145,6 +148,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   right: var(--space-4);
   z-index: 6;
   opacity: var(--cta-a);
+  transition: opacity var(--t-slow) var(--ease-soft);
   pointer-events: none;
 }
 .login.is-open .login__switch { pointer-events: auto; }

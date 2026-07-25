@@ -79,10 +79,17 @@ export function installLensMap() {
  *  pojawiają się dopiero, gdy tytuł osiądzie (`cta`). W dół — wszystko wstecz. */
 export const KEYFRAMES = [
   { p: 0.00, cx: 0.5, cy: 1.08, s: 1.85, hero: 1, dest: 0, dsl: 0, cta: 0 },
-  { p: 0.40, cx: 0.5, cy: 0.72, s: 1.02, hero: 0.45, dest: 0, dsl: 0, cta: 0 },
-  { p: 0.52, cx: 0.5, cy: 0.56, s: 0.76, hero: 0, dest: 0.4, dsl: 0.06, cta: 0 },
-  { p: 0.66, cx: 0.5, cy: 0.45, s: 0.58, hero: 0, dest: 1, dsl: 0.38, cta: 0 },
-  { p: 0.86, anchor: true, s: 0.34, hero: 0, dest: 1, dsl: 0.82, cta: 0.2 },
+  { p: 0.36, cx: 0.5, cy: 0.80, s: 1.32, hero: 0.5, dest: 0, dsl: 0, cta: 0 },
+  // Okno narodzin tytułu (.50→.58): tytuł jest wtedy jeszcze ~16vh poniżej celu,
+  // czyli DOKŁADNIE pod soczewką (cy .585→.545), a szkło ma ~250 px średnicy —
+  // słowo „Finansowa" rodzi się w całości pod taflą, zniekształcone. Dopiero potem
+  // soczewka wspina się na kotwicę, a tytuł jedzie wolniej za nią (dsl → 1).
+  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.06, hero: 0, dest: 0, dsl: 0, cta: 0 },
+  { p: 0.58, cx: 0.5, cy: 0.545, s: 0.94, hero: 0, dest: 1, dsl: 0.10, cta: 0 },
+  { p: 0.82, anchor: true, s: 0.52, hero: 0, dest: 1, dsl: 0.66, cta: 0 },
+  // cta = 0 aż do pełnego osadzenia: podtytuł i przyciski wchodzą DOPIERO, gdy
+  // tytuł stoi, a soczewka siedzi na kotwicy (płynność robi transition w CSS).
+  { p: 0.985, anchor: true, s: 0.26, hero: 0, dest: 1, dsl: 0.985, cta: 0 },
   { p: 1.00, anchor: true, s: 0.25, hero: 0, dest: 1, dsl: 1, cta: 1 },
 ];
 
