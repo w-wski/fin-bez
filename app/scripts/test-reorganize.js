@@ -104,7 +104,7 @@ const WIERSZE = [
   ['C2 kategoria „Tantiemy" (nazwa, nie opis)', 'Tantiemy', 'PRZYCHÓD', '', 'Tantiemy', 'C2'],
   ['C3 Zwrot → Zwroty', 'Zwrot', 'PRZYCHÓD', 'EPP', 'Zwroty', 'C3'],
   ['C6 Dodatkowe (przychód) = wypłata z PERSEVERY', 'Dodatkowe', 'PRZYCHÓD', '', 'PERSEVERA (wypłaty)', 'C6'],
-  ['C8 sierota przychodowa → Inne', 'Dom', 'PRZYCHÓD', 'jakiś wpływ', 'Inne', 'C8'],
+  ['C8 sierota przychodowa → Inne przychody (K1)', 'Dom', 'PRZYCHÓD', 'jakiś wpływ', 'Inne przychody', 'C8'],
   ['D2 PERSEVERA Paliwo → księga spółki', 'PERSEVERA Paliwo', 'WYDATEK', '', 'Samochód>Paliwo', 'D2'],
   ['D3 PERSEVERA Hotele → Delegacje', 'PERSEVERA Hotele', 'WYDATEK', '', 'Działalność>Hotele/Delegacje', 'D3'],
   ['D4 CIT 8 Anny → księga PERSEVERA', 'Podatek', 'WYDATEK', 'CIT 8 za 2025', 'Podatki i opłaty>CIT', 'D4'],
@@ -198,7 +198,7 @@ t('A30: wyjazd dostaje tag kontekstu zamiast osobnej gałęzi', () => {
 t('Rozdział przepływów: „Dom" jako wydatek ≠ „Dom" jako przychód', () => {
   const c = old('Dom');
   assert.strictEqual(ruleFor(tx('WYDATEK', c), c).to, 'Dom i media');
-  assert.strictEqual(ruleFor(tx('PRZYCHÓD', c), c).to, 'Inne');
+  assert.strictEqual(ruleFor(tx('PRZYCHÓD', c), c).to, 'Inne przychody');
 });
 t('Księga źródłowa: „Szkolenia" w RODZINIE to wydatek, w PERSEVERZE przychód spółki', () => {
   const f = old('Szkolenia', 1), p = old('Szkolenia', 2);
@@ -212,7 +212,7 @@ t('Księga źródłowa: reguła RODZINY nie rusza kategorii spółki (sl)', () =
 });
 t('Wpis bez kategorii: wydatek nie jest ruszany, przychód łapie C8', () => {
   assert.strictEqual(ruleFor(tx('WYDATEK', null), null), null);
-  assert.strictEqual(ruleFor(tx('PRZYCHÓD', null), null).to, 'Inne');
+  assert.strictEqual(ruleFor(tx('PRZYCHÓD', null), null).to, 'Inne przychody');
 });
 
 // ---------- bramka księgowa ----------
@@ -248,10 +248,13 @@ t('Regexy opisów są poprawne i nie łapią przypadkiem („Citibank" ≠ CIT 8
   assert.strictEqual(ruleFor(tx('WYDATEK', c, 'CIT 8'), c).id, 'D4');
 });
 
-// Scenariusze z odrzuconych przebiegów, idempotencja (K2) i arytmetyka „Konta Bartusia"
-// (K8) siedzą w pliku obok — ten dobił do limitu 300 linii z preflighta. Wołane tutaj,
-// tym samym licznikiem błędów, więc `npm test` zostaje bez zmian w package.json.
-require('./test-reorganize-scen')({ t, old, tx, target, cats });
-
-if (failures) { console.error(`\n${failures} test(ów) NIE przeszło`); process.exit(1); }
-console.log('\nWszystkie testy taksonomii przeszły.');
+// Scenariusze z odrzuconych przebiegów, rozdzielone „Inne" (Z5/K1), brak UPDATE na
+// transakcjach (K2), propozycje i ich idempotencja (K4), przyjęcie z bramką kwotową (K7),
+// walidacja celu w retarget (K8) i arytmetyka „Konta Bartusia" siedzą w pliku obok — ten
+// dobił do limitu 300 linii z preflighta. Wołane tutaj, tym samym licznikiem błędów, więc
+// `npm test` zostaje bez zmian w package.json. Część testów jest asynchroniczna (atrapa puli
+// połączeń), dlatego podsumowanie czeka na obietnicę zwróconą przez tamten plik.
+require('./test-reorganize-scen')({ t, old, tx, target, cats }).then(() => {
+  if (failures) { console.error(`\n${failures} test(ów) NIE przeszło`); process.exit(1); }
+  console.log('\nWszystkie testy taksonomii przeszły.');
+}).catch((e) => { console.error('FAIL harness testów scenariuszowych —', e.message); process.exit(1); });
