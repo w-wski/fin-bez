@@ -70,7 +70,11 @@ function raport(x, log = console.log) {
     .forEach((c) => x.notes.push(`„${c.path}" (księga ${c.ledger_id}) nie pasuje do żadnej reguły D — zostaje bez zmian`));
   const s = x.stat;
   log(`\n== PODSUMOWANIE ==\nnowe kategorie: ${s.cats} (dzieci przeniesione 1:1: ${s.kids}) · TRANSAKCJE PRZEPIĘTE: 0 (skrypt tylko proponuje)`);
+  // `otwarte` = wpisy pominięte, bo mają JUŻ otwartą (NOWA) propozycję. Jeden wpis może mieć
+  // najwyżej jedną — inaczej licznik „do przydziału" liczył go dwa razy, a przyjęcie starszej
+  // grupy cofało ręczne przepięcie w Historii. Wpisy z Kosza nie biorą udziału w przydziale.
   log(`propozycje zapisane: ${s.prop} (po opisie, do sprawdzenia pojedynczo: ${s.reczne}) · pominięte, bo już były: ${s.jest}`
+    + ` · pominięte, bo mają otwartą propozycję: ${s.otwarte || 0} · wpisy z Kosza: pominięte (poza przydziałem)`
     + `\ncategory_map: +${s.map} nowych / ${s.mapUpd} przestawionych`
     + `\nmapping_cache: ${s.cache} przestawionych, ${s.cacheNull} wyczyszczonych (kategoria zmienia księgę)`
     + `\nwpisy na kategoriach active=0: ${x.wiszaceA} → ${x.wiszaceB} (musi być bez zmian) · kategorie zarchiwizowane: 0 (K3)`);

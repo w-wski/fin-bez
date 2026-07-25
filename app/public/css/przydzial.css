@@ -44,6 +44,10 @@
   border-top: 1px solid var(--bar);
   padding-top: .4rem;
 }
+/* „Pokazano 500 z 700" — obcięcie listy musi być widoczne nad wpisami, bo decyzja grupowa
+   obejmuje także te wpisy, których na liście nie ma. */
+.prz-obciete { margin: 0 0 .3rem; font-weight: 600; }
+
 .prz-wpis { align-items: center; font-size: .9rem; }
 .prz-wpis > * { flex: 0 1 auto; min-width: 0; }
 .prz-wpis > .prz-opis { flex: 1 1 10rem; overflow-wrap: anywhere; }

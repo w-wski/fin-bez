@@ -165,6 +165,24 @@ module.exports = function scenariusze({ t, old, tx, target, cats }) {
     assert.ok(/INSERT INTO category_proposals/.test(zrodlo('reorganize-categories.js')),
       'skrypt nie zapisuje propozycji');
   });
+  t('Z5: skrypt nie proponuje wpisom z Kosza ani wpisom z otwartą propozycją', () => {
+    // Kosz: reszta aplikacji wyklucza usunięte z każdej edycji, a przydział zmieniał im kategorię
+    // (przy regule D także księgę i typ), więc po „Przywróć" wpis wracał zmieniony.
+    // Otwarta propozycja: druga dla tego samego wpisu podwajała licznik „do przydziału",
+    // a przyjęcie starszej grupy cofało ręczne przepięcie w Historii.
+    const src = zrodlo('reorganize-categories.js');
+    assert.ok(/FROM transactions WHERE deleted_at IS NULL/.test(src), 'skrypt czyta też wpisy z Kosza');
+    assert.ok(/FROM category_proposals WHERE status='NOWA'/.test(src), 'brak odsiewu otwartych propozycji');
+    assert.ok(/otwarte\.has\(Number\(tx\.id\)\)/.test(src), 'odsiew otwartych propozycji nie jest używany w pętli');
+  });
+  t('Z5/K2: komentarz przy bramce skryptu nie obiecuje więcej, niż bramka umie', () => {
+    // Kubełki to księga × typ × kosz — przepięcie samej kategorii w obrębie tej samej księgi
+    // i typu przechodzi przez nie bez śladu. Komentarz musi mówić to wprost, a jako gwarancję
+    // K2 wskazywać test grepujący źródło (ten obok). Inaczej ktoś zaufa bramce zamiast testu.
+    const src = zrodlo('reorganize-categories.js');
+    assert.ok(/NIE ŁAPIE/.test(src), 'komentarz bramki nie nazywa jej ograniczenia');
+    assert.ok(/jedyna realna gwarancja K2|gwarancją K2/.test(src), 'komentarz nie wskazuje testu jako gwarancji K2');
+  });
   t('Z5/K2: transakcje przepina WYŁĄCZNIE przyjęcie propozycji, zawsze z WHERE', () => {
     const src = zrodlo('..', 'src', 'routes', 'proposals.js');
     const zapisy = src.match(/UPDATE transactions[^\n]*/g) || [];

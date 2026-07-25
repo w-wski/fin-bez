@@ -1,20 +1,17 @@
 // Wykonawca reorganizacji taksonomii kategorii — drzewa i reguły siedzą w
 // scripts/reorganize-plan.js (tabele A1–A30, B1–B8, C1–C8, CP1–CP4, D1–D4).
-//
 // Decyzja Szymona z 2026-07-24: „Wszystkie decyzje o przydziale do nowych kategorii zrobię
-// ręcznie. Zaproponuj, a ja wybiorę w aplikacji, które jest które." Skrypt więc TYLKO
-// PROPONUJE: zakłada docelowe drzewo, zapisuje category_map (E2), renormalizuje mapping_cache
-// (E3) i wpisuje propozycje przydziału do `category_proposals` (migracja 008). ZERO UPDATE
-// na tabeli `transactions` — kategorię, księgę, typ i tag wpisu zmienia wyłącznie przyjęcie
-// propozycji w karcie „Przydział" (src/routes/proposals.js). Nic nie archiwizuje (K3):
-// stare kategorie zostają aktywne, bo do decyzji człowieka leżą w nich wszystkie wpisy;
-// archiwizacja to osobna, ręczna czynność w panelu Admin PO przyjęciu propozycji.
+// ręcznie. Zaproponuj, a ja wybiorę w aplikacji, które jest które." Skrypt więc TYLKO PROPONUJE:
+// zakłada docelowe drzewo, zapisuje category_map (E2), renormalizuje mapping_cache (E3) i wpisuje
+// propozycje do `category_proposals` (migracja 008). ZERO UPDATE na `transactions` — kategorię,
+// księgę, typ i tag zmienia wyłącznie przyjęcie propozycji w karcie „Przydział"
+// (src/routes/proposals.js). Nic nie archiwizuje (K3): stare kategorie zostają aktywne, bo leżą
+// w nich wszystkie wpisy; archiwizacja to ręczna czynność w panelu Admin PO przyjęciu propozycji.
 // Użycie: node scripts/reorganize-categories.js [--dry-run] — --dry-run robi CAŁĄ pracę
 // w transakcji i kończy ROLLBACK-iem, więc raport jest dokładnie tym, co zrobi przebieg
 // właściwy (ten sam kod + COMMIT). Błąd = rollback. Idempotentny: 2. przebieg = „0 zmian".
-// Połączenie bierzemy z src/db.js (dateStrings: daty jako napisy — inaczej tag wyjazdu
-// cofa się o miesiąc przy Europe/Warsaw; namedPlaceholders nie przeszkadza, bo tu
-// wszystkie parametry podajemy tablicami).
+// Połączenie z src/db.js (dateStrings: daty jako napisy — inaczej tag wyjazdu cofa się
+// o miesiąc przy Europe/Warsaw; parametry podajemy tablicami, więc namedPlaceholders nie szkodzi).
 const { pool } = require('../src/db');
 const { F, P, TREE, RULES, zwin, pathOf, norm, propozycja, planKategorii,
   grosze, zlot, kubel, przesun } = require('./reorganize-plan');
@@ -27,7 +24,7 @@ if (require.main === module) main().catch((e) => { console.error('BŁĄD:', e.me
 async function main() {
   const DRY = process.argv.includes('--dry-run');
   const conn = await pool.getConnection();
-  const stat = { cats: 0, kids: 0, prop: 0, reczne: 0, jest: 0, map: 0, mapUpd: 0, cache: 0, cacheNull: 0 };
+  const stat = { cats: 0, kids: 0, prop: 0, reczne: 0, jest: 0, otwarte: 0, map: 0, mapUpd: 0, cache: 0, cacheNull: 0 };
   const perRule = new Map(), notes = [], kand = [], kolizje = [], opisowe = [], zostaje = new Map();
   const bump = (id) => { if (!perRule.has(id)) perRule.set(id, { cats: new Set(), tx: 0 }); return perRule.get(id); };
   try {
@@ -35,8 +32,9 @@ async function main() {
     console.log('UWAGA: pracuję na migawce transakcji (REPEATABLE READ). Wpis dodany przez aplikację\n'
       + 'W TRAKCIE przebiegu nie dostanie propozycji — uruchamiaj po backupie i przy zatrzymanej aplikacji.');
     console.log('ZAKRES BRAMKI KSIĘGOWEJ: liczba wpisów i suma kwot w kubełkach księga × typ × (żywe/kosz)\n'
-      + 'MUSZĄ być identyczne przed i po przebiegu — skrypt nie ma prawa ruszyć transakcji.\n'
-      + 'Jakakolwiek różnica to błąd i rollback.\n');
+      + 'MUSZĄ być identyczne przed i po. Bramka ŁAPIE ruch księgi, typu i kosza, NIE ŁAPIE\n'
+      + 'przepięcia samej kategorii w obrębie tej samej księgi i typu. Że skrypt w ogóle nie pisze\n'
+      + 'do `transactions`, pilnuje test grepujący źródło („Z5/K2") — to jedyna realna gwarancja K2.\n');
     await conn.beginTransaction();
     const przed = await migawka(conn);
     const wiszaceA = await naArchiwum(conn);
@@ -67,9 +65,9 @@ async function main() {
     const targets = new Set();
     for (const r of RULES) if (r.to) targets.add(targetOf(r.to, r.l).id);
 
-    // 3) plan dla kategorii: stara kategoria -> warianty {przepływ, reguła, cel}. Kategorii
-    // zarchiwizowanych NIE planujemy — już przeszły (albo właściciel je schował), a liczenie
-    // ich w raporcie dawało „A1 kategorie: 1" obok „0 zmian" przy drugim przebiegu.
+    // 3) plan dla kategorii: stara kategoria -> warianty {przepływ, reguła, cel}. Zarchiwizowanych
+    // NIE planujemy — już przeszły (albo właściciel je schował), a liczenie ich w raporcie dawało
+    // „A1 kategorie: 1" obok „0 zmian" przy drugim przebiegu.
     const plan = new Map();
     for (const c of cats.rows) {
       if (!c.active || targets.has(c.id)) continue;
@@ -78,15 +76,14 @@ async function main() {
       plan.set(c.id, { r: w[0].r, dst: w[0].dst, w });
     }
     // 3a) dzieci starych korzeni bez własnej reguły idą pod nowy korzeń (A1: „dzieci 1:1").
-    // Odpowiednik powstaje zawsze AKTYWNY, także dla zarchiwizowanego oryginału: to cel
-    // propozycji, a do zarchiwizowanej kategorii nie da się przyjąć wpisu (proposals.js
-    // przywraca ją dopiero przy przyjęciu, ale listy wyboru mają ją widzieć od razu).
+    // Odpowiednik powstaje zawsze AKTYWNY, także dla zarchiwizowanego oryginału: przyjęcia do
+    // kategorii z archiwum proposals.js ODMAWIA, więc cel musi być aktywny od razu.
     for (const c of cats.rows) {
       if (c.parent_id == null || plan.has(c.id) || targets.has(c.id)) continue;
       const pp = plan.get(c.parent_id);
-      // Za rodzicem idziemy wyłącznie jego wariantem WYDATKOWYM: „PERSEVERA" (korzeń) ma
-      // wariant przychodowy (C6 → „PERSEVERA (wypłaty)"), a wieszanie kosztów pod korzeniem
-      // przychodowym to ten sam błąd, co dziedziczenie księgi po regule przeciwnego przepływu.
+      // Za rodzicem idziemy wyłącznie jego wariantem WYDATKOWYM: „PERSEVERA" (korzeń) ma wariant
+      // przychodowy (C6 → „PERSEVERA (wypłaty)"), a wieszanie kosztów pod korzeniem przychodowym
+      // to ten sam błąd, co dziedziczenie księgi po regule przeciwnego przepływu.
       const pv = pp && pp.w.find((x) => x.flow === 'out');
       if (!pv || !pv.dst || pv.dst.parent_id != null) continue; // rodzic musi trafiać w korzeń
       const bylo = stat.cats;
@@ -94,30 +91,40 @@ async function main() {
       if (kid === c.id) continue;
       const dst = { id: kid, ledger_id: pv.dst.ledger_id };
       plan.set(c.id, { r: pv.r, dst, w: [{ flow: 'out', r: pv.r, dst }] });
-      // licznik = tylko NAPRAWDĘ utworzone dziecko. Przy drugim przebiegu odpowiednik już
-      // istnieje i „dzieci przeniesione 1:1: 1" obok „0 zmian" byłoby raportem, który kłamie.
+      // licznik = tylko NAPRAWDĘ utworzone dziecko: przy 2. przebiegu odpowiednik już istnieje,
+      // a „dzieci przeniesione 1:1: 1" obok „0 zmian" byłoby raportem, który kłamie.
       if (stat.cats > bylo) stat.kids++;
     }
     if (stat.kids || stat.cats) cats = await load();          // odśwież po ewentualnych INSERT-ach
 
-    // 4) propozycje przydziału per wpis. Wpisy w koszu też, bo Historia ma „Przywróć": wpis
-    // wyjęty po reorganizacji ma mieć swoją propozycję jak każdy inny.
-    const [txs] = await conn.query(
-      'SELECT id, ledger_id, type, amount, category_id, description, tx_date, tag, deleted_at FROM transactions', []);
-    // K4: para (wpis, cel), która JUŻ jest w tabeli, nie powstaje po raz drugi — niezależnie
-    // od statusu. ODRZUCONA nie wraca (decyzja „nie" jest trwała), PRZYJETA nie dubluje.
+    // 4) propozycje przydziału per wpis. WPISY Z KOSZA POMIJAMY (deleted_at IS NULL): reszta
+    // aplikacji wyklucza usunięte z każdej edycji, a przydział zmieniający im kategorię (przy
+    // regule D też księgę i typ) oddawał po „Przywróć" wpis po zmianie, której Historia nigdy by
+    // nie pozwoliła wykonać. Skrypt nic nie archiwizuje (K3), więc przywrócony wpis zostaje w
+    // starej, NADAL AKTYWNEJ kategorii i człowiek przepnie go w Historii. Nie „naprawiaj" tego
+    // z powrotem (to samo uzasadnienie w src/routes/proposals.js).
+    const [txs] = await conn.query('SELECT id, ledger_id, type, amount, category_id, description, tx_date,'
+      + ' tag, deleted_at FROM transactions WHERE deleted_at IS NULL', []);
+    // K4: para (wpis, cel), która JUŻ jest w tabeli, nie powstaje po raz drugi — niezależnie od
+    // statusu. ODRZUCONA nie wraca (decyzja „nie" jest trwała), PRZYJETA nie dubluje.
     const [byle] = await conn.query('SELECT transaction_id t, to_category_id c FROM category_proposals', []);
     const istniejace = new Set(byle.map((r) => `${r.t}|${r.c}`));
+    // Wpis z OTWARTĄ propozycją (NOWA) nie dostaje drugiej — niezależnie od pary. Inaczej po
+    // ręcznym przeniesieniu wpisu w Historii kolejny przebieg dokładał propozycję z nowej pary:
+    // licznik liczył wpis dwa razy, a przyjęcie starszej grupy cofało ręczną decyzję właściciela.
+    const [otw] = await conn.query("SELECT DISTINCT transaction_id t FROM category_proposals WHERE status='NOWA'", []);
+    const otwarte = new Set(otw.map((r) => Number(r.t)));
     const wiersze = [], delta = new Map(), uzycie = new Map();
     for (const tx of txs) {
       const cat = tx.category_id ? cats.byId.get(tx.category_id) : null;
       if (cat) { const u = uzycie.get(cat.id) || { in: 0, out: 0 }; u[tx.type === 'PRZYCHÓD' ? 'in' : 'out']++; uzycie.set(cat.id, u); }
+      if (otwarte.has(Number(tx.id))) { stat.otwarte++; continue; }
       const teraz = cat ? cat.path : '(bez kategorii)';
       const warianty = cat && plan.has(cat.id) ? plan.get(cat.id).w : null;
       const p = propozycja(tx, cat, warianty, targetOf, istniejace);
       if (!p) {
-        // Brak reguły dla przepływu TEGO wpisu (K5): wpis NIE dostaje propozycji — idzie do
-        // sekcji raportu. Bez dziedziczenia księgi ani kategorii przeciwnego przepływu.
+        // Brak reguły dla przepływu TEGO wpisu (K5): wpis NIE dostaje propozycji, idzie do
+        // raportu. Bez dziedziczenia księgi ani kategorii przeciwnego przepływu.
         if (cat && plan.has(cat.id)) { const kk = `${teraz}|${tx.type}`; zostaje.set(kk, (zostaje.get(kk) || 0) + 1); }
         continue;
       }
@@ -134,9 +141,9 @@ async function main() {
     }
     await zapiszPropozycje(conn, wiersze);
 
-    // 5) mapping_cache + category_map (E2, E3). Archiwizacji NIE MA (K3) — po tej zmianie
-    // wpisy leżą w starych kategoriach do decyzji człowieka, a chowanie kategorii z wpisami
-    // wycinało je z list wyboru. Kandydatów do ręcznej archiwizacji wypisuje raport.
+    // 5) mapping_cache + category_map (E2, E3). Archiwizacji NIE MA (K3): wpisy leżą w starych
+    // kategoriach do decyzji człowieka, a chowanie kategorii z wpisami wycinało je z list
+    // wyboru. Kandydatów do ręcznej archiwizacji wypisuje raport.
     const zajete = new Map();
     if (plan.size) {
       const [z] = await conn.query('SELECT category_id id, COUNT(*) n FROM transactions WHERE category_id IN (?) GROUP BY category_id', [[...plan.keys()]]);
@@ -150,14 +157,16 @@ async function main() {
       if (p.dst) ruszone += await przestawCache(conn, c, p.dst, stat, notes);
       await zapiszMape(conn, c, p, uzycie.get(oldId), stat, kolizje);
       if (!zajete.get(oldId) && c.active) puste.push(`„${c.path}" (księga ${c.ledger_id})`);
-      // licznik kategorii w raporcie = to, co NAPRAWDĘ ruszyło (mapa, cache).
-      // Sam plan nie wystarcza: „B8 kategorie: 1" obok „0 zmian" to raport, który kłamie.
+      // licznik kategorii w raporcie = to, co NAPRAWDĘ ruszyło (mapa, cache). Sam plan nie
+      // wystarcza: „B8 kategorie: 1" obok „0 zmian" to raport, który kłamie.
       if (ruszone || stat.map + stat.mapUpd > bylo) bump(p.r.id).cats.add(oldId);
     }
 
     // 6) bramka księgowa: kubełki księga × typ × (żywe/kosz) MUSZĄ być identyczne przed i po.
-    // Skrypt nie przepina już transakcji, więc każda różnica — choćby o grosz albo o jeden
-    // wpis — znaczy, że coś ruszyło księgę wbrew decyzji właściciela. Wtedy rollback.
+    // UCZCIWY ZAKRES: różnica znaczy, że ruszyła się KSIĘGA, TYP albo kosz — i wtedy rollback.
+    // Przepięcie samej kategorii w obrębie tej samej księgi i typu PRZEJDZIE tu bez śladu, bo
+    // kategoria w kubełkach nie występuje. Jedyną realną gwarancją K2 („zero UPDATE na
+    // transactions") jest test grepujący źródło: „Z5/K2" w scripts/test-reorganize-scen.js.
     const po = await migawka(conn);
     const zle = [];
     for (const k of new Set([...przed.keys(), ...po.keys()])) {
@@ -180,9 +189,9 @@ async function main() {
   } finally { conn.release(); await pool.end(); }
 }
 
-// Zapis propozycji paczkami. `affectedRows` musi zgadzać się z liczbą wierszy: zderzenie
-// z unikatem uq_prop (transaction_id, to_category_id) ma być błędem i rollbackiem, nie cichym
-// INSERT IGNORE — pary już istniejące odsiewamy WCZEŚNIEJ, zbiorem `istniejace`.
+// Zapis propozycji paczkami. `affectedRows` musi zgadzać się z liczbą wierszy: zderzenie z unikatem
+// uq_prop (transaction_id, to_category_id) ma być błędem i rollbackiem, nie cichym INSERT IGNORE —
+// pary już istniejące odsiewamy WCZEŚNIEJ (`istniejace`, `otwarte`).
 async function zapiszPropozycje(conn, wiersze) {
   for (let i = 0; i < wiersze.length; i += PACZKA) {
     const cz = wiersze.slice(i, i + PACZKA);
@@ -205,9 +214,8 @@ async function naArchiwum(conn) {
   const [[r]] = await conn.query('SELECT COUNT(*) n FROM transactions t JOIN categories c ON c.id = t.category_id WHERE c.active = 0', []);
   return Number(r.n);
 }
-// Bez migracji 006 nie ma typu TRANSFER, kolumny `tag` ani category_map, bez 008 nie ma tabeli
-// propozycji — przebieg wywaliłby się w połowie. Sprawdzamy schemat, nie wpis w
-// schema_migrations (ALTER-y mogły pójść ręcznie).
+// Bez migracji 006 nie ma typu TRANSFER, kolumny `tag` ani category_map, bez 008 tabeli propozycji
+// — przebieg wywaliłby się w połowie. Sprawdzamy schemat, nie schema_migrations (ALTER-y ręczne).
 async function sprawdzSchemat(conn) {
   const [[k]] = await conn.query(
     `SELECT SUM(TABLE_NAME='transactions' AND COLUMN_NAME='tag') tag,
@@ -220,9 +228,8 @@ async function sprawdzSchemat(conn) {
   if (brak.length) throw new Error(`brak migracji: ${brak.join(', ')} — uruchom najpierw: npm run migrate`
     + ' (jeśli migracje SĄ wykonane, sprawdź uprawnienia konta do information_schema)');
 }
-// Znajdź lub utwórz kategorię (ledger, parent, name). NIE przywraca active=1: kategoria
-// zarchiwizowana ręcznie przez właściciela ma taka zostać (przywraca ją dopiero przyjęcie
-// propozycji w src/routes/proposals.js, gdy wpisy naprawdę do niej trafiają).
+// Znajdź lub utwórz kategorię (ledger, parent, name). NIE przywraca active=1: kategoria schowana
+// ręcznie ma taka zostać (przyjęcie propozycji też jej nie przywraca — odmawia z komunikatem).
 async function ensure(conn, ledger, parentId, name, order, stat) {
   const [[f]] = await conn.query(
     'SELECT id, active FROM categories WHERE ledger_id=? AND (parent_id <=> ?) AND name=? LIMIT 1', [ledger, parentId, name]);
@@ -273,12 +280,11 @@ async function zapiszMape(conn, c, p, uz, stat, kolizje) {
     stat.map++;
   }
 }
-// mapping_cache (E3) jest WSPÓLNY dla obu ksiąg — nie ma w nim kolumny księgi, a unikat leży
-// na samym wzorcu. Przestawienie wzorca na kategorię z innej księgi tworzy wskaźnik między
-// księgami: import rodzinnego CSV podpowiadałby kategorię spółki, wpis zapisywał się z
-// ledger_id=1 i kategorią z księgi 2, a w raporcie lądował w „(bez kategorii)". W takim
-// przypadku CZYŚCIMY sam wskaźnik (category_id=NULL) — wzorzec, hits i confidence zostają,
-// więc pierwsza decyzja człowieka nauczy go od nowa (nic nie kasujemy).
+// mapping_cache (E3) jest WSPÓLNY dla obu ksiąg — nie ma w nim kolumny księgi, a unikat leży na
+// samym wzorcu. Przestawienie wzorca na kategorię z innej księgi tworzy wskaźnik międzyksięgowy:
+// import rodzinnego CSV podpowiadałby kategorię spółki, wpis zapisywał się z ledger_id=1
+// i kategorią z księgi 2, a w raporcie lądował w „(bez kategorii)". Wtedy CZYŚCIMY sam wskaźnik
+// (category_id=NULL) — wzorzec, hits i confidence zostają, więc człowiek nauczy go od nowa.
 async function przestawCache(conn, c, dst, stat, notes) {
   const miedzyKsiegami = dst.ledger_id !== c.ledger_id;
   const [r] = await conn.query(`UPDATE mapping_cache SET category_id=${miedzyKsiegami ? 'NULL' : '?'} WHERE category_id=?`,

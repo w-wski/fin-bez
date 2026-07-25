@@ -3,48 +3,29 @@
 // categories.js) zapisuje propozycje do `category_proposals` i NIE rusza transakcji —
 // przepięcie dzieje się WYŁĄCZNIE tutaj, w `accept`, na świadomą decyzję człowieka.
 // To jedyne miejsce w aplikacji, które zmienia kategorię, księgę, typ i tag hurtem, więc:
-// jedna transakcja SQL, wiersze pod FOR UPDATE, bramka na liczbie wpisów i sumie kwot.
+// jedna transakcja SQL, wiersze pod FOR UPDATE, bramka na kubełkach księga × typ (fakt vs
+// ruch wynikający z propozycji), jeden wpis = jeden UPDATE i zero wpisów z Kosza.
 // Wszystkie trasy tylko dla roli admin (K6) — przydział to decyzja właściciela ksiąg.
+//
+// KOSZ: wpisy usunięte miękko (`t.deleted_at IS NOT NULL`) NIE BIORĄ UDZIAŁU w przydziale —
+// ani w skrypcie, ani tutaj. Reszta aplikacji (transactions.js) wyklucza je z każdej edycji,
+// a nagłówek grupy liczący wpisy z Kosza nie dawał się uzgodnić z /summary. Skrypt niczego
+// nie archiwizuje (K3), więc przywrócony wpis zostaje w swojej starej, NADAL AKTYWNEJ
+// kategorii i Szymon przepnie go w Historii — nie wróci jako TRANSFER z cudzej księgi po
+// zmianie, której Historia nigdy by mu nie pozwoliła wykonać. Nie „naprawiaj" tego z powrotem.
 const express = require('express');
 const { pool, q } = require('../db');
 const { ledgerScope } = require('../auth');
-const { parseKwota } = require('../kwota');   // jedyne miejsce, gdzie napis staje się kwotą
+const { kluczGrupy, parsujKlucz, parsujIds, docelowaKsiega, groszeZ, bladRetarget, grupujCele,
+  dubleWpisow, nieaktualna, kubelki, oczekiwanaDelta, rozbieznosci, tkniete } = require('../proposals-core');
 
 const router = express.Router();
 const LIMIT_WPISOW = 500;
-
-// --- czyste pomocniki (testowane w scripts/test-reorganize-scen.js) ---
-
-// Klucz grupy = para (kategoria obecna → proponowana). „0" na pierwszej pozycji = wpis bez
-// kategorii (from_category_id IS NULL), bo w URL-u nie ma sensownego zapisu NULL-a.
-const kluczGrupy = (from, to) => `${Number(from) || 0}-${Number(to)}`;
-function parsujKlucz(k) {
-  const m = /^(\d+)-(\d+)$/.exec(String(k == null ? '' : k));
-  if (!m) return null;
-  const to = Number(m[2]);
-  return to > 0 ? { from: Number(m[1]) || null, to } : null;
-}
-// Identyfikatory propozycji z ciała żądania — same liczby całkowite dodatnie albo null.
-// Pusta lista jest poprawna (żądanie nic nie robi), napis „5 OR 1=1" nie.
-function parsujIds(v) {
-  if (!Array.isArray(v) || v.length > 5000) return null;
-  const ids = v.map((x) => Number(x));
-  return ids.every((n) => Number.isInteger(n) && n > 0) ? [...new Set(ids)] : null;
-}
-// Księga, w której wpis wyląduje: z propozycji, a gdy ta księgi nie zmienia — obecna księga wpisu.
-const docelowaKsiega = (p) => Number(p.to_ledger_id || p.ledger_id);
-// Suma kwot w groszach — przez parseKwota, bo SUM(amount) wraca z MySQL jako NAPIS.
-const groszeZ = (suma) => Math.round((parseKwota(suma) || 0) * 100);
-
-// K8: nowy cel musi istnieć, być AKTYWNY i leżeć w księdze, w której wpis wyląduje.
-// Kategoria z cudzej księgi to ten sam błąd, który w Historii pokazywał „—" zamiast nazwy.
-function bladRetarget(props, cel) {
-  if (!props.length) return 'nothing_to_update';
-  if (!cel) return 'category_not_found';
-  if (!Number(cel.active)) return 'category_archived';
-  if (props.some((p) => docelowaKsiega(p) !== Number(cel.ledger_id))) return 'category_other_ledger';
-  return null;
-}
+// Propozycja opisuje wpis w miejscu, w którym leżał przy jej powstaniu. Jeśli wpis został
+// od tamtej pory ręcznie przeniesiony, para (obecna → proponowana) z nagłówka grupy KŁAMIE,
+// a licznik „do przydziału" liczy wpis dwa razy (stara propozycja + nowa z kolejnego
+// przebiegu). Dlatego wszędzie liczą się WYŁĄCZNIE propozycje zgodne z faktem.
+const AKTUALNE = "p.status = 'NOWA' AND t.deleted_at IS NULL AND (t.category_id <=> p.from_category_id)";
 
 // Księgi, których dotyczy żądanie: zasięg roli przecięty z opcjonalnym ?ledger=. null = błąd.
 // Pusty zasięg też jest błędem — nie budujemy „IN ()", które i tak wywala składnię SQL.
@@ -56,7 +37,7 @@ function ksiegi(req) {
   const n = Number(p);
   return dozwolone.includes(n) ? [n] : null;
 }
-const lista = (ids) => ids.join(',');   // ids są już zwalidowane jako liczby całkowite
+const lista = (ids) => ids.map(Number).join(',');   // ids są już zwalidowane jako liczby całkowite
 
 // Ścieżki kategorii („Dom i media > Czynsz") jednym zapytaniem — zamiast dokładania JOIN-ów
 // po rodzicach do każdego zapytania grupującego.
@@ -85,18 +66,22 @@ router.get('/', async (req, res, next) => {
     if (!led) return res.status(400).json({ error: 'bad_ledger' });
     const rows = await q(
       // MIN po ENUM-ie liczy się po pozycji w typie, więc `to_type` bierzemy jako tekst.
-      // Grupa może mieć różne tagi (A30: tag z miesiąca wpisu) — wtedy nie pokazujemy
-      // żadnego, żeby nagłówek nie obiecywał jednego tagu dla wszystkich wpisów.
+      // Grupa może być MIESZANA (różne reguły, księgi, typy, tagi — np. A30 nadaje tag
+      // z miesiąca wpisu). MIN pomija NULL-e, więc bez licznika różnorodności nagłówek
+      // pokazywał pigułkę „→ księga PERSEVERA" dla wpisów, które zostają w RODZINIE.
+      // COALESCE w COUNT(DISTINCT …) jest konieczne: samo COUNT(DISTINCT) nie liczy NULL-i.
       `SELECT p.from_category_id f, p.to_category_id t2, MIN(p.rule_id) rule_id,
               MIN(p.to_ledger_id) to_ledger_id, MIN(CAST(p.to_type AS CHAR)) to_type, MIN(p.tag) tag,
-              COUNT(DISTINCT p.tag) tagow, COUNT(DISTINCT p.to_type) typow,
+              COUNT(DISTINCT p.rule_id) regul, COUNT(DISTINCT COALESCE(p.to_ledger_id, 0)) ksiag,
+              COUNT(DISTINCT COALESCE(p.tag, '')) tagow, COUNT(DISTINCT COALESCE(CAST(p.to_type AS CHAR), '')) typow,
               COUNT(*) n, SUM(t.amount) suma,
               SUBSTRING(GROUP_CONCAT(t.description ORDER BY t.tx_date DESC SEPARATOR ' § '), 1, 300) opisy
          FROM category_proposals p JOIN transactions t ON t.id = p.transaction_id
-        WHERE p.status = 'NOWA' AND t.ledger_id IN (${lista(led)})
+        WHERE ${AKTUALNE} AND t.ledger_id IN (${lista(led)})
         GROUP BY p.from_category_id, p.to_category_id
         ORDER BY n DESC, p.to_category_id`, {});
     const nazwy = await sciezki();
+    const jeden = (r, ile, v) => (Number(ile) > 1 ? null : v);
     const groups = rows.map((r) => ({
       key: kluczGrupy(r.f, r.t2),
       from_id: r.f == null ? null : Number(r.f),
@@ -105,32 +90,38 @@ router.get('/', async (req, res, next) => {
       to: nazwy.get(Number(r.t2)) || `kat. ${r.t2}`,
       n: Number(r.n),
       kwota: groszeZ(r.suma) / 100,
-      rule_id: r.rule_id,
-      to_ledger_id: r.to_ledger_id == null ? null : Number(r.to_ledger_id),
-      to_type: Number(r.typow) > 1 ? null : r.to_type,
-      tag: Number(r.tagow) > 1 ? null : r.tag,
+      rule_id: jeden(r, r.regul, r.rule_id),
+      regul: Number(r.regul),
+      to_ledger_id: r.to_ledger_id == null ? null : jeden(r, r.ksiag, Number(r.to_ledger_id)),
+      ksiag: Number(r.ksiag),
+      to_type: jeden(r, r.typow, r.to_type),
+      tag: jeden(r, r.tagow, r.tag),
       przyklady: String(r.opisy || '').split(' § ').filter(Boolean).slice(0, 3),
     }));
-    res.json({ groups, total: groups.reduce((s, g) => s + g.n, 0) });
+    res.json({ groups, total: groups.reduce((s, g) => s + g.n, 0), limit: LIMIT_WPISOW });
   } catch (e) { next(e); }
 });
 
-// GET /api/v1/proposals/:key/items — pełna lista wpisów jednej grupy (data, kwota, opis, kto).
+// GET /api/v1/proposals/:key/items — lista wpisów jednej grupy (data, kwota, opis, kto).
+// `total` obok `limit`: lista jest OBCIĘTA, a front musi napisać wprost „pokazano 500 z 700".
+// Bez tego Szymon przewijał 500 wpisów, uznawał że przejrzał wszystko i przyjmował grupę
+// razem z 200 wpisami, których nigdy nie widział.
 router.get('/:key/items', async (req, res, next) => {
   try {
     const led = ksiegi(req);
     if (!led) return res.status(400).json({ error: 'bad_ledger' });
     const g = parsujKlucz(req.params.key);
     if (!g) return res.status(400).json({ error: 'bad_group' });
+    const gdzie = `${AKTUALNE} AND p.to_category_id = :to AND (p.from_category_id <=> :from)
+          AND t.ledger_id IN (${lista(led)})`;
+    const zrodlo = 'FROM category_proposals p JOIN transactions t ON t.id = p.transaction_id';
     const rows = await q(
-      `SELECT p.id, p.rule_id, p.to_type, p.tag, t.id tx_id, t.tx_date, t.amount, t.type,
-              t.description, t.deleted_at, u.name user_name
-         FROM category_proposals p JOIN transactions t ON t.id = p.transaction_id
-         JOIN users u ON u.id = t.user_id
-        WHERE p.status = 'NOWA' AND p.to_category_id = :to AND (p.from_category_id <=> :from)
-          AND t.ledger_id IN (${lista(led)})
-        ORDER BY t.tx_date DESC, t.id DESC LIMIT ${LIMIT_WPISOW}`, g);
-    res.json({ items: rows, limit: LIMIT_WPISOW });
+      `SELECT p.id, p.rule_id, p.to_ledger_id, p.to_type, p.tag, t.id tx_id, t.tx_date, t.amount, t.type,
+              t.description, u.name user_name
+         ${zrodlo} JOIN users u ON u.id = t.user_id
+        WHERE ${gdzie} ORDER BY t.tx_date DESC, t.id DESC LIMIT ${LIMIT_WPISOW}`, g);
+    const [{ n }] = await q(`SELECT COUNT(*) n ${zrodlo} WHERE ${gdzie}`, g);
+    res.json({ items: rows, limit: LIMIT_WPISOW, total: Number(n) });
   } catch (e) { next(e); }
 });
 
@@ -148,50 +139,56 @@ async function idsZadania(req) {
   if (!g) return { error: 'bad_group' };
   const rows = await q(
     `SELECT p.id FROM category_proposals p JOIN transactions t ON t.id = p.transaction_id
-      WHERE p.status = 'NOWA' AND p.to_category_id = :to AND (p.from_category_id <=> :from)
+      WHERE ${AKTUALNE} AND p.to_category_id = :to AND (p.from_category_id <=> :from)
         AND t.ledger_id IN (${lista(led)})`, g);
   return { ids: rows.map((r) => Number(r.id)) };
 }
 
-// Wpisy o tym samym celu idą jednym UPDATE-em. `tag: null` w propozycji = bez zmiany tagu,
-// więc bierzemy tag, który wpis ma dziś (nie czyścimy go po cichu).
-function grupujCele(nowe) {
-  const grupy = new Map();
-  for (const p of nowe) {
-    const cel = { c: Number(p.to_category_id), l: docelowaKsiega(p), t: p.to_type || p.type,
-      g: p.tag == null ? (p.tx_tag == null ? null : p.tx_tag) : p.tag };
-    const k = `${cel.c}|${cel.l}|${cel.t}|${cel.g == null ? '' : cel.g}`;
-    if (!grupy.has(k)) grupy.set(k, { ...cel, ids: [] });
-    grupy.get(k).ids.push(Number(p.transaction_id));
-  }
-  return grupy;
-}
-
-// Migawka dotkniętych wpisów: ile ich jest i ile łącznie kosztują (w groszach).
-async function migawka(conn, txIds) {
-  const [[r]] = await conn.query('SELECT COUNT(*) n, SUM(amount) suma FROM transactions WHERE id IN (?)', [txIds]);
-  return { n: Number(r.n), gr: groszeZ(r.suma) };
-}
+// Zakleszczenie/timeout blokady = ktoś (drugie okno, skrypt) rusza te same wiersze w tej samej
+// chwili. To nie awaria: 409 „busy" i powtórz, dokładnie jak w categories.js. Surowy komunikat
+// MySQL-a w 500 nic Szymonowi nie mówi.
+const zajete = (e) => e && (e.code === 'ER_LOCK_DEADLOCK' || e.code === 'ER_LOCK_WAIT_TIMEOUT');
 
 // K7: przyjęcie propozycji. JEDNA transakcja SQL, wiersze zablokowane przed walidacją.
-// Bramka: liczba wpisów i suma kwot dotkniętych transakcji przed i po MUSZĄ być identyczne —
-// przydział zmienia kategorię, księgę, typ i tag, a nigdy kwotę, datę ani liczbę wpisów.
-// Ponowne przyjęcie tej samej grupy nic nie robi (statusy nie są już NOWA).
-// `zrodlo` to pula połączeń — podstawiana wyłącznie w testach (scripts/test-reorganize-scen.js).
+// Pomijamy propozycje: już rozstrzygnięte (idempotencja), NIEAKTUALNE (wpis przeniesiony
+// ręcznie w Historii — przyjęcie cofałoby decyzję Szymona bez śladu) oraz wpisy z Kosza.
+// Bramka: kubełki księga × typ na dotkniętych wpisach muszą się zmienić DOKŁADNIE tak, jak
+// wynika z przyjmowanych propozycji, a kwota i data żadnego wpisu w ogóle. Inaczej ROLLBACK.
+// `zrodlo` to pula połączeń — podstawiana wyłącznie w testach (scripts/test-reorganize-prop.js).
 async function przyjmij(ids, uid, zrodlo = pool) {
   if (!ids.length) return { status: 200, body: { ok: true, przyjete: 0, pominiete: 0 } };
   const conn = await zrodlo.getConnection();
   try {
     await conn.beginTransaction();
     const [props] = await conn.query(
-      `SELECT p.id, p.transaction_id, p.status, p.to_category_id, p.to_ledger_id, p.to_type, p.tag,
-              t.ledger_id, t.type, t.tag tx_tag
+      `SELECT p.id, p.transaction_id, p.status, p.from_category_id, p.to_category_id, p.to_ledger_id,
+              p.to_type, p.tag, t.category_id, t.ledger_id, t.type, t.tag tx_tag, t.amount, t.tx_date,
+              t.deleted_at
          FROM category_proposals p JOIN transactions t ON t.id = p.transaction_id
         WHERE p.id IN (?) FOR UPDATE`, [ids]);
-    const nowe = props.filter((p) => p.status === 'NOWA');
+    const otwarte = props.filter((p) => p.status === 'NOWA');
+    const duble = dubleWpisow(otwarte);
+    if (duble.length) {
+      await conn.rollback();
+      return { status: 400, body: { error: 'sprzeczne_propozycje', transactions: duble.slice(0, 20) } };
+    }
+    const stare = otwarte.filter((p) => nieaktualna(p));
+    const kosz = otwarte.filter((p) => !nieaktualna(p) && p.deleted_at != null);
+    const nowe = otwarte.filter((p) => !nieaktualna(p) && p.deleted_at == null);
+    // Propozycja zdezaktualizowana (wpis przeniesiony ręcznie w Historii) dostaje własny
+    // status z migracji 009 i datę, ale BEZ `decided_by` — to nie jest decyzja człowieka.
+    // Gdyby wpaść tu na „ODRZUCONA", ślad kłamałby, że Szymon powiedział „nie".
+    if (stare.length) {
+      await conn.query("UPDATE category_proposals SET status='NIEAKTUALNA', decided_at=NOW() WHERE id IN (?) AND status='NOWA'",
+        [stare.map((p) => Number(p.id))]);
+    }
+    const pominiete = props.length - nowe.length;
+    const raport = { pominiete, nieaktualne: stare.length, w_koszu: kosz.length };
     if (!nowe.length) {
-      await conn.rollback();   // nie ma czego zapisać — idempotencja, nie błąd
-      return { status: 200, body: { ok: true, przyjete: 0, pominiete: props.length } };
+      // Nie ma czego przepiąć — idempotencja, nie błąd. COMMIT tylko wtedy, gdy jest co
+      // utrwalić (znaczniki nieaktualnych); inaczej żądanie nie zostawia w bazie śladu.
+      if (stare.length) await conn.commit(); else await conn.rollback();
+      return { status: 200, body: { ok: true, przyjete: 0, ...raport } };
     }
     // Kategoria docelowa musi należeć do księgi, w której wpis wyląduje (kategoriaWKsiedze
     // z transactions.js). Inaczej wpis miałby kategorię cudzej księgi i znikał z raportów.
@@ -204,31 +201,33 @@ async function przyjmij(ids, uid, zrodlo = pool) {
         await conn.rollback();
         return { status: 400, body: { error: 'bad_category', proposal: Number(p.id) } };
       }
+      // Cel w archiwum = właściciel schował tę kategorię ręcznie. Dawniej accept po cichu
+      // podnosił jej `active` z powrotem, czyli odwracał jego decyzję — a `retarget` ten sam
+      // cel odrzucał jako `category_archived`. Jedna reguła: ODMAWIAMY, nie przywracamy.
+      if (!Number(c.active)) {
+        await conn.rollback();
+        return { status: 400, body: { error: 'category_archived', proposal: Number(p.id), category: Number(c.id) } };
+      }
     }
     const txIds = [...new Set(nowe.map((p) => Number(p.transaction_id)))];
-    const przed = await migawka(conn, txIds);
     for (const g of grupujCele(nowe).values()) {
       await conn.query('UPDATE transactions SET category_id=?, ledger_id=?, type=?, tag=? WHERE id IN (?)',
         [g.c, g.l, g.t, g.g, g.ids]);
     }
-    // Kategoria, do której NAPRAWDĘ trafiły wpisy, nie może zostać w archiwum — inaczej wpis
-    // wisi na active=0 i wypada z list wyboru. Skrypt niczego nie archiwizuje, ale właściciel
-    // mógł schować cel ręcznie między przebiegiem a przyjęciem.
-    const uspione = [...byId.values()].filter((c) => !Number(c.active)).map((c) => Number(c.id));
-    if (uspione.length) await conn.query('UPDATE categories SET active=1 WHERE id IN (?)', [uspione]);
     await conn.query(
       "UPDATE category_proposals SET status='PRZYJETA', decided_by=?, decided_at=NOW() WHERE id IN (?) AND status='NOWA'",
       [uid, nowe.map((p) => Number(p.id))]);
-    const po = await migawka(conn, txIds);
-    if (przed.n !== po.n || przed.gr !== po.gr) {
+    const [po] = await conn.query('SELECT id, ledger_id, type, amount, tx_date FROM transactions WHERE id IN (?)', [txIds]);
+    const zle = [...rozbieznosci(kubelki(nowe), kubelki(po), oczekiwanaDelta(nowe)), ...tkniete(nowe, po)];
+    if (zle.length) {
       await conn.rollback();
-      return { status: 500, body: { error: 'ksiega_sie_nie_zgadza', przed, po } };
+      return { status: 500, body: { error: 'ksiega_sie_nie_zgadza', rozbieznosci: zle.slice(0, 5) } };
     }
     await conn.commit();
-    return { status: 200, body: { ok: true, przyjete: nowe.length, pominiete: props.length - nowe.length,
-      przywrocone_kategorie: uspione.length } };
+    return { status: 200, body: { ok: true, przyjete: nowe.length, ...raport } };
   } catch (e) {
     await conn.rollback();
+    if (zajete(e)) return { status: 409, body: { error: 'busy' } };
     throw e;
   } finally { conn.release(); }
 }
@@ -264,31 +263,34 @@ router.post('/retarget', async (req, res, next) => {
     const cel = Number((req.body || {}).to_category_id);
     if (!Number.isInteger(cel) || cel <= 0) return res.status(400).json({ error: 'bad_category' });
     if (!z.ids.length) return res.status(400).json({ error: 'nothing_to_update' });
-    const props = await q('SELECT p.id, p.to_ledger_id, t.ledger_id FROM category_proposals p'
-      + ' JOIN transactions t ON t.id = p.transaction_id'
-      + ` WHERE p.id IN (${lista(z.ids)}) AND p.status = 'NOWA'`, {});
+    const props = await q('SELECT p.id, p.transaction_id, p.to_ledger_id, t.ledger_id FROM category_proposals p'
+      + ` JOIN transactions t ON t.id = p.transaction_id WHERE p.id IN (${lista(z.ids)}) AND ${AKTUALNE}`, {});
     const [k] = await q('SELECT id, ledger_id, active FROM categories WHERE id = :id', { id: cel });
     const blad = bladRetarget(props, k);
-    if (blad) return res.status(400).json({ error: blad });
+    if (blad) return res.status(400).json(blad);
     const ids = props.map((p) => Number(p.id));
+    // uq_prop (transaction_id, to_category_id): dla któregoś wpisu taka propozycja już jest —
+    // być może ODRZUCONA. Nadpisanie jej po cichu skasowałoby decyzję „nie". Mówimy KTÓRY
+    // wpis blokuje, bo 409 na całą grupę bez wskazania winnego nie da się rozplątać w UI.
+    const kol = await q('SELECT id, transaction_id FROM category_proposals WHERE to_category_id = :cel'
+      + ` AND transaction_id IN (${lista(props.map((p) => p.transaction_id))}) AND id NOT IN (${lista(ids)})`, { cel });
+    if (kol.length) {
+      return res.status(409).json({ error: 'proposal_exists', transaction: Number(kol[0].transaction_id),
+        proposal: Number(kol[0].id), ile: kol.length });
+    }
     const r = await q(`UPDATE category_proposals SET to_category_id = :cel WHERE id IN (${lista(ids)}) AND status = 'NOWA'`,
       { cel });
     res.json({ ok: true, przestawione: r.affectedRows, to_category_id: cel });
   } catch (e) {
-    // uq_prop (transaction_id, to_category_id): dla tego wpisu taka propozycja już jest —
-    // być może ODRZUCONA. Nadpisanie jej po cichu skasowałoby decyzję „nie".
     if (e && e.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'proposal_exists' });
+    if (zajete(e)) return res.status(409).json({ error: 'busy' });
     next(e);
   }
 });
 
 module.exports = router;
-// eksport dla scripts/test-reorganize-scen.js (testy bez bazy i bez HTTP)
-module.exports.kluczGrupy = kluczGrupy;
-module.exports.parsujKlucz = parsujKlucz;
-module.exports.parsujIds = parsujIds;
-module.exports.bladRetarget = bladRetarget;
-module.exports.docelowaKsiega = docelowaKsiega;
-module.exports.groszeZ = groszeZ;
-module.exports.grupujCele = grupujCele;
+// eksport dla scripts/test-reorganize-prop.js (testy bez bazy i bez HTTP). Czyste pomocniki
+// mieszkają w src/proposals-core.js — tam też są testowane.
 module.exports.przyjmij = przyjmij;
+module.exports.AKTUALNE = AKTUALNE;
+module.exports.LIMIT_WPISOW = LIMIT_WPISOW;
