@@ -235,9 +235,10 @@
       <!-- JEDEN przebieg displacement. Rozdzielanie kanałów RGB (aberracja) dawało
            tęczowe łuki odklejone od koła na iOS i potrajało koszt filtra — usunięte
            2026-07-25 po nagraniach produkcji. Czystość rantu robi mapa: przesunięcie
-           wygasa do zera przy krawędzi (glass-mapa.js), więc nic nie wyjeżdża poza obrys. -->
+           wygasa do zera przy krawędzi (glass-mapa.js), więc nic nie wyjeżdża poza obrys.
+           scale nadpisuje installLensMap() — odwrócony obraz wymaga offsetów > promień. -->
       <feImage id="fin-refract-map" preserveAspectRatio="none" result="lensmap"/>
-      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="84" xChannelSelector="R" yChannelSelector="G"/>
+      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="441" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
   </defs>
 </svg>

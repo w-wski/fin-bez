@@ -72,7 +72,9 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 .login__title, .login__sub { margin: 0; text-wrap: balance; }
 .login__title {
   opacity: var(--dest-a);
-  transform: translateY(calc((1 - var(--dest-s)) * 18vh));
+  /* 30vh poślizgu: tytuł rodzi się NISKO, pod wielką soczewką (bramka w glass.js),
+     i wynurza się spod jej dolnej krawędzi przez całą wspinaczkę. */
+  transform: translateY(calc((1 - var(--dest-s)) * 30vh));
 }
 .login__sub {
   opacity: var(--cta-a);
@@ -241,23 +243,30 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   pointer-events: none;
   background:
     /* mleczna matowość jak kamyk Wabi — STATYCZNA warstwa zamiast backdrop-filter:
-       drugi filtr liczony co klatkę dławił iOS, wrażenie frostu daje półmleko */
-    radial-gradient(closest-side, color-mix(in oklch, var(--surface) 34%, transparent) 0 58%, transparent 80%),
+       drugi filtr liczony co klatkę dławił iOS, wrażenie frostu daje półmleko.
+       Ścieniona (34%→20%), żeby ODWRÓCONY obraz pod taflą był wyraźny. */
+    radial-gradient(closest-side, color-mix(in oklch, var(--surface) 20%, transparent) 0 58%, transparent 80%),
     /* rozświetlenie u góry (źródło światła) */
     radial-gradient(115% 95% at 50% 14%, var(--glass-hi), transparent 54%),
     /* „horyzont" — łuk załamanego tła u dołu */
     radial-gradient(145% 82% at 50% 126%, var(--glass-horizon) 0 36%, transparent 62%),
-    /* pierścień gęstniejący ku rantowi — sylwetka bez zamglenia środka */
+    /* pierścień gęstniejący ku rantowi — sylwetka bez zamglenia środka;
+       domieszka --fg odcina szkło także od JASNEGO tła (uwaga Szymona 07-25 nocą) */
+    radial-gradient(closest-side, transparent 58%,
+      color-mix(in oklch, var(--fg) 6%, transparent) 84%,
+      color-mix(in oklch, var(--fg) 16%, transparent) 96%, transparent 100%),
     radial-gradient(closest-side, transparent 56%, var(--glass-tint) 84%, transparent 100%);
   /* Stałe grubości zamiast dzielenia przez --ls: pięć calc()/var() w box-shadow
      przeliczało się co klatkę gestu (zacinanie). Rant skaluje się razem ze szkłem —
      grubszy przy dużej bańce, cieńszy przy kamyku — i tak zachowuje się prawdziwe szkło. */
   box-shadow:
-    inset 0 0 0 1.5px var(--glass-rim),
+    inset 0 0 0 2px var(--glass-rim),
+    inset 0 0 0 3.5px color-mix(in oklch, var(--fg) 14%, transparent),
     inset 0 3px 12px -5px var(--glass-hi),
     inset 0 0 34px -14px var(--glass-edge),
     inset 0 -20px 30px -24px var(--glass-horizon),
-    0 18px 42px -16px var(--glass-shadow);
+    0 22px 48px -16px var(--glass-shadow),
+    0 4px 14px -6px var(--glass-shadow);
 }
 
 /* Kaustyka: indygowy łuk skupionego światła na DOLNYM obwodzie, ~140°, wyłącznie w ruchu.

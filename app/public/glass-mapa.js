@@ -10,10 +10,17 @@ export const RELEASE_THRESHOLD = 0.4;       // powyżej — dobiega do 1, poniż
 
 /* ---------- 1. Mapa przemieszczenia (generowana RAZ) ---------- */
 
-/** Profil sferyczny: R = przesunięcie X, G = przesunięcie Y, 128 = zero.
- *  Alfa zawsze 255 — filtry SVG liczą na kanałach premultiplikowanych, więc alfa 0
- *  wyzerowałaby R/G i dała gigantyczne przesunięcie zamiast żadnego. Koło wycina
- *  border-radius soczewki, nie mapa. */
+/** Profil PRAWDZIWEJ wypukłej soczewki (Szymon 07-25 nocą): obraz ODWRÓCONY —
+ *  próbkujemy ZA środkiem (offset > r), więc to, co jest pod soczewką na dole,
+ *  widać u góry tafli, i odwrotnie. M(r) = powiększenie odwróconego obrazu:
+ *  większe w środku (mocna wypukłość), mniejsze przy rancie — daje bańkę.
+ *  R = przesunięcie X, G = przesunięcie Y, 128 = zero. Alfa zawsze 255 — filtry
+ *  SVG liczą na kanałach premultiplikowanych, alfa 0 dałaby ogromny skok zamiast
+ *  zera. Koło wycina border-radius soczewki, nie mapa. */
+const M_CENTER = 2.3;                // powiększenie odwróconego obrazu w środku
+const M_EDGE = 1.4;                  // …i przy rancie
+export const MAP_OMAX = 1 + 1 / M_EDGE; // maks. offset (w jednostkach promienia) — do atrybutu scale
+
 export function buildLensMap(size = MAP_SIZE) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
@@ -32,18 +39,15 @@ export function buildLensMap(size = MAP_SIZE) {
       let oy = 0;
 
       if (r <= 1) {
-        // Powiększenie liniowe + beczka; przy rancie przesunięcie WYGASA do zera —
-        // stąd czysty obrys koła: piksel na krawędzi zostaje na miejscu, więc żaden
-        // fragment obrazu (ani refleks) nie może „wyjechać" poza soczewkę.
-        // (Poprzedni wariant robił odwrotnie — wzmacniał przesunięcie na rancie —
-        // i to była ta odklejona obwódka z nagrań produkcji.)
-        const lens = r * 0.55;                                    // równomierne powiększenie
-        const barrel = Math.pow(r, 2.6) * 0.20;                   // beczka: proste linie w łuk
-        const fade = r < 0.90 ? 1 : Math.max(0, 1 - (r - 0.90) / 0.10);
-        const mag = Math.min(1, lens + barrel) * fade * fade;
+        // Piksel tafli w promieniu r pokazuje źródło w -r/M(r) (odwrócenie przez środek).
+        // Przy rancie przesunięcie WYGASA do zera — czysty obrys koła: skrajny piksel
+        // zostaje na miejscu, nic (ani refleks) nie wyjeżdża poza soczewkę.
+        const M = M_CENTER - (M_CENTER - M_EDGE) * r * r;
+        const f = r < 0.94 ? 1 : Math.max(0, 1 - (r - 0.94) / 0.06);
+        const mag = r * (1 + 1 / M) * f * f;
         const inv = r > 1e-6 ? 1 / r : 0;
-        ox = -dx * inv * mag;                                     // próbkujemy bliżej środka => powiększenie
-        oy = -dy * inv * mag;
+        ox = -dx * inv * mag / MAP_OMAX;   // normalizacja do [-1,1]; skalę oddaje atrybut scale
+        oy = -dy * inv * mag / MAP_OMAX;
       }
 
       px[i] = Math.round(128 + ox * 127);
@@ -63,6 +67,10 @@ export function installLensMap() {
   const url = buildLensMap();
   node.setAttribute('href', url);
   node.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); // starsze WebKit
+  // scale tak, by pełny offset mapy = MAP_OMAX promieni w px: D = scale·(C−0,5),
+  // C koduje ox·127/255 → scale = OMAX·R·255/127. Nadal JEDEN przebieg — koszt bez zmian.
+  const disp = document.querySelector('#fin-refract feDisplacementMap');
+  if (disp) disp.setAttribute('scale', String(Math.round(MAP_OMAX * (LENS_BASE / 2) * 255 / 127)));
   return true;
 }
 
@@ -79,19 +87,20 @@ export function installLensMap() {
  *  pojawiają się dopiero, gdy tytuł osiądzie (`cta`). W dół — wszystko wstecz. */
 export const KEYFRAMES = [
   { p: 0.00, cx: 0.5, cy: 1.08, s: 1.85, hero: 1, dest: 0, dsl: 0, cta: 0 },
-  { p: 0.36, cx: 0.5, cy: 0.80, s: 1.32, hero: 0.5, dest: 0, dsl: 0, cta: 0 },
-  // Okno narodzin tytułu (.50→.58): tytuł jest wtedy jeszcze ~16vh poniżej celu,
-  // czyli DOKŁADNIE pod soczewką (cy .585→.545), a szkło ma ~250 px średnicy —
-  // słowo „Finansowa" rodzi się w całości pod taflą, zniekształcone. Dopiero potem
-  // soczewka wspina się na kotwicę, a tytuł jedzie wolniej za nią (dsl → 1).
-  // `dest` to tylko UZBROJENIE narodzin — o faktycznym zapaleniu tytułu decyduje
-  // bramka geometryczna w glass.js: cały prostokąt tytułu musi mieścić się w kole.
-  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.12, hero: 0, dest: 0, dsl: 0, cta: 0 },
-  { p: 0.58, cx: 0.5, cy: 0.545, s: 1.00, hero: 0, dest: 1, dsl: 0.10, cta: 0 },
-  { p: 0.82, anchor: true, s: 0.52, hero: 0, dest: 1, dsl: 0.66, cta: 0 },
+  // Narodziny tytułu przesunięte NISKO (07-25 nocą): soczewka i tytuł mijają się
+  // ok. p .3–.45, gdy szkło jest jeszcze WIELKIE i nisko — tam tytuł (30vh poślizgu,
+  // logowanie.css) mieści się w kole w całości i rodzi się pod taflą, odwrócony
+  // i powiększony przez mapę. Potem szkło ucieka w górę szybciej niż napis (dsl
+  // zostaje w tyle — „nie może mieć tej samej prędkości"), więc słowo wynurza się
+  // spod DOLNEJ krawędzi soczewki i jedzie na miejsce. `dest` tylko UZBRAJA
+  // narodziny — zapala je bramka geometryczna w glass.js (pełne zakrycie koła).
+  { p: 0.36, cx: 0.5, cy: 0.80, s: 1.32, hero: 0.5, dest: 1, dsl: 0.05, cta: 0 },
+  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.12, hero: 0, dest: 1, dsl: 0.22, cta: 0 },
+  { p: 0.58, cx: 0.5, cy: 0.545, s: 1.00, hero: 0, dest: 1, dsl: 0.35, cta: 0 },
+  { p: 0.82, anchor: true, s: 0.52, hero: 0, dest: 1, dsl: 0.78, cta: 0 },
   // cta = 0 aż do pełnego osadzenia: podtytuł i przyciski wchodzą DOPIERO, gdy
   // tytuł stoi, a soczewka siedzi na kotwicy (płynność robi transition w CSS).
-  { p: 0.985, anchor: true, s: 0.26, hero: 0, dest: 1, dsl: 0.985, cta: 0 },
+  { p: 0.985, anchor: true, s: 0.26, hero: 0, dest: 1, dsl: 0.97, cta: 0 },
   { p: 1.00, anchor: true, s: 0.25, hero: 0, dest: 1, dsl: 1, cta: 1 },
 ];
 

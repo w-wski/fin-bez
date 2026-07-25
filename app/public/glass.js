@@ -262,7 +262,7 @@ function boot() {
   const supported = installLensMap() && CSS.supports('filter', 'url(#fin-refract)');
   if (!supported) document.documentElement.classList.add('no-refract');
 
-  const stage = new LoginStage(root);
+  const stage = window.__finStage = new LoginStage(root); // ekspozycja: rig zrzutów steruje p
 
   // Emisja spoczynkowa: scena oddycha także, gdy nic się nie rusza (rzadsza niż w geście).
   setInterval(() => {
