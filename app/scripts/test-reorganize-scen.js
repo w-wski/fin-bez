@@ -1,10 +1,17 @@
 // Scenariusze z ODRZUCONYCH przebiegów reorganizacji (weryfikacja 2026-07-24) + idempotencja
-// (K2) + arytmetyka „Konta Bartusia" (K8, §7.5). Osobny plik, bo test-reorganize.js dobił do
-// limitu 300 linii z preflighta; uruchamiany z tamtego pliku, więc `npm test` zostaje bez zmian.
+// + arytmetyka „Konta Bartusia" (§7.5) + zlecenie Z5: rozdzielone „Inne" (K1), brak UPDATE na
+// transakcjach (K2) i propozycje wraz z ich idempotencją (K4, K5). Osobny plik, bo
+// test-reorganize.js dobił do limitu 300 linii z preflighta; uruchamiany z tamtego pliku,
+// więc `npm test` zostaje bez zmian w package.json.
 // Harness (t/old/tx/target/cats) dostajemy z pliku głównego — jeden licznik błędów, jeden przebieg.
 const assert = require('assert');
-const { RULES, ruleFor, kandydat, decyzja, planKategorii } = require('./reorganize-plan');
+const fs = require('fs');
+const path = require('path');
+const { RULES, TREE, F, P, ruleFor, kandydat, decyzja, planKategorii, propozycja } = require('./reorganize-plan');
 const { kubelBartusia, miesiaceBartusia } = require('../src/routes/reports');
+// Przyjęcie propozycji (K7) i walidacja celu (K8) — w pliku obok, żeby oba zmieściły się
+// w limicie 300 linii. Zwraca obietnicę: tamte testy są asynchroniczne (atrapa puli).
+const testyPropozycji = require('./test-reorganize-prop');
 
 module.exports = function scenariusze({ t, old, tx, target, cats }) {
   // Warianty planu kategorii dokładnie jak w kroku 3 wykonawcy (cel z syntetycznego drzewa).
@@ -128,4 +135,84 @@ module.exports = function scenariusze({ t, old, tx, target, cats }) {
     const [m] = miesiaceBartusia([R('PRZYCHÓD', 1, 0, 1, '150.00')]);
     assert.deepStrictEqual([m.kieszonkowe, m.wydatki, m.saldo], [150, 0, 150]);
   });
+
+  // ---------- Z5: „Inne" rozdzielone (K1) ----------
+  t('Z5/K1: każda księga ma osobne „Inne" (wydatki) i „Inne przychody"', () => {
+    for (const led of [F, P]) {
+      assert.ok('Inne' in TREE[led], 'brak „Inne" w księdze ' + led);
+      assert.ok('Inne przychody' in TREE[led], 'brak „Inne przychody" w księdze ' + led);
+    }
+    assert.strictEqual(RULES.find((r) => r.id === 'A29').to, 'Inne');
+    assert.strictEqual(RULES.find((r) => r.id === 'C8').to, 'Inne przychody');
+    assert.strictEqual(RULES.find((r) => r.id === 'CP4').to, 'Inne przychody');
+  });
+  t('Z5/K1: przychód nie wpada do „Inne" wydatkowego, a wydatek do przychodowego', () => {
+    const zle = RULES.filter((r) => (r.to === 'Inne' && r.flow === 'in')
+      || (r.to === 'Inne przychody' && r.flow === 'out')).map((r) => r.id);
+    assert.deepStrictEqual(zle, [], 'reguły mieszające oba „Inne": ' + zle.join(', '));
+    const c = old('Dom');
+    assert.strictEqual(ruleFor(tx('WYDATEK', c), c).to, 'Dom i media');
+    assert.strictEqual(ruleFor(tx('PRZYCHÓD', c), c).to, 'Inne przychody');
+  });
+
+  // ---------- Z5: skrypt tylko PROPONUJE (K2) ----------
+  const zrodlo = (...p) => fs.readFileSync(path.join(__dirname, ...p), 'utf8');
+  t('Z5/K2: skrypt reorganizacji nie ma ani jednego UPDATE/DELETE na transakcjach', () => {
+    for (const n of ['reorganize-categories.js', 'reorganize-plan.js', 'reorganize-raport.js']) {
+      assert.ok(!/UPDATE\s+transactions/i.test(zrodlo(n)), n + ': UPDATE na transakcjach');
+      assert.ok(!/DELETE\s+FROM\s+transactions/i.test(zrodlo(n)), n + ': DELETE na transakcjach');
+    }
+    assert.ok(/INSERT INTO category_proposals/.test(zrodlo('reorganize-categories.js')),
+      'skrypt nie zapisuje propozycji');
+  });
+  t('Z5/K2: transakcje przepina WYŁĄCZNIE przyjęcie propozycji, zawsze z WHERE', () => {
+    const src = zrodlo('..', 'src', 'routes', 'proposals.js');
+    const zapisy = src.match(/UPDATE transactions[^\n]*/g) || [];
+    assert.strictEqual(zapisy.length, 1, 'liczba UPDATE-ów na transakcjach: ' + zapisy.length);
+    assert.ok(/WHERE id IN \(\?\)/.test(zapisy[0]), 'UPDATE bez WHERE: ' + zapisy[0]);
+    assert.ok(!/DELETE\s+FROM/i.test(src), 'trasa propozycji nic nie kasuje');
+  });
+
+  // ---------- Z5: propozycje i ich idempotencja (K4, K5) ----------
+  const cel = (to, l) => target({ to, l });
+  const prop = (typ, stara, opis, istniejace) => {
+    const c = old(stara);
+    return propozycja(tx(typ, c, opis), c, warianty(c), cel, istniejace || new Set());
+  };
+  t('Z5/K5: propozycja niesie cel, wiersz reguły i pochodzenie wpisu', () => {
+    const p = prop('WYDATEK', '1000 Czynsz');
+    assert.strictEqual(p.rule_id, 'A3');
+    assert.strictEqual(p.to_category_id, cel('Dom i media>Czynsz', 1).id);
+    assert.strictEqual(p.from_category_id, old('1000 Czynsz').id);
+    assert.deepStrictEqual([p.to_ledger_id, p.to_type, p.tag], [null, null, null]);
+  });
+  t('Z5/K5: propozycja niesie księgę (D2), typ (B4) i tag (A30), gdy reguła je zmienia', () => {
+    assert.strictEqual(prop('WYDATEK', 'PERSEVERA Paliwo').to_ledger_id, 2);
+    assert.strictEqual(prop('WYDATEK', 'Poduszka').to_type, 'TRANSFER');
+    assert.strictEqual(prop('WYDATEK', 'Wakacje > Nocleg').tag, 'wyjazd-2026-06');
+  });
+  t('Z5/K5: wpis bez reguły dla swojego przepływu NIE dostaje propozycji', () => {
+    assert.strictEqual(prop('WYDATEK', 'PZU', 'składka OC'), null);
+    assert.strictEqual(prop('WYDATEK', 'Zwroty', 'zwrot za bilet'), null);
+  });
+  t('Z5/K5: propozycja po opisie jest oznaczona jako słabo umocowana (tryb reczna)', () => {
+    const p = prop('PRZYCHÓD', 'Zwrot', 'przelew od Kamila za czynsz');
+    assert.strictEqual(p.rule_id, 'C7');
+    assert.strictEqual(p.tryb, 'reczna');
+  });
+  t('Z5/K4: wpis leżący już w celu nie dostaje propozycji (2. i 3. przebieg)', () => {
+    for (const [typ, cel2] of [['PRZYCHÓD', 'Film'], ['TRANSFER', 'Cele>Poduszka'], ['WYDATEK', 'Dom i media>Czynsz']]) {
+      const k = cats.find((x) => x.id === cel('' + cel2, 1).id);
+      const p = propozycja(tx(typ, k), k, warianty(k), cel, new Set());
+      assert.ok(!p || p.nic, `${cel2} (${typ}) dostało propozycję: ` + JSON.stringify(p));
+    }
+  });
+  t('Z5/K4: propozycja raz ODRZUCONA nie wraca (para wpis+cel już w tabeli)', () => {
+    const docelu = cel('Dom i media>Czynsz', 1).id;
+    const p = prop('WYDATEK', '1000 Czynsz', '', new Set([`1|${docelu}`]));
+    assert.strictEqual(p.jest, true);
+    assert.strictEqual(p.to_category_id, docelu);   // ten sam cel, więc na pewno ta sama para
+  });
+
+  return testyPropozycji(t);
 };

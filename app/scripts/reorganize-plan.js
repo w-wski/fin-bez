@@ -24,14 +24,19 @@ const TREE = {
     'Spłaty': ['Kredyt Bank Handlowy', 'Raty Santander', 'SM Piast'],   // TRANSFER
     'Cele': ['Poduszka', 'Konto inwestycyjne', 'Działka', 'Oszczędności'], // TRANSFER
     'Film': [], 'Tantiemy': [], 'Zwroty': [], 'Alimenty': [], '800+': [], // przychody (C1–C8);
-    'PERSEVERA (wypłaty)': [], 'Najem (od Kamila)': [], 'Inne': [], // „Inne" wspólne z wydatkami
+    'PERSEVERA (wypłaty)': [], 'Najem (od Kamila)': [],
+    // K1: „Inne" ROZDZIELONE na wydatkowe i przychodowe. Kategoria w schemacie nie ma typu,
+    // a unikat nie dopuszcza dwóch korzeni o tej samej nazwie w jednej księdze — rozróżnienie
+    // idzie więc przez nazwę: A29 (wydatki) → „Inne", C8/CP4 (przychody) → „Inne przychody".
+    'Inne': [], 'Inne przychody': [],
   },
   [P]: {
     'Lokal': ['Czynsz', 'Woda', 'Ogrzewanie', 'Prąd'],
     'Samochód': ['Paliwo', 'Serwis/Naprawy', 'Ubezpieczenie'],
     'Działalność': ['Telefony', 'Hotele/Delegacje', 'Remonty', 'Usługi obce'],
     'Podatki i opłaty': ['CIT', 'ZUS', 'Księgowość'],
-    'PZU': [], 'Agencja': [], 'Szkolenia': [], 'Inne': [], // przychody spółki (CP1–CP4)
+    // przychody spółki (CP1–CP4) + „Inne" wydatkowe: rozdział jak w księdze rodziny (K1)
+    'PZU': [], 'Agencja': [], 'Szkolenia': [], 'Inne': [], 'Inne przychody': [],
   },
 };
 
@@ -114,11 +119,11 @@ const RULES = [
   R('C6', 'in', ['Dodatkowe > PERSEVERA', 'Dodatkowe', 'PERSEVERA', 'PERSEVERA (wypłaty)'], 'PERSEVERA (wypłaty)', { sl: F }),
   R('C7', 'in', '*', 'Najem (od Kamila)', { sl: F, d: '\\bkamil' }), // §7.3 — po opisie = ręcznie
   R('C7', 'in', 'Najem (od Kamila)', 'Najem (od Kamila)', { sl: F }),
-  R('C8', 'in', '*', 'Inne', { sl: F }),                            // sieroty przychodowe
+  R('C8', 'in', '*', 'Inne przychody', { sl: F }),                  // sieroty przychodowe (K1)
   R('CP1', 'in', 'PZU', 'PZU', { sl: P, l: P }),
   R('CP2', 'in', 'Agencja', 'Agencja', { sl: P, l: P }),
   R('CP3', 'in', 'Szkolenia', 'Szkolenia', { sl: P, l: P }),
-  R('CP4', 'in', '*', 'Inne', { sl: P, l: P }),
+  R('CP4', 'in', '*', 'Inne przychody', { sl: P, l: P }),           // K1
   // D1–D3 celowo BEZ `sl`: nazwa „PERSEVERA *" jest jednoznaczna i te same kategorie mogą
   // wisieć zarówno w RODZINIE (wpisy Szymona), jak i w księdze spółki (wpisy usera PERSEVERA).
   // Każda występuje w dwóch kształtach: korzeń „PERSEVERA Telefony" i gałąź „PERSEVERA > Telefony"
@@ -220,11 +225,13 @@ const planKategorii = (cat) => ['out', 'in'].map((flow) => { const r = ruleForCa
 // Czy reguła wskazuje kategorię, w której wpis już leży (nie ma czego rozstrzygać)?
 const celem = (r, cat) => !!cat && !!r.to && r.l === cat.ledger_id && norm(r.to) === norm(cat.path || cat.name);
 
-// JEDNO miejsce decyzji o wpisie — wspólne dla wykonawcy i testów:
-//  • 'reczna' — wpis idzie WYŁĄCZNIE na listę do rozstrzygnięcia i zostaje NIETKNIĘTY
-//    (raport obiecywał to od początku, a łapacz C8 i tak zabierał np. alimenty do „Inne");
-//  • 'automat' — UPDATE wg reguły (dziedziczony = plan kategorii, nie własna reguła wpisu);
-//  • null — żadna reguła nie dotyczy tego przepływu: wpis zostaje na miejscu.
+// JEDNO miejsce decyzji o wpisie — wspólne dla wykonawcy i testów. Po decyzji Szymona
+// (2026-07-24) ŻADEN tryb nie przepina transakcji: oba kończą się propozycją w
+// `category_proposals`, a przydział wybiera człowiek w karcie „Przydział".
+//  • 'reczna' — podstawą jest OPIS wpisu (albo jawne `m`), więc propozycja jest słabiej
+//    umocowana i raport wypisuje ją osobno (dawniej: „lista do rozstrzygnięcia");
+//  • 'automat' — reguła nazwowa (dziedziczona = plan kategorii, nie własna reguła wpisu);
+//  • null — żadna reguła nie dotyczy tego przepływu: wpis nie dostaje propozycji (K5).
 function decyzja(tx, cat, warianty) {
   const k = kandydat(tx, cat);
   if (k && k.to && !celem(k, cat)) return { tryb: 'reczna', r: k };
@@ -232,6 +239,28 @@ function decyzja(tx, cat, warianty) {
   if (r) return { tryb: 'automat', r };
   const v = (warianty || []).find((x) => x.flow === flowOf(tx));
   return v ? { tryb: 'automat', r: v.r, dst: v.dst, dziedziczony: true } : null;
+}
+
+// Wiersz propozycji dla wpisu — CZYSTA zamiana decyzji na rekord `category_proposals`.
+// `cel(to, ledger)` podaje kategorię docelową ({id, ledger_id}): w skrypcie z bazy, w testach
+// z syntetycznego drzewa. `istniejace` to zbiór kluczy „txId|catId" propozycji, które już są
+// w tabeli — także ODRZUCONYCH, bo decyzja „nie" jest trwała (K4).
+// Zwraca: null (brak reguły dla przepływu) · {nic:true} (nie ma czego proponować — wpis leży
+// już w celu albo reguła nie ma celu, np. B8) · {jest:true, …} (taka propozycja już istnieje)
+// · wiersz do zapisu. Kwoty i daty nie występują — propozycja ich nie dotyka.
+function propozycja(tx, cat, warianty, cel, istniejace) {
+  const d = decyzja(tx, cat, warianty);
+  if (!d) return null;
+  const dst = d.dst || (d.r.to ? cel(d.r.to, d.r.l) : null);
+  if (!dst) return { nic: true, r: d.r };
+  const led = dst.ledger_id !== tx.ledger_id ? dst.ledger_id : null;   // null = bez zmiany księgi
+  const typ = d.r.t && d.r.t !== tx.type ? d.r.t : null;               // null = bez zmiany typu
+  const tg = d.r.tag ? monthTag(tx.tx_date) : null;
+  const tag = tg != null && tg !== tx.tag ? tg : null;
+  if (dst.id === tx.category_id && led == null && typ == null && tag == null) return { nic: true, r: d.r };
+  const row = { transaction_id: tx.id, from_category_id: tx.category_id || null, to_category_id: dst.id,
+    to_ledger_id: led, to_type: typ, tag, rule_id: d.r.id, tryb: d.tryb, r: d.r };
+  return istniejace && istniejace.has(`${tx.id}|${dst.id}`) ? { ...row, jest: true } : row;
 }
 
 // --- bramka księgowa: kubełki księga × typ × (żywe/kosz) ---
@@ -244,4 +273,5 @@ const kubel = (led, typ, usuniety) => `${led}|${typ}|${usuniety ? 0 : 1}`;
 const przesun = (m, k, n, gr) => { const v = m.get(k) || { n: 0, gr: 0 }; m.set(k, { n: v.n + n, gr: v.gr + gr }); };
 
 module.exports = { F, P, TREE, RULES, ORDERED, zwin, norm, pathOf, monthTag, hits, ruleFor, kandydat, ruleForCat,
-  RECZNA, PRIO, flowOf, wDrzewie, sierota, planKategorii, celem, decyzja, grosze, zlot, kubel, przesun };
+  RECZNA, PRIO, flowOf, wDrzewie, sierota, planKategorii, celem, decyzja, propozycja,
+  grosze, zlot, kubel, przesun };
