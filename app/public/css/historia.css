@@ -27,13 +27,15 @@
   #txTable { font-size: 1rem; }
   #txTable, #txTable tbody, #txTable tr { display: block; width: 100%; }
   #txTable thead { display: none; }
-  #txTable tr { background: var(--card); border: 1px solid var(--line); border-radius: .6rem;
-    padding: .5rem .7rem; margin: .6rem 0; }
+  #txTable tr { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: var(--space-3) var(--space-4); margin: var(--space-3) 0;
+    box-shadow: inset 0 1px 0 var(--glass-rim-a), 0 1px 2px -1px var(--glass-drop); }
   #txTable td { display: flex; gap: .8rem; justify-content: space-between; align-items: baseline;
     width: 100%; border: 0; padding: .15rem 0; }
   #txTable td::before { content: attr(data-label); flex: 0 0 5.5rem;
-    color: var(--muted); font-size: .85rem; }
-  #txTable td[data-label="Kwota"] { font-size: 1.3rem; font-weight: 600; }
+    color: var(--muted); font-size: var(--text-xs);
+    text-transform: uppercase; letter-spacing: .08em; }
+  #txTable td[data-label="Kwota"] { font-size: var(--text-md); font-weight: 600; font-variant-numeric: tabular-nums; }
   #txTable td[data-label="Opis"] { display: block; }
   #txTable td[data-label="Opis"]::before { display: block; }
   /* Pusta komórka znika razem z etykietą (wpis bez opisu nie dostaje pustej linii „Opis").

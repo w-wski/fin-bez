@@ -13,6 +13,11 @@
 
 #catAddBox:empty { display: none; }
 
+/* Formularz wjeżdża w trakcie wypełniania Wpisu — wejście miękkie, bez ruchu przy reduce. */
+@keyframes catadd-in { from { opacity: 0; transform: translateY(-6px); } }
+#catAddBox .catadd { animation: catadd-in var(--t-base) var(--ease-glass); }
+@media (prefers-reduced-motion: reduce) { #catAddBox .catadd { animation: none; } }
+
 #catAddBox .catadd {
   flex-wrap: wrap;
   align-items: center;
