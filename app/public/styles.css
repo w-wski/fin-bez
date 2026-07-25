@@ -4,11 +4,18 @@
    css/logowanie.css). Źródło prawdy designu: repo finansowe,
    docs/design/DESIGN-SPEC-GLASS.md. Komponenty nie znają wartości — tokeny.
    ========================================================================== */
-/* Typografia: JEDEN krój systemowy — na sprzęcie Apple SF Pro, dokładnie jak
-   w referencji Wabi. Hierarchię robi waga i wielkość (600/700 + tracking ujemny),
-   nie zmiana kroju. Instrument Serif wycofany decyzją Szymona (2026-07-25):
-   „czcionka i organizacja ma być bardziej Apple-like". Pliki fontów zostają
-   na dysku, ale nie są ładowane. */
+/* Typografia: JEDEN krój — SF Pro wszędzie. Sprzęt Apple bierze systemowy SF
+   (-apple-system stoi PIERWSZY w stacku, więc webfont się tam nawet nie pobiera);
+   Windows/Android/Linux dostają self-hostowane subsety woff2 (łacina+PL, 4 wagi,
+   ~55 KB każda). Pliki woff2 leżą WYŁĄCZNIE na serwerze produkcyjnym, poza gitem —
+   kroje są własnością Apple i nie podlegają redystrybucji w repo; wgrywa je Szymon
+   (RUNBOOK). Brak plików niczego nie psuje: font-display swap + fallback w stacku.
+   Wagi: 400/500/600 = SF Pro Text, 700 = SF Pro Display Bold (tytuły).
+   Instrument Serif wycofany z użycia. */
+@font-face { font-family: 'SF Pro'; src: url('fonts/sf-pro-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'SF Pro'; src: url('fonts/sf-pro-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'SF Pro'; src: url('fonts/sf-pro-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'SF Pro'; src: url('fonts/sf-pro-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 
 /* ---------- 1. Tokeny wspólne (motyw-niezależne) ---------- */
 :root {
@@ -17,7 +24,7 @@
 
   --r-sm: 8px; --r-md: 12px; --r-lg: 20px; --r-pill: 999px;
 
-  --font: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, "Segoe UI", Roboto, sans-serif;
   /* Display = ten sam krój, inna waga i tracking (tokeny niżej) — Apple-like, nie para krojów. */
   --font-display: var(--font);
   --track-display: -0.022em;
