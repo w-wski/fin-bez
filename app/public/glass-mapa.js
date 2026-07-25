@@ -68,47 +68,23 @@ export function installLensMap() {
 
 /* ---------- 2. Choreografia ---------- */
 
-/** Klatki kluczowe: cx/cy to ułamki viewportu, s — skala pudełka bazowego.
- *  Klatki specjalne rozwiązuje glass.js z żywego DOM: `anchor` = środek .login__mark,
- *  `heroc`/`textc` = środek bloku hero / tytułu, `cover:'hero'|'dest'` = skala,
- *  przy której soczewka ZAKRYWA cały dany blok tekstu.
+/** Klatki kluczowe: cx/cy to ułamki viewportu, s — skala pudełka bazowego;
+ *  `anchor` = środek .login__mark z żywego DOM.
  *
- *  Zasada „zero fade" (Szymon, referencja Wabi): napisy przełączają się TWARDO
- *  (klatki .50→.54 i .68→.72 leżą tuż obok siebie), ale zawsze pod taflą — stary
- *  napis znika, gdy soczewka go zakrywa, nowy rodzi się już zniekształcony pod
- *  szkłem, a odsłania go dopiero kurczenie się soczewki w drodze do kotwicy.
- *  W dół — ta sama droga wstecz: soczewka rośnie na wysokości tekstu i go „zjada".
- *  `cta` steruje osobno przyciskami na dole (te wolno wjeżdżają — nie są pod szkłem). */
+ *  Model z referencji Wabi (Szymon, 07-25 wieczór): soczewka NIE rośnie na
+ *  wysokości tekstu — to TYTUŁ wjeżdża od dołu (pole `dsl`: 0 = nisko, 1 = na
+ *  miejscu) i przechodzi przez szkło wolniej, niż jedzie soczewka; różnica
+ *  prędkości robi efekt „soczewka wynosi napis". Hero gaśnie slide+blur+fade
+ *  (jedna zmienna --hero-a napędza wszystkie trzy). Podtytuł i przyciski
+ *  pojawiają się dopiero, gdy tytuł osiądzie (`cta`). W dół — wszystko wstecz. */
 export const KEYFRAMES = [
-  { p: 0.00, cx: 0.5, cy: 1.08, s: 1.85, hero: 1, dest: 0, cta: 0 },
-  { p: 0.28, cx: 0.5, cy: 0.86, s: 1.80, hero: 1, dest: 0, cta: 0 },
-  { p: 0.50, heroc: true, cover: 'hero', hero: 1, dest: 0, cta: 0 },
-  { p: 0.54, heroc: true, cover: 'hero', hero: 0, dest: 0, cta: 0 },
-  { p: 0.68, textc: true, cover: 'dest', hero: 0, dest: 0, cta: 0.1 },
-  { p: 0.72, textc: true, cover: 'dest', hero: 0, dest: 1, cta: 0.35 },
-  { p: 1.00, anchor: true, s: 0.25, hero: 0, dest: 1, cta: 1 },
+  { p: 0.00, cx: 0.5, cy: 1.08, s: 1.85, hero: 1, dest: 0, dsl: 0, cta: 0 },
+  { p: 0.40, cx: 0.5, cy: 0.72, s: 1.02, hero: 0.45, dest: 0, dsl: 0, cta: 0 },
+  { p: 0.52, cx: 0.5, cy: 0.56, s: 0.76, hero: 0, dest: 0.4, dsl: 0.06, cta: 0 },
+  { p: 0.66, cx: 0.5, cy: 0.45, s: 0.58, hero: 0, dest: 1, dsl: 0.38, cta: 0 },
+  { p: 0.86, anchor: true, s: 0.34, hero: 0, dest: 1, dsl: 0.82, cta: 0.2 },
+  { p: 1.00, anchor: true, s: 0.25, hero: 0, dest: 1, dsl: 1, cta: 1 },
 ];
-
-/** Prostokąt obejmujący listę elementów (viewport px). */
-export function blockRect(els) {
-  let L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
-  for (const el of els) {
-    if (!el) continue;
-    const r = el.getBoundingClientRect();
-    if (!r.width && !r.height) continue;
-    L = Math.min(L, r.left); T = Math.min(T, r.top);
-    R = Math.max(R, r.right); B = Math.max(B, r.bottom);
-  }
-  if (!Number.isFinite(L)) return null;
-  return { cx: (L + R) / 2, cy: (T + B) / 2, w: R - L, h: B - T };
-}
-
-/* Rozwiązywanie klatek na żywym DOM: kotwica (.login__mark), środek bloku tekstu,
-   skala „cover" zakrywająca cały blok. */
-function blok(root, which) {
-  const sel = which === 'hero' ? ['.login__hero'] : ['.login__title', '.login__sub'];
-  return blockRect(sel.map((s) => root.querySelector('.login__inner ' + s)));
-}
 
 export function anchorCenter(root) {
   const vw = window.innerWidth, vh = window.innerHeight;
@@ -120,29 +96,17 @@ export function anchorCenter(root) {
 
 function resolveK(root, k) {
   if (k.anchor) return anchorCenter(root);
-  if (k.heroc || k.textc) {
-    const b = blok(root, k.heroc ? 'hero' : 'dest');
-    if (b) return { cx: b.cx, cy: b.cy };
-  }
   return { cx: (k.cx ?? 0.5) * window.innerWidth, cy: (k.cy ?? 0.5) * window.innerHeight };
 }
 
-function scaleK(root, k) {
-  if (k.cover) {
-    const b = blok(root, k.cover);
-    if (b) return Math.min(2.8, (Math.hypot(b.w, b.h) + 44) / LENS_BASE);
-  }
-  return k.s;
-}
-
-/** Pełny punkt toru dla postępu p: pozycja, skala i przezroczystości warstw. */
+/** Pełny punkt toru dla postępu p: pozycja, skala, przezroczystości i slide tytułu. */
 export function trackPoint(root, p) {
   const { a, b, t } = sampleTrack(p);
   const ca = resolveK(root, a), cb = resolveK(root, b);
   return {
-    x: lerp(ca.cx, cb.cx, t), y: lerp(ca.cy, cb.cy, t),
-    s: lerp(scaleK(root, a), scaleK(root, b), t),
-    hero: lerp(a.hero, b.hero, t), dest: lerp(a.dest, b.dest, t), cta: lerp(a.cta, b.cta, t),
+    x: lerp(ca.cx, cb.cx, t), y: lerp(ca.cy, cb.cy, t), s: lerp(a.s, b.s, t),
+    hero: lerp(a.hero, b.hero, t), dest: lerp(a.dest, b.dest, t),
+    dsl: lerp(a.dsl, b.dsl, t), cta: lerp(a.cta, b.cta, t),
   };
 }
 
@@ -176,7 +140,7 @@ export function emitBubble(host, x, y, burst = 1) {
   b.className = 'bubble';
   b.style.left = `${(x + (Math.random() - 0.5) * 44).toFixed(1)}px`;
   b.style.top = `${(y + (Math.random() - 0.5) * 18).toFixed(1)}px`;
-  b.style.setProperty('--b-size', `${(4 + Math.pow(Math.random(), 2.1) * 26 * burst).toFixed(1)}px`);
+  b.style.setProperty('--b-size', `${(6 + Math.pow(Math.random(), 1.9) * 34 * burst).toFixed(1)}px`);
   b.style.setProperty('--b-hue', hue);
   b.style.setProperty('--b-hue2', (hue + 50 + Math.random() * 70).toFixed(0));
   b.style.setProperty('--b-dur', `${(4.5 + Math.random() * 6).toFixed(1)}s`);

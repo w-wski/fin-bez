@@ -17,6 +17,8 @@ class LoginStage {
   constructor(root) {
     this.root = root;
     this.lens = root.querySelector('.lens');
+    this.world = root.querySelector('.lens__world');
+    this.title = root.querySelector('.login__inner .login__title');
     this.bubbles = root.querySelector('.login__bubbles');
 
     this.p = 0;
@@ -51,15 +53,21 @@ class LoginStage {
   apply() {
     const tp = this.trackPoint(this.p);
     this.s = tp.s;
-    const half = (LENS_BASE * tp.s) / 2;
+    const tx = this.x - (LENS_BASE * tp.s) / 2;
+    const ty = this.y - (LENS_BASE * tp.s) / 2;
+    // Transformy wprost na elementach, nie przez zmienne CSS: zmiana custom property
+    // na .login unieważniała style CAŁEJ sceny co klatkę — to był główny powód
+    // klatkowania na iOS. Zmienne zostają tylko dla przezroczystości (zmieniają się
+    // wolno) i jako wartości startowe w arkuszu.
+    this.lens.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${tp.s.toFixed(4)})`;
+    if (this.world) {
+      this.world.style.transform = `scale(${(1 / tp.s).toFixed(5)}) translate(${(-tx).toFixed(2)}px, ${(-ty).toFixed(2)}px)`;
+    }
     const st = this.root.style;
-    st.setProperty('--ls', tp.s.toFixed(4));
-    st.setProperty('--lx', `${(this.x - half).toFixed(2)}px`);
-    st.setProperty('--ly', `${(this.y - half).toFixed(2)}px`);
     st.setProperty('--hero-a', tp.hero.toFixed(3));
     st.setProperty('--dest-a', tp.dest.toFixed(3));
+    st.setProperty('--dest-s', tp.dsl.toFixed(3));
     st.setProperty('--cta-a', tp.cta.toFixed(3));
-    st.setProperty('--p', this.p.toFixed(4));
 
     // Refrakcja jest droga: włączona w ruchu i w chwycie, wyłączona po osiadnięciu.
     const moving = !!this.grab || !!this.raf;
@@ -77,15 +85,22 @@ class LoginStage {
     }
   }
 
-  /* Emisja dymu: bąbelki rodzą się przy górnej krawędzi soczewki. W ruchu/chwycie
-     gęsto (wąż podąża za szkłem), poza ruchem emituje interval w boot(). */
-  emit(dt) {
+  /* Emisja dymu: bąbelki rodzą się przy górnej krawędzi soczewki, ale WYŁĄCZNIE
+     nad linią tytułu (referencja: poniżej napisu ich nie ma). Im szybszy ruch,
+     tym gęstsza emisja i większe bąble — „namnażają się" przy machaniu. */
+  emitOne(burst) {
     if (reduceMotion.matches || !this.bubbles) return;
+    const t = this.title && this.title.getBoundingClientRect();
+    if (t && t.height && this.y > t.top - 8) return;
+    emitBubble(this.bubbles, this.x, this.y - (LENS_BASE * (this.s || 1)) * 0.28, burst);
+  }
+
+  emit(dt, speed) {
     this.emitMs = (this.emitMs || 0) + dt;
-    const rate = this.grab ? 75 : 200;
+    const rate = this.grab ? (speed > 7 ? 40 : 85) : 180;
     if (this.emitMs >= rate) {
       this.emitMs = 0;
-      emitBubble(this.bubbles, this.x, this.y - (LENS_BASE * (this.s || 1)) * 0.28, this.grab ? 1 : 0.8);
+      this.emitOne(this.grab ? (speed > 7 ? 1.35 : 1.1) : 0.9);
     }
   }
 
@@ -122,7 +137,11 @@ class LoginStage {
       }
     }
 
-    if (busy) this.emit(dt);
+    if (busy) {
+      const speed = Math.hypot(this.x - (this.lx ?? this.x), this.y - (this.ly ?? this.y));
+      this.emit(dt, speed);
+    }
+    this.lx = this.x; this.ly = this.y;
 
     if (busy) this.raf = requestAnimationFrame(this.frame);
     else { this.raf = 0; this.last = 0; }
@@ -245,10 +264,8 @@ function boot() {
 
   // Emisja spoczynkowa: scena oddycha także, gdy nic się nie rusza (rzadsza niż w geście).
   setInterval(() => {
-    if (!reduceMotion.matches && !document.hidden && !root.closest('#view-login')?.hidden && !stage.raf) {
-      emitBubble(stage.bubbles, stage.x, stage.y - LENS_BASE * (stage.s || 1) * 0.28, 0.8);
-    }
-  }, 700);
+    if (!document.hidden && !root.closest('#view-login')?.hidden && !stage.raf) stage.emitOne(0.9);
+  }, 650);
 
   const settle = () => {
     if (reduceMotion.matches) { document.documentElement.classList.add('no-refract'); stage.open(); }

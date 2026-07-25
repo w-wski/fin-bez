@@ -19,6 +19,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   --p: 0;
   --hero-a: 1;
   --dest-a: 0;
+  --dest-s: 0;
   --cta-a: 0;
 
   position: fixed;
@@ -65,7 +66,18 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 /* Kotwica pozycji docelowej krążka — niewidoczna, ale trzyma miejsce w przepływie. */
 .login__mark { width: 64px; height: 64px; flex: none; }
 
-.login__title, .login__sub { opacity: var(--dest-a); margin: 0; text-wrap: balance; }
+/* Tytuł WJEŻDŻA od dołu (referencja: soczewka „wynosi" napis — tekst jedzie wolniej
+   niż szkło, różnicę widać w powiększeniu pod taflą). Podtytuł czeka, aż tytuł
+   osiądzie, i dopiero wtedy pojawia się razem z przyciskami (--cta-a). */
+.login__title, .login__sub { margin: 0; text-wrap: balance; }
+.login__title {
+  opacity: var(--dest-a);
+  transform: translateY(calc((1 - var(--dest-s)) * 18vh));
+}
+.login__sub {
+  opacity: var(--cta-a);
+  transform: translateY(calc((1 - var(--cta-a)) * 12px));
+}
 .login__title {
   font-family: var(--font-display);
   font-size: var(--text-display);
@@ -85,8 +97,14 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   max-width: 24ch;
 }
 
-/* Faza A i faza D zajmują to samo miejsce — hero znika, tytuł się pojawia. */
-.login__hero { position: absolute; top: 50%; transform: translateY(-50%); }
+/* Hero gaśnie jak w referencji: delikatny slide W GÓRĘ + blur + fade, wszystkie trzy
+   z jednej zmiennej --hero-a — są więc z definicji współmierne z ruchem soczewki. */
+.login__hero {
+  position: absolute;
+  top: 50%;
+  transform: translateY(calc(-50% - (1 - var(--hero-a)) * 52px));
+  filter: blur(calc((1 - var(--hero-a)) * 9px));
+}
 .login:not(.is-open) .login__title, .login:not(.is-open) .login__sub { pointer-events: none; }
 .login__hero[aria-hidden="true"] { pointer-events: none; }
 
