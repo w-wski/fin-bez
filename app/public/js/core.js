@@ -105,6 +105,10 @@ export async function flushTelemetry() {
 window.addEventListener('online', flushTelemetry);
 
 export async function api(path, opts = {}) {
+  // WAF hostingu (ModSecurity) odrzuca 400-tką żądania mutujące BEZ treści — tak jak
+  // przy „Wyloguj" (07-25) i „Przywróć" z Kosza (07-26). Każdy POST/PATCH/DELETE
+  // bez body dostaje jawne, puste '{}' — treść jest, WAF przepuszcza, API ignoruje.
+  if (opts.method && opts.method !== 'GET' && opts.body === undefined) opts = { ...opts, body: '{}' };
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
   if (res.status === 401) { show('login'); throw new Error('auth'); }
   const data = await res.json().catch(() => ({}));

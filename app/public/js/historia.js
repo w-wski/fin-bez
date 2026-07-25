@@ -36,8 +36,9 @@ async function catOptions(ledger) {
     const { categories } = await api('/api/v1/categories?ledger=' + ledger);
     const flat = [];
     for (const c of categories) {
-      flat.push({ id: c.id, name: c.name, label: c.name });
-      for (const k of c.children) flat.push({ id: k.id, name: k.name, label: `${c.name} > ${k.name}` });
+      flat.push({ id: c.id, name: c.name, label: c.name, color: c.color || null });
+      // podkategoria bez własnego koloru dziedziczy kolor rodzica (życzenie 07-26)
+      for (const k of c.children) flat.push({ id: k.id, name: k.name, label: `${c.name} > ${k.name}`, color: k.color || c.color || null });
     }
     catsCache[ledger] = flat;
   }
@@ -61,17 +62,26 @@ function akcje(tr, r) {
   return td;
 }
 
+// Kolor kategorii wpisu (z cache kategorii księgi — pobierzHist grzeje go przed rysowaniem).
+const kolorKat = (r) => (catsCache[r.ledger_id] || []).find((c) => c.id === Number(r.category_id))?.color || null;
+
 // Wiersz w trybie odczytu. data-label jest obowiązkowe: na mobile CSS robi z komórek karty.
 function fillRow(tr, r) {
   tr.innerHTML = '';
   tr.classList.toggle('del', kosz);
+  // Cały wpis łapie mgiełkę koloru swojej kategorii (nadanego w Admin) + kropkę przy nazwie.
+  const kolor = kolorKat(r);
+  if (kolor) tr.style.setProperty('--cat-c', kolor); else tr.style.removeProperty('--cat-c');
   const data = el('td', { 'data-label': 'Data' }, dzien(r.tx_date));
   // Wpis uzgodniony z wierszem wyciągu — widać to od razu, bo zmiana kwoty/daty rozjedzie uzgodnienie.
   if (r.bank_tx_id) data.append(el('span', { class: 'pill bank', title: 'Uzgodniony z wyciągiem bankowym' }, 'z banku'));
+  const kat = el('td', { 'data-label': 'Kategoria' });
+  if (kolor) kat.append(el('i', { class: 'catdot', 'aria-hidden': 'true' }));
+  kat.append(r.category || '—');
   tr.append(
     data,
     el('td', { 'data-label': 'Typ', class: KLASA[r.type] || '' }, ZNAK[r.type] || '·'),
-    el('td', { 'data-label': 'Kategoria' }, r.category || '—'),
+    kat,
     el('td', { 'data-label': 'Kwota', class: 'num ' + (KLASA[r.type] || '') }, zl(r.amount)),
     el('td', { 'data-label': 'Opis', class: 'opis' }, r.description || ''),
     el('td', { 'data-label': 'Kto' }, r.user_name),
@@ -215,6 +225,10 @@ async function pobierzHist(reset, widokKosza) {
   if ($('#fType').value) p.set('type', $('#fType').value);
   if (widokKosza) p.set('deleted', '1');           // domyślnie wpisy usunięte są niewidoczne
   const { rows, total } = await api('/api/v1/transactions?' + p);
+  // Cache kategorii ksiąg z listy MUSI być ciepły przed rysowaniem — fillRow czyta z niego
+  // kolory synchronicznie. Błąd pobrania kategorii nie blokuje listy (wpisy bez kropek).
+  await Promise.all([...new Set(rows.map((r) => r.ledger_id))]
+    .map((l) => catOptions(l).catch(() => {})));
   kosz = widokKosza;                               // stan widoku zmieniamy dopiero po udanym pobraniu
   const tb = $('#txTable tbody');
   if (reset) { tb.innerHTML = ''; histOffset = 0; wersjaListy += 1; }

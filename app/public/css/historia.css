@@ -7,6 +7,25 @@
 
 /* Wiersz jest klikalny — otwiera edycję w miejscu. */
 #txTable tbody tr { cursor: pointer; }
+
+/* Kolor kategorii (nadany w Admin) wyróżnia CAŁY wpis: delikatna mgiełka barwy na
+   wierszu/karcie + kropka przy nazwie. --cat-c ustawia historia.js per wiersz;
+   wpis bez koloru zostaje neutralny (var z fallbackiem transparent). Warstwa jako
+   background-image: na telefonie kładzie się NAD tłem karty, na desktopie nad
+   przezroczystym wierszem — jedna reguła dla obu układów. */
+#txTable tbody tr {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--cat-c, transparent) 10%, transparent),
+    color-mix(in srgb, var(--cat-c, transparent) 10%, transparent));
+}
+.catdot {
+  display: inline-block;
+  width: .55em; height: .55em;
+  border-radius: 50%;
+  background: var(--cat-c, transparent);
+  margin-right: .45em;
+  box-shadow: inset 0 0 0 .5px oklch(0% 0 0 / .12);
+}
 #txTable tr.del { cursor: default; }                /* wpis z Kosza: bez edycji w miejscu */
 #txTable tr.del td { opacity: .7; }
 #txTable td.opis { overflow-wrap: anywhere; }       /* długi opis zawija się, nie rozpycha tabeli */
@@ -42,7 +61,10 @@
    robi się użyteczna dopiero na szerokim ekranie. Nagłówki tabeli zastępuje etykieta
    z data-label (dokładana w historia.js). */
 @media (max-width: 900px) {
-  #txTable { font-size: 1rem; }
+  /* min-width: 0 nadpisuje globalne `.overflow table { min-width: max-content }`:
+     w trybie kart tabela jest blokiem, a max-content liczy szerokość NAJDŁUŻSZEGO
+     niezawiniętego opisu — karty wyjeżdżały poza ekran telefonu (nagranie 07-26). */
+  #txTable { font-size: 1rem; min-width: 0; }
   #txTable, #txTable tbody, #txTable tr { display: block; width: 100%; }
   #txTable thead { display: none; }
   #txTable tr { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
@@ -60,11 +82,12 @@
      Reguła MUSI stać PO regułach td[data-label=...]: ma tę samą specyficzność, więc decyduje
      kolejność — wcześniej przegrywała i etykieta zostawała. */
   #txTable td:empty { display: none; }
-  /* Akcje: pełnowymiarowe przyciski pod treścią karty (cel dotyku ≥ 44 px). */
-  #txTable td.akcje { gap: .5rem; margin-top: .5rem; }
+  /* Akcje: zwarte przyciski przy prawej krawędzi karty (cel dotyku ≥ 44 px) —
+     NIE rozciągnięte na całą szerokość (uwaga Szymona 07-26: „po co takie szerokie"). */
+  #txTable td.akcje { gap: .5rem; margin-top: .5rem; justify-content: flex-end; }
   #txTable td.akcje::before { display: none; }
-  #txTable td.akcje button { flex: 1; min-height: 44px; padding: .6rem .8rem; font-size: 1rem;
-    margin-left: 0; }
+  #txTable td.akcje button { flex: 0 0 auto; min-height: 44px; min-width: 64px;
+    padding: .6rem 1rem; font-size: 1rem; margin-left: 0; }
   #txTable td.edycja { display: block; padding: .2rem 0; }
   #txTable td.edycja::before { display: none; }
   #txTable td.edycja input, #txTable td.edycja select, #txTable td.edycja .btn { min-height: 44px; }

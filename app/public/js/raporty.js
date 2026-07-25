@@ -37,12 +37,23 @@ export async function loadReport() {
     t.append(el('b', {}, val), el('span', {}, label));
     $('#kpi').append(t);
   }
+  // Kolory kategorii (nadane w Admin) barwią słupki raportu; podkategoria bez
+  // własnego koloru dziedziczy kolor rodzica. Bez koloru — słupek w szałwii.
+  const kolory = {};
+  try {
+    const { categories } = await api('/api/v1/categories?ledger=' + ledger);
+    for (const c of categories) {
+      if (c.color) kolory[c.id] = c.color;
+      for (const k of c.children) if (k.color || c.color) kolory[k.id] = k.color || c.color;
+    }
+  } catch { /* raport ważniejszy niż barwy */ }
   const max = Math.max(...s.by_category.map((c) => Number(c.total)), 1);
   const box = $('#byCat'); box.innerHTML = '';
   for (const c of s.by_category) {
     const r = el('div', { class: 'barrow' });
     const bar = el('div', { class: 'bar' });
     bar.style.width = (100 * Number(c.total) / max).toFixed(1) + '%';
+    if (kolory[c.category_id]) bar.style.background = kolory[c.category_id];
     r.append(el('span', {}, c.category), bar, el('span', { class: 'val' }, zl(c.total)));
     box.append(r);
   }
