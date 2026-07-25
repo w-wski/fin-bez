@@ -84,8 +84,10 @@ export const KEYFRAMES = [
   // czyli DOKŁADNIE pod soczewką (cy .585→.545), a szkło ma ~250 px średnicy —
   // słowo „Finansowa" rodzi się w całości pod taflą, zniekształcone. Dopiero potem
   // soczewka wspina się na kotwicę, a tytuł jedzie wolniej za nią (dsl → 1).
-  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.06, hero: 0, dest: 0, dsl: 0, cta: 0 },
-  { p: 0.58, cx: 0.5, cy: 0.545, s: 0.94, hero: 0, dest: 1, dsl: 0.10, cta: 0 },
+  // `dest` to tylko UZBROJENIE narodzin — o faktycznym zapaleniu tytułu decyduje
+  // bramka geometryczna w glass.js: cały prostokąt tytułu musi mieścić się w kole.
+  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.12, hero: 0, dest: 0, dsl: 0, cta: 0 },
+  { p: 0.58, cx: 0.5, cy: 0.545, s: 1.00, hero: 0, dest: 1, dsl: 0.10, cta: 0 },
   { p: 0.82, anchor: true, s: 0.52, hero: 0, dest: 1, dsl: 0.66, cta: 0 },
   // cta = 0 aż do pełnego osadzenia: podtytuł i przyciski wchodzą DOPIERO, gdy
   // tytuł stoi, a soczewka siedzi na kotwicy (płynność robi transition w CSS).

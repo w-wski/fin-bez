@@ -76,9 +76,9 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 }
 .login__sub {
   opacity: var(--cta-a);
-  transform: translateY(calc((1 - var(--cta-a)) * 12px));
-  /* --cta-a skacze 0→1 dopiero po pełnym osadzeniu — płynne wejście robi transition */
-  transition: opacity var(--t-slow) var(--ease-soft), transform var(--t-slow) var(--ease-soft);
+  /* Bez ruchu: element stoi na miejscu i tylko blaknie do widoczności — żadnego
+     „dosuwania" na końcu (uwaga Szymona). --cta-a skacze 0→1 po pełnym osadzeniu. */
+  transition: opacity var(--t-slow) var(--ease-soft);
 }
 .login__title {
   font-family: var(--font-display);
@@ -136,8 +136,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   padding: 0 var(--space-5);
   z-index: 5;
   opacity: var(--cta-a);
-  transform: translateY(calc((1 - var(--cta-a)) * 22px));
-  transition: opacity var(--t-slow) var(--ease-soft), transform var(--t-slow) var(--ease-soft);
+  transition: opacity var(--t-slow) var(--ease-soft);
   pointer-events: none;
 }
 .login.is-open .login__actions { pointer-events: auto; }
@@ -240,11 +239,10 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   inset: 0;
   border-radius: 50%;
   pointer-events: none;
-  /* Mleczna matowość jak kamyk Wabi: lekki blur tego, co POD taflą (czyli już
-     załamanej kopii sceny) — soczewka przestaje wyglądać jak puste kółko. */
-  backdrop-filter: blur(1.5px) saturate(1.05);
-  -webkit-backdrop-filter: blur(1.5px) saturate(1.05);
   background:
+    /* mleczna matowość jak kamyk Wabi — STATYCZNA warstwa zamiast backdrop-filter:
+       drugi filtr liczony co klatkę dławił iOS, wrażenie frostu daje półmleko */
+    radial-gradient(closest-side, color-mix(in oklch, var(--surface) 34%, transparent) 0 58%, transparent 80%),
     /* rozświetlenie u góry (źródło światła) */
     radial-gradient(115% 95% at 50% 14%, var(--glass-hi), transparent 54%),
     /* „horyzont" — łuk załamanego tła u dołu */
@@ -309,7 +307,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 }
 
 @media (min-width: 700px) {
-  .login__actions { left: 50%; transform: translateX(-50%) translateY(calc((1 - var(--cta-a)) * 22px));
+  .login__actions { left: 50%; transform: translateX(-50%);
                     right: auto; width: min(420px, 90vw); padding: 0; }
   .login__hero, .login__title, .login__sub { max-width: 22ch; }
 }

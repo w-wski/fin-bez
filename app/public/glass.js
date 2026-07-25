@@ -5,13 +5,10 @@
  * Pion soczewki JEST postępem: p = f(y), plateau p=1 u góry; reszta z klatek glass-mapa.js. */
 
 import { LENS_BASE, installLensMap, clamp01, trackPoint, anchorCenter, emitBubble, keepActiveTabVisible } from './glass-mapa.js';
-
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-
 const K_DRAG = 0.34;   // podążanie za wskaźnikiem: żwawe, ale z masą
 const K_SNAP = 0.06;   // dojazd po puszczeniu: powolny, „estetyczny" (~1 s)
-const CLICK_MS = 300;  // klik vs przeciągnięcie
-const CLICK_PX = 6;
+const CLICK_MS = 300; const CLICK_PX = 6; // klik vs przeciągnięcie
 
 class LoginStage {
   constructor(root) {
@@ -46,8 +43,9 @@ class LoginStage {
   /* Geometria toru mieszka w glass-mapa.js (trackPoint/anchorCenter na żywym DOM). */
   trackPoint(p) { return trackPoint(this.root, p); }
 
-  yStart() { return window.innerHeight * 1.08; }                       // spoczynek fazy 1 (jak klatka p=0)
-  yPlay() { return anchorCenter(this.root).cy + window.innerHeight * 0.16; } // górna strefa zabawy: p trzyma 1
+  // spoczynek fazy 1 (jak klatka p=0) / górna strefa zabawy, gdzie p trzyma 1
+  yStart() { return window.innerHeight * 1.08; }
+  yPlay() { return anchorCenter(this.root).cy + window.innerHeight * 0.16; }
   pFromY(y) { return clamp01((this.yStart() - y) / Math.max(1, this.yStart() - this.yPlay())); }
 
   apply() {
@@ -55,17 +53,25 @@ class LoginStage {
     this.s = tp.s;
     const tx = this.x - (LENS_BASE * tp.s) / 2;
     const ty = this.y - (LENS_BASE * tp.s) / 2;
-    // Transformy wprost na elementach, nie przez zmienne CSS: zmiana custom property
-    // na .login unieważniała style CAŁEJ sceny co klatkę — to był główny powód
-    // klatkowania na iOS. Zmienne zostają tylko dla przezroczystości (zmieniają się
-    // wolno) i jako wartości startowe w arkuszu.
+    // Transformy wprost na elementach (nie przez zmienne CSS): zmiana custom property
+    // na .login unieważniała style całej sceny co klatkę — główny powód klatkowania.
     this.lens.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${tp.s.toFixed(4)})`;
     if (this.world) {
       this.world.style.transform = `scale(${(1 / tp.s).toFixed(5)}) translate(${(-tx).toFixed(2)}px, ${(-ty).toFixed(2)}px)`;
     }
+    // Tytuł zapala się WYŁĄCZNIE w pełni zakryty: klatki uzbrajają narodziny (dest>0),
+    // decyduje geometria — cały prostokąt tytułu (rect liczy aktualny slide) musi
+    // mieścić się w kole. Zatrzask do zjazdu (dest==0); awaryjnie p>0.8.
+    if (tp.dest <= 0) this.born = false;
+    else if (!this.born && this.title) {
+      const r = this.title.getBoundingClientRect();
+      const dx = Math.max(Math.abs(r.left - this.x), Math.abs(r.right - this.x));
+      const dy = Math.max(Math.abs(r.top - this.y), Math.abs(r.bottom - this.y));
+      this.born = Math.hypot(dx, dy) <= (LENS_BASE * tp.s) / 2 - 4 || this.p > 0.8;
+    }
     const st = this.root.style;
     st.setProperty('--hero-a', tp.hero.toFixed(3));
-    st.setProperty('--dest-a', tp.dest.toFixed(3));
+    st.setProperty('--dest-a', this.born ? '1' : '0');
     st.setProperty('--dest-s', tp.dsl.toFixed(3));
     st.setProperty('--cta-a', tp.cta.toFixed(3));
 
@@ -149,7 +155,6 @@ class LoginStage {
   }
 
   wake() { if (!this.raf) { this.last = 0; this.raf = requestAnimationFrame(this.frame); } }
-
   animateTo(v) { this.pTarget = clamp01(v); this.wake(); }
 
   jump(v) {
@@ -161,9 +166,9 @@ class LoginStage {
   }
 
   unbind() {
-    window.removeEventListener('pointermove', this.onPointerMove);
-    window.removeEventListener('pointerup', this.onPointerUp);
-    window.removeEventListener('pointercancel', this.onPointerUp);
+    for (const ev of ['pointermove', 'pointerup', 'pointercancel']) {
+      window.removeEventListener(ev, ev === 'pointermove' ? this.onPointerMove : this.onPointerUp);
+    }
   }
 
   release() {
@@ -247,11 +252,8 @@ class LoginStage {
     }
   }
 
-  reset() { this.jump(0); }
-  open() { this.jump(1); }
+  reset() { this.jump(0); } open() { this.jump(1); }
 }
-
-/* ---------- start ---------- */
 
 function boot() {
   const root = document.querySelector('.login');
