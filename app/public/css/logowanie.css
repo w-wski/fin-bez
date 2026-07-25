@@ -19,14 +19,15 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   --p: 0;
   --hero-a: 1;
   --dest-a: 0;
-  --caustic-a: 0;
+  --cta-a: 0;
 
   position: fixed;
   inset: 0;
   overflow: hidden;
   background-color: var(--bg);
   background-image: var(--paper);
-  background-attachment: fixed;
+  /* bez background-attachment: fixed — element i tak jest fixed, a iOS przy
+     „fixed" potrafi rysować tło z osobnej, wolniejszej ścieżki (zacinanie) */
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -94,6 +95,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   left: 0; right: 0;
   bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
   margin: 0;
+  max-width: none;   /* globalne p{max-width:65ch} spychało napis z osi na desktopie */
   text-align: center;
   font-size: var(--text-xs);
   letter-spacing: .04em;
@@ -102,6 +104,8 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   z-index: 4;
 }
 
+/* Przyciski nie są pod szkłem, więc jako jedyne wjeżdżają płynnie (--cta-a);
+   napisy przełączają się twardo pod soczewką (--hero-a/--dest-a, zero fade). */
 .login__actions {
   position: absolute;
   left: 0; right: 0;
@@ -111,8 +115,8 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   gap: var(--space-3);
   padding: 0 var(--space-5);
   z-index: 5;
-  opacity: var(--dest-a);
-  transform: translateY(calc((1 - var(--dest-a)) * 22px));
+  opacity: var(--cta-a);
+  transform: translateY(calc((1 - var(--cta-a)) * 22px));
   pointer-events: none;
 }
 .login.is-open .login__actions { pointer-events: auto; }
@@ -122,7 +126,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   top: calc(var(--space-4) + env(safe-area-inset-top, 0px));
   right: var(--space-4);
   z-index: 6;
-  opacity: var(--dest-a);
+  opacity: var(--cta-a);
   pointer-events: none;
 }
 .login.is-open .login__switch { pointer-events: auto; }
@@ -202,12 +206,9 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
    powiększony splot to spektakl WYŁĄCZNIE na czas gestu. */
 .login.is-open .lens__world { background-image: var(--grain); }
 
-/* Wewnątrz soczewki treść docelowa jest widoczna, zanim pojawi się na ekranie —
-   to soczewka „zapowiada", co nadchodzi (dokładnie jak w referencji). */
-/* Treść docelowa ujawnia się w soczewce dopiero, gdy ta faktycznie nad nią zawisa
-   (jak w referencji: w fazie pełnej bańki szkło jest jeszcze puste). */
-.lens__world .login__title,
-.lens__world .login__sub { opacity: clamp(0, calc((var(--p) - 0.42) / 0.2), 1); }
+/* Kopia sceny pod soczewką dziedziczy --hero-a/--dest-a z .login — napisy przełączają
+   się w kopii i w oryginale W TEJ SAMEJ chwili (twardo, pod zakrywającym szkłem).
+   Żadnych osobnych ramp opacity: to one robiły widoczny fade-in z nagrań 07-25. */
 
 /* Szkło czyta się KRAWĘDZIĄ, nie mleczną taflą: środek zostaje przezroczysty
    (tekst pod soczewką musi być czytelny), a sylwetkę niosą rant, pierścień przy
@@ -217,19 +218,26 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   inset: 0;
   border-radius: 50%;
   pointer-events: none;
+  /* Mleczna matowość jak kamyk Wabi: lekki blur tego, co POD taflą (czyli już
+     załamanej kopii sceny) — soczewka przestaje wyglądać jak puste kółko. */
+  backdrop-filter: blur(1.5px) saturate(1.05);
+  -webkit-backdrop-filter: blur(1.5px) saturate(1.05);
   background:
     /* rozświetlenie u góry (źródło światła) */
     radial-gradient(115% 95% at 50% 14%, var(--glass-hi), transparent 54%),
-    /* „horyzont" — łuk załamanego tła; to on robi ze statycznego krążka znak, a nie placeholder */
+    /* „horyzont" — łuk załamanego tła u dołu */
     radial-gradient(145% 82% at 50% 126%, var(--glass-horizon) 0 36%, transparent 62%),
     /* pierścień gęstniejący ku rantowi — sylwetka bez zamglenia środka */
-    radial-gradient(closest-side, transparent 58%, var(--glass-tint) 86%, transparent 100%);
+    radial-gradient(closest-side, transparent 56%, var(--glass-tint) 84%, transparent 100%);
+  /* Stałe grubości zamiast dzielenia przez --ls: pięć calc()/var() w box-shadow
+     przeliczało się co klatkę gestu (zacinanie). Rant skaluje się razem ze szkłem —
+     grubszy przy dużej bańce, cieńszy przy kamyku — i tak zachowuje się prawdziwe szkło. */
   box-shadow:
-    inset 0 0 0 calc(1.5px / var(--ls)) var(--glass-rim),
-    inset 0 calc(3px / var(--ls)) calc(12px / var(--ls)) calc(-5px / var(--ls)) var(--glass-hi),
-    inset 0 0 calc(34px / var(--ls)) calc(-14px / var(--ls)) var(--glass-edge),
-    inset 0 calc(-20px / var(--ls)) calc(30px / var(--ls)) calc(-24px / var(--ls)) var(--glass-horizon),
-    0 calc(18px / var(--ls)) calc(42px / var(--ls)) calc(-16px / var(--ls)) var(--glass-shadow);
+    inset 0 0 0 1.5px var(--glass-rim),
+    inset 0 3px 12px -5px var(--glass-hi),
+    inset 0 0 34px -14px var(--glass-edge),
+    inset 0 -20px 30px -24px var(--glass-horizon),
+    0 18px 42px -16px var(--glass-shadow);
 }
 
 /* Kaustyka: indygowy łuk skupionego światła na DOLNYM obwodzie, ~140°, wyłącznie w ruchu.
@@ -240,61 +248,46 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
    scena go nie pokazuje. */
 .lens__caustic { display: none; }
 
-/* ---------- 9b. Bąbelki ----------
-   W referencji unoszą się WYŁĄCZNIE nad krążkiem, w wąskiej kolumnie, i pojawiają się
-   dopiero razem z ekranem logowania — faza powitalna jest czysta. Stąd kolumna
-   zamiast całego ekranu i opacity spięte z `--dest-a`. */
+/* ---------- 9b. Bąbelki — dym z emitera ----------
+   Kontener to cały ekran; każdy bąbelek dostaje left/top w chwili narodzin PRZY
+   SOCZEWCE (glass.js) i od tej pory leci swobodnie w górę (animacja jednorazowa,
+   po niej element znika). Świeże trzymają się soczewki, stare płyną własną drogą —
+   przy machaniu szkłem powstaje wąż jak smuga dymu. */
 .login__bubbles {
-  --trail-x: 0px;
-  --trail-y: 0px;
   position: absolute;
-  left: 50%;
-  /* --trail-*: smuga podąża za soczewką w trybie zabawy (glass.js, z opóźnieniem). */
-  transform: translateX(-50%) translate(var(--trail-x), var(--trail-y));
-  width: min(330px, 84%);
-  top: 7vh;
-  height: 32vh;
+  inset: 0;
   z-index: 2;
   pointer-events: none;
   overflow: hidden;
-  opacity: var(--dest-a);
-  /* Smuga rozrzedza się ku górze zamiast urywać na krawędzi kolumny. */
-  -webkit-mask: linear-gradient(180deg, transparent 0, #000 20%);
-          mask: linear-gradient(180deg, transparent 0, #000 20%);
 }
-/* Bąbelek = matowy kamyk mlecznego szkła z ledwo wyczuwalnym pastelowym tonem —
-   NIE błyszcząca kulka. Poprzednie nasycone conic-gradienty (fiolet/magenta) czytały
-   się jak clipart z lat 2000 i zostały wycofane po nagraniu produkcji 07-25. */
+/* Żywe szkło: nasycony barwnik zatopiony w bańce + refleks — mają być WIDOCZNE. */
 .bubble {
   position: absolute;
-  bottom: -6%;
-  left: var(--b-x);
   width: var(--b-size);
   height: var(--b-size);
+  margin: calc(var(--b-size) / -2) 0 0 calc(var(--b-size) / -2);
   border-radius: 50%;
   opacity: 0;
   background:
-    radial-gradient(circle at 32% 26%, oklch(100% 0 0 / .85), transparent 42%),
-    radial-gradient(circle at 50% 58%,
-      oklch(97% var(--b-c, 0.015) var(--b-hue) / .75),
-      oklch(93% var(--b-c, 0.015) var(--b-hue) / .45) 72%,
-      oklch(90% var(--b-c, 0.015) var(--b-hue) / .25));
+    radial-gradient(circle at 30% 26%, oklch(100% 0 0 / .95), transparent 38%),
+    radial-gradient(circle at 64% 72%, oklch(52% 0.19 var(--b-hue2) / .85), transparent 58%),
+    radial-gradient(circle at 50% 50%, oklch(78% 0.15 var(--b-hue) / .95), oklch(60% 0.19 var(--b-hue) / .8));
   box-shadow:
-    inset 0 0 0 1px oklch(100% 0 0 / .55),
-    inset -2px -3px 6px oklch(70% 0.02 var(--b-hue) / .30),
-    0 2px 6px -3px var(--glass-shadow);
-  animation: bubble-rise var(--b-dur) linear var(--b-delay) infinite;
+    inset 0 0 0 1px oklch(100% 0 0 / .5),
+    inset -2px -3px 6px oklch(42% 0.17 var(--b-hue2) / .5),
+    0 2px 8px -4px var(--glass-shadow);
+  animation: bubble-rise var(--b-dur) cubic-bezier(.22, .6, .6, 1) forwards;
   will-change: transform, opacity;
 }
 @keyframes bubble-rise {
-  0%   { transform: translate3d(0, 0, 0) scale(.7); opacity: 0; }
-  20%  { opacity: var(--b-op); }
+  0%   { transform: translate3d(0, 0, 0) scale(.5); opacity: 0; }
+  10%  { opacity: var(--b-op); }
   78%  { opacity: var(--b-op); }
-  100% { transform: translate3d(var(--b-drift), -46vh, 0) scale(1); opacity: 0; }
+  100% { transform: translate3d(var(--b-drift), -48vh, 0) scale(1.06); opacity: 0; }
 }
 
 @media (min-width: 700px) {
-  .login__actions { left: 50%; transform: translateX(-50%) translateY(calc((1 - var(--dest-a)) * 22px));
+  .login__actions { left: 50%; transform: translateX(-50%) translateY(calc((1 - var(--cta-a)) * 22px));
                     right: auto; width: min(420px, 90vw); padding: 0; }
   .login__hero, .login__title, .login__sub { max-width: 22ch; }
 }
