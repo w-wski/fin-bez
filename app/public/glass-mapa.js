@@ -1,6 +1,6 @@
-/* glass-mapa.js — materiał soczewki: mapa przemieszczenia, tor gestu, bąbelki.
- * Wydzielone z glass.js pod bramkę preflight (<300 linii/plik). Spec: DESIGN-SPEC-GLASS §1.
- */
+/* glass-mapa.js — materiał soczewki i drobne pomocniki sceny: mapa przemieszczenia,
+ * tor gestu, bąbelki, scroller nawigacji. Wydzielone z glass.js pod bramkę preflight
+ * (<300 linii/plik). Spec: DESIGN-SPEC-GLASS §1. */
 
 export const LENS_BASE = 256;               // px — bok bazowego pudełka soczewki (skalowany transformem).
                                      // Mniejsze pudełko = tańszy filtr; wielkość na ekranie robi transform.
@@ -98,29 +98,48 @@ export function sampleTrack(p) {
 
 /* ---------- 3. Bąbelki ---------- */
 
-/* Barwy „ikon zatopionych w szkle" z referencji — nasycone, rozrzucone po kole barw.
-   Ruch robią animacje CSS (kompozytor), nie JS: zero pracy na klatkę. */
-export const BUBBLE_HUES = [8, 32, 55, 95, 140, 190, 215, 250, 280, 315, 340];
+/* Bąbelki = matowe kamyki mlecznego szkła; ton to szept pastelu (szałwia / róż / niebo
+   — te same barwy co plamy tła), nie kolor. Ruch robią animacje CSS (kompozytor). */
+export const BUBBLE_HUES = [165, 25, 250];
 
-export function spawnBubbles(host, count = 18) {
+export function spawnBubbles(host, count = 16) {
   if (!host || host.childElementCount) return;
   const frag = document.createDocumentFragment();
   for (let i = 0; i < count; i++) {
     const b = document.createElement('span');
     b.className = 'bubble';
-    const size = 5 + Math.pow(Math.random(), 2.6) * 38;           // dużo małych, kilka dużych
+    const size = 4 + Math.pow(Math.random(), 2.6) * 26;           // dużo drobnych, kilka większych
     const hue = BUBBLE_HUES[Math.floor(Math.random() * BUBBLE_HUES.length)];
     b.style.setProperty('--b-size', `${size.toFixed(1)}px`);
     // Start wąsko nad krążkiem; rozrzut robi dopiero dryf w trakcie wznoszenia — smuga, nie konfetti.
     b.style.setProperty('--b-x', `${(50 + (Math.random() - 0.5) * 26).toFixed(2)}%`);
     b.style.setProperty('--b-hue', hue);
-    b.style.setProperty('--b-hue2', (hue + 40 + Math.random() * 60).toFixed(0));
+    b.style.setProperty('--b-c', (0.010 + Math.random() * 0.014).toFixed(3)); // chroma-szept
     b.style.setProperty('--b-dur', `${(11 + Math.random() * 16).toFixed(1)}s`);
     b.style.setProperty('--b-delay', `${(-Math.random() * 22).toFixed(1)}s`);
     b.style.setProperty('--b-drift', `${(Math.random() * 120 - 60).toFixed(1)}px`);
-    b.style.setProperty('--b-op', (0.55 + Math.random() * 0.45).toFixed(2));
+    b.style.setProperty('--b-op', (0.5 + Math.random() * 0.35).toFixed(2));
     frag.appendChild(b);
   }
   host.appendChild(frag);
+}
+
+/* ---------- 4. Nawigacja-scroller ----------
+   Na telefonie nav przewija się w poziomie — aktywna zakładka sama wjeżdża w kadr.
+   Obserwujemy klasę, której i tak używa main.js, i niczego w nim nie zmieniamy. */
+export function keepActiveTabVisible(reduceMotion) {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  const reveal = () => {
+    const on = nav.querySelector('button.active');
+    if (on && nav.scrollWidth > nav.clientWidth) {
+      on.scrollIntoView({ inline: 'center', block: 'nearest',
+        behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+    }
+  };
+  new MutationObserver(reveal).observe(nav, {
+    subtree: true, attributes: true, attributeFilter: ['class'],
+  });
+  reveal();
 }
 

@@ -46,15 +46,17 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   text-align: center;
 }
 
+/* Typografia sceny: systemowy sans (SF na Apple), semibold, ciasny tracking —
+   dokładnie rejestr referencji Wabi („Meet Wabi. The first personal software platform."). */
 .login__hero {
   opacity: var(--hero-a);
   margin: 0;
   max-width: 16ch;
   font-family: var(--font-display);
   font-size: var(--text-display);
-  font-weight: 400;
-  line-height: 1.14;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  line-height: 1.16;
+  letter-spacing: var(--track-display);
   color: var(--fg);
   text-wrap: balance;
 }
@@ -62,15 +64,13 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 /* Kotwica pozycji docelowej krążka — niewidoczna, ale trzyma miejsce w przepływie. */
 .login__mark { width: 64px; height: 64px; flex: none; }
 
-/* Hierarchia parą krojów: tytuł w display serif, podtytuł cichym sansem.
-   Świadome odejście od referencji (tam oba wiersze identyczne) — mandat „Tylko lepiej". */
 .login__title, .login__sub { opacity: var(--dest-a); margin: 0; text-wrap: balance; }
 .login__title {
   font-family: var(--font-display);
   font-size: var(--text-display);
-  font-weight: 400;
+  font-weight: 700;
   line-height: 1.1;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--track-display);
   text-transform: none;
   color: var(--fg);
   margin-top: var(--space-6);
@@ -129,6 +129,8 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 
 /* Przycisk logowania — wysoka szklana pigułka, logo po lewej, podpis wyśrodkowany
    w CAŁEJ szerokości (charakterystyczny detal referencji). */
+/* Przycisk logowania — pełna biała pigułka z miękkim cieniem, jak w Wabi
+   („Continue with Google"). Bez szklanych warstw: solidna, pewna, do naciśnięcia. */
 .btn-glass {
   position: relative;
   display: flex;
@@ -137,21 +139,19 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   min-height: 56px;
   padding: 0 var(--space-5);
   border-radius: var(--r-pill);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line-soft);
   background: var(--surface);
   color: var(--fg);
   font: inherit;
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   text-decoration: none;
   cursor: pointer;
-  background: var(--glass-fill);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: var(--glass-stack);
-  transition: transform var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
+  box-shadow: 0 1px 2px -1px var(--glass-drop), 0 14px 34px -22px var(--glass-drop);
+  transition: transform var(--t-fast) var(--ease-soft), box-shadow var(--t-fast) var(--ease-soft);
 }
-.btn-glass:hover { background: color-mix(in oklch, var(--surface) 88%, var(--fg)); }
+.btn-glass:hover { box-shadow: 0 2px 4px -2px var(--glass-drop), 0 18px 40px -22px var(--glass-drop); }
 .btn-glass:active { transform: scale(.985); }
 .btn-glass svg { position: absolute; left: var(--space-5); width: 20px; height: 20px; }
 
@@ -168,7 +168,10 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 }
 /* Podpowiedź dla kompozytora tylko na czas ruchu — po osiadnięciu pełna ostrość rantu. */
 .login:not(.is-open) .lens { will-change: transform; }
-.login.is-open .lens { cursor: default; }
+/* Osiadłą soczewkę też można złapać (tryb zabawy) — kursor to komunikuje. */
+.login.is-open .lens { cursor: grab; }
+.login.is-dragging .lens { cursor: grabbing; }
+.login.is-dragging .lens { will-change: transform; }
 
 .lens__scene {
   position: absolute;
@@ -232,32 +235,22 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 /* Kaustyka: indygowy łuk skupionego światła na DOLNYM obwodzie, ~140°, wyłącznie w ruchu.
    Conic + maska pierścieniowa zamiast box-shadow — daje kontrolę nad rozpiętością łuku
    i nasyceniem rdzenia, bez animowania `filter`. */
-.lens__caustic {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  pointer-events: none;
-  opacity: var(--caustic-a);
-  background: conic-gradient(from 110deg at 50% 50%,
-    transparent 0deg,
-    var(--caustic-far) 22deg,
-    var(--caustic) 50deg,
-    var(--caustic-hot) 70deg,
-    var(--caustic) 90deg,
-    var(--caustic-far) 118deg,
-    transparent 140deg);
-  -webkit-mask: radial-gradient(closest-side, transparent 74%, #000 85% 97%, transparent 100%);
-          mask: radial-gradient(closest-side, transparent 74%, #000 85% 97%, transparent 100%);
-}
+/* Kaustyka WYCOFANA 2026-07-25: indygowy łuk na produkcji renderował się jako tęczowy
+   artefakt na rancie (nagranie Szymona), nie jako światło. Element zostaje w HTML,
+   scena go nie pokazuje. */
+.lens__caustic { display: none; }
 
 /* ---------- 9b. Bąbelki ----------
    W referencji unoszą się WYŁĄCZNIE nad krążkiem, w wąskiej kolumnie, i pojawiają się
    dopiero razem z ekranem logowania — faza powitalna jest czysta. Stąd kolumna
    zamiast całego ekranu i opacity spięte z `--dest-a`. */
 .login__bubbles {
+  --trail-x: 0px;
+  --trail-y: 0px;
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  /* --trail-*: smuga podąża za soczewką w trybie zabawy (glass.js, z opóźnieniem). */
+  transform: translateX(-50%) translate(var(--trail-x), var(--trail-y));
   width: min(330px, 84%);
   top: 7vh;
   height: 32vh;
@@ -269,6 +262,9 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   -webkit-mask: linear-gradient(180deg, transparent 0, #000 20%);
           mask: linear-gradient(180deg, transparent 0, #000 20%);
 }
+/* Bąbelek = matowy kamyk mlecznego szkła z ledwo wyczuwalnym pastelowym tonem —
+   NIE błyszcząca kulka. Poprzednie nasycone conic-gradienty (fiolet/magenta) czytały
+   się jak clipart z lat 2000 i zostały wycofane po nagraniu produkcji 07-25. */
 .bubble {
   position: absolute;
   bottom: -6%;
@@ -277,23 +273,16 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   height: var(--b-size);
   border-radius: 50%;
   opacity: 0;
-  /* szkło z barwną „zawartością" w środku, nie płaska kulka */
   background:
-    /* refleks specular */
-    radial-gradient(circle at 31% 25%, oklch(100% 0 0 / .95), transparent 36%),
-    /* ciemna, załamana „zawartość" — bez niej bąbelek czyta się jak cukierek 3D */
-    radial-gradient(circle at 63% 71%, oklch(44% 0.20 var(--b-hue2)), transparent 56%),
-    conic-gradient(from 200deg,
-      oklch(64% 0.24 var(--b-hue)),
-      oklch(42% 0.20 var(--b-hue2)),
-      oklch(72% 0.20 var(--b-hue)),
-      oklch(46% 0.22 var(--b-hue)));
+    radial-gradient(circle at 32% 26%, oklch(100% 0 0 / .85), transparent 42%),
+    radial-gradient(circle at 50% 58%,
+      oklch(97% var(--b-c, 0.015) var(--b-hue) / .75),
+      oklch(93% var(--b-c, 0.015) var(--b-hue) / .45) 72%,
+      oklch(90% var(--b-c, 0.015) var(--b-hue) / .25));
   box-shadow:
-    /* rant rozszczepiony na barwy — ciepła z jednej strony, chłodna z drugiej */
-    inset 0 0 0 1.5px oklch(22% 0.10 280 / .55),
-    inset -2px -3px 6px oklch(62% 0.24 32 / .45),
-    inset 2px 3px 6px oklch(64% 0.20 242 / .45),
-    0 2px 7px -4px var(--glass-shadow);
+    inset 0 0 0 1px oklch(100% 0 0 / .55),
+    inset -2px -3px 6px oklch(70% 0.02 var(--b-hue) / .30),
+    0 2px 6px -3px var(--glass-shadow);
   animation: bubble-rise var(--b-dur) linear var(--b-delay) infinite;
   will-change: transform, opacity;
 }

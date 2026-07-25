@@ -9,8 +9,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Finansowa">
-<link rel="preload" href="fonts/instrument-serif-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/instrument-serif-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="css/logowanie.css">
 <link rel="stylesheet" href="css/historia.css">
@@ -235,9 +233,11 @@
     <filter id="fin-refract" x="0%" y="0%" width="100%" height="100%"
             color-interpolation-filters="sRGB">
       <feImage id="fin-refract-map" preserveAspectRatio="none" result="lensmap"/>
-      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="137" xChannelSelector="R" yChannelSelector="G" result="dR"/>
-      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="133" xChannelSelector="R" yChannelSelector="G" result="dG"/>
-      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="129" xChannelSelector="R" yChannelSelector="G" result="dB"/>
+      <!-- Skale zbite z 137/133/129: rozstrzał 8 px robił tęczową obwódkę zamiast
+           subtelnej dyspersji (patrz nagranie produkcji 07-25). -->
+      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="92" xChannelSelector="R" yChannelSelector="G" result="dR"/>
+      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="90" xChannelSelector="R" yChannelSelector="G" result="dG"/>
+      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="88" xChannelSelector="R" yChannelSelector="G" result="dB"/>
       <feColorMatrix in="dR" type="matrix" result="cR"
         values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/>
       <feColorMatrix in="dG" type="matrix" result="cG"

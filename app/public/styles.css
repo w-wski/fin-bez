@@ -4,25 +4,11 @@
    css/logowanie.css). Źródło prawdy designu: repo finansowe,
    docs/design/DESIGN-SPEC-GLASS.md. Komponenty nie znają wartości — tokeny.
    ========================================================================== */
-/* Display: Instrument Serif (self-host, OFL) — hero, wordmark, kwoty-bohaterki.
-   Body: system-ui — na sprzęcie Apple daje SF Pro, naturę „Apple look".
-   Para zamiast jednego kroju (Hallmark: single-font page = slop). */
-@font-face {
-  font-family: 'Instrument Serif';
-  src: url('fonts/instrument-serif-latin.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2212;
-}
-@font-face {
-  font-family: 'Instrument Serif';
-  src: url('fonts/instrument-serif-latin-ext.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C0;
-}
+/* Typografia: JEDEN krój systemowy — na sprzęcie Apple SF Pro, dokładnie jak
+   w referencji Wabi. Hierarchię robi waga i wielkość (600/700 + tracking ujemny),
+   nie zmiana kroju. Instrument Serif wycofany decyzją Szymona (2026-07-25):
+   „czcionka i organizacja ma być bardziej Apple-like". Pliki fontów zostają
+   na dysku, ale nie są ładowane. */
 
 /* ---------- 1. Tokeny wspólne (motyw-niezależne) ---------- */
 :root {
@@ -32,7 +18,9 @@
   --r-sm: 8px; --r-md: 12px; --r-lg: 20px; --r-pill: 999px;
 
   --font: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-display: 'Instrument Serif', ui-serif, Georgia, serif;
+  /* Display = ten sam krój, inna waga i tracking (tokeny niżej) — Apple-like, nie para krojów. */
+  --font-display: var(--font);
+  --track-display: -0.022em;
 
   /* Skala 1,25 (tercja wielka) od 16 px — max 5 rozmiarów na ekran. */
   --text-xs: .72rem;
@@ -51,13 +39,16 @@
     0 1px 2px -1px var(--glass-drop);
   --glass-blur: blur(16px) saturate(1.8);
 
-  /* Ziarno + siatka: powierzchnia, którą szkło rozmywa i załamuje. */
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
-  /* Splot o okresie ~4,2 px — na tyle drobny, że mieści się w krążku 64 px,
-     i na tyle regularny, że soczewka ma co powiększyć. */
+  /* Ziarno: ledwo wyczuwalna faktura papieru — jedyna tekstura tła. Kraciasty splot
+     (repeating-linear-gradient 45°/-45°) WYCOFANY: na ekranie czytał się jak tkanina
+     obrusu, nie jak powierzchnia. Soczewka ma co załamywać: ziarno + plamy barwne. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  /* Tło sceny: trzy wielkie, miękkie plamy pastelu (szałwia / róż / niebo) na ciepłej
+     bieli + ziarno. Barwy z referencji kitu szkła; natężenie per motyw (tokeny --wash-*). */
   --paper:
-    repeating-linear-gradient(45deg,  transparent 0 2px, var(--paper-weave) 2px 3px),
-    repeating-linear-gradient(-45deg, transparent 0 2px, var(--paper-weave) 2px 3px),
+    radial-gradient(58rem 42rem at 10% -8%,  var(--wash-a), transparent 62%),
+    radial-gradient(52rem 38rem at 108% 14%, var(--wash-b), transparent 60%),
+    radial-gradient(46rem 42rem at 72% 112%, var(--wash-c), transparent 62%),
     var(--grain);
 
   --ease-glass: cubic-bezier(.22, 1, .36, 1);
@@ -77,8 +68,15 @@
   --line-strong: oklch(62% 0.014 40);   /* granice kontrolek — 3.4:1 na --bg */
   --line-soft:   oklch(93% 0.007 40);
 
-  --accent:    oklch(48% 0.10 240);
+  /* Akcent: głęboka szałwia z referencji (aktywny segment kitu szkła) — nie niebieski. */
+  --accent:    oklch(50% 0.055 165);
   --accent-fg: oklch(99% 0 0);
+  --accent-soft: oklch(50% 0.055 165 / .14);   /* podświetlenie zaznaczenia/fokusu */
+
+  /* Plamy tła (jasny: pastele czytelne, ale spokojne) */
+  --wash-a: oklch(93% 0.030 165 / .55);   /* szałwia */
+  --wash-b: oklch(94% 0.026 25 / .50);    /* róż pudrowy */
+  --wash-c: oklch(93% 0.024 250 / .34);   /* niebo */
 
   --glass-bg:     oklch(99% 0.004 40 / .62);
   --glass-tint:   oklch(99% 0.004 40 / .10);
@@ -92,8 +90,7 @@
   --glass-rim-b:   oklch(100% 0 0 / .85);
   --glass-hairline: oklch(100% 0 0 / .70);
   --glass-drop:    oklch(24% 0.012 40 / .28);
-  --paper-weave:   oklch(24% 0.012 40 / .022);
-  --iris:          .17;
+  --iris:          0;                      /* tęczowy rant WYCOFANY — Apple-like = wstrzemięźliwość */
   --caustic:      oklch(48% 0.27 268);
   --caustic-hot:  oklch(66% 0.21 243);
   --caustic-far:  oklch(52% 0.22 275 / .35);
@@ -122,8 +119,14 @@
   --line-strong: oklch(56% 0.014 265);  /* granice kontrolek — 3.4:1 na --bg */
   --line-soft:   oklch(25% 0.012 265);
 
-  --accent:    oklch(72% 0.13 240);
+  --accent:    oklch(76% 0.075 165);
   --accent-fg: oklch(16% 0.02 265);
+  --accent-soft: oklch(76% 0.075 165 / .16);
+
+  /* Plamy tła (ciemny: te same barwy, śladowe natężenie — scena, nie dyskoteka) */
+  --wash-a: oklch(40% 0.045 165 / .20);
+  --wash-b: oklch(38% 0.040 25 / .16);
+  --wash-c: oklch(40% 0.045 250 / .14);
 
   /* Szkło na ciemnym: korpus ciemnieje, rant jaśnieje, cień ustępuje poświacie. */
   --glass-bg:     oklch(70% 0.02 265 / .14);
@@ -138,8 +141,7 @@
   --glass-rim-b:   oklch(100% 0 0 / .18);
   --glass-hairline: oklch(100% 0 0 / .26);
   --glass-drop:    oklch(0% 0 0 / .55);
-  --paper-weave:   oklch(100% 0 0 / .020);
-  --iris:          .13;
+  --iris:          0;
   --caustic:      oklch(62% 0.24 258);
   --caustic-hot:  oklch(80% 0.18 232);
   --caustic-far:  oklch(60% 0.20 268 / .35);
@@ -196,9 +198,9 @@ header {
 header h1 {
   font-family: var(--font-display);
   font-size: var(--text-md);
-  font-weight: 400;
+  font-weight: 700;
   margin: 0;
-  letter-spacing: 0;
+  letter-spacing: var(--track-display);
 }
 
 #who { color: var(--muted); font-size: var(--text-xs); }
@@ -218,14 +220,14 @@ nav button {
   min-height: 36px;
   transition: color var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
 }
-nav button:hover { color: var(--fg); background: var(--bg-sunk); }
+nav button:hover { color: var(--fg); background: var(--accent-soft); }
+/* Aktywna karta: wypełniona głęboką szałwią jak segment z referencji —
+   „gdzie jestem" widać od razu, przyjemnie, bez ramek i cieni. */
 nav button.active {
-  color: var(--fg);
-  background: var(--glass-fill);
-  border-color: var(--line-strong);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: var(--glass-stack);
+  color: var(--accent-fg);
+  background: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 2px 10px -6px var(--glass-drop);
 }
 
 main {
@@ -233,6 +235,13 @@ main {
   margin: var(--space-7) auto var(--space-8);
   padding: 0 var(--space-5);
 }
+/* Widoki danych są tabelaryczne — na szerokim ekranie dostają szerszą scenę niż
+   formularz Wpisu (660 px dusiło 7 kolumn Historii niezależnie od stylów tabeli). */
+body:has(#view-historia:not([hidden])) main,
+body:has(#view-import:not([hidden])) main,
+body:has(#view-raporty:not([hidden])) main,
+body:has(#view-przydzial:not([hidden])) main,
+body:has(#view-admin:not([hidden])) main { max-width: 1080px; }
 
 /* `both` zostawiłoby sekcję na zawsze w stanie animowanej opacity — a element
    z animowaną opacity jest korzeniem tła, więc backdrop-filter w środku nie ma
@@ -296,19 +305,24 @@ header .theme-switch { margin-left: auto; }
 header .theme-switch + #who { margin-left: 0; }
 
 /* ---------- 7. Karty, pola, przyciski ---------- */
+/* Karta = mleczna tafla z referencji: półprzezroczysta, rozmywa plamy tła pod sobą,
+   biały rant u góry, miękki cień. Treść leży NA szkle, nie na płaskim kartonie. */
 .card {
   position: relative;
-  background: var(--surface);
+  background: var(--glass-bg);
   border: 1px solid transparent;
   border-radius: var(--r-lg);
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow:
     inset 0 1px 0 var(--glass-rim-a),
+    inset 0 0 0 .5px var(--glass-hairline),
     0 1px 2px -1px var(--glass-drop),
-    0 12px 32px -24px var(--glass-drop);
+    0 18px 44px -30px var(--glass-drop);
 }
 .card.center { align-items: center; text-align: center; padding: var(--space-7) var(--space-4); }
 
@@ -329,16 +343,22 @@ input, select {
   transition: border-color var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
 }
 input:hover, select:hover { border-color: var(--muted); }
-input:focus-visible, select:focus-visible { border-color: var(--accent); }
+/* Fokus = przyjemna poświata, nie sama zmiana ramki: widać, GDZIE się wpisuje. */
+input:focus-visible, select:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--accent-soft), inset 0 1px 2px var(--glass-rim-a);
+}
 input::placeholder { color: var(--muted); }
 input:disabled, select:disabled, .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 input#amount {
   font-family: var(--font-display);
   font-size: clamp(2.4rem, 8vw, 3rem);
-  font-weight: 400;
+  font-weight: 600;
   text-align: center;
-  letter-spacing: 0;
+  letter-spacing: var(--track-display);
+  font-variant-numeric: tabular-nums;
   min-height: 64px;
   padding-top: var(--space-3);
   border: 0;
@@ -380,10 +400,11 @@ input#amount::placeholder {
 }
 .btn:hover { border-color: var(--muted); }
 .btn:active { transform: scale(.985); }
-.btn.primary { background: color-mix(in oklch, var(--fg) 92%, transparent); color: var(--bg);
-  border-color: color-mix(in oklch, var(--fg) 60%, transparent);
-  box-shadow: 0 1px 2px -1px var(--glass-drop); }
-.btn.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+/* Główna akcja: pełna szałwia — jednoznaczne „to jest TEN przycisk". */
+.btn.primary { background: var(--accent); color: var(--accent-fg);
+  border-color: transparent; font-weight: 600;
+  box-shadow: 0 1px 2px -1px var(--glass-drop), 0 10px 24px -16px var(--accent); }
+.btn.primary:hover { background: color-mix(in oklch, var(--accent) 88%, var(--fg)); }
 .btn.big { padding: var(--space-4) var(--space-5); font-size: var(--text-base); min-height: 52px; }
 
 .seg { gap: 0; padding: 3px; background: var(--glass-fill); border: 1px solid var(--line-strong);
@@ -408,40 +429,20 @@ input#amount::placeholder {
    dziedziczone z .row > * min-width 8rem rozsadzało wiersz. */
 .seg > button { min-width: 0; flex: 1 1 0; padding-inline: var(--space-2); }
 .seg button:hover { color: var(--fg); }
-.seg button.active[data-type="WYDATEK"] { background: var(--glass-fill); color: var(--expense); box-shadow: var(--glass-stack); }
-.seg button.active[data-type="PRZYCHÓD"] { background: var(--glass-fill); color: var(--income); box-shadow: var(--glass-stack); }
-.seg button.active[data-type="TRANSFER"] { background: var(--glass-fill); color: var(--transfer); box-shadow: var(--glass-stack); }
+/* Wybrany typ: pastelowe wypełnienie w barwie znaczenia + mocny tekst — od razu widać,
+   co jest zaznaczone (jak aktywny segment w referencji), bez szklanych cieni. */
+.seg button.active { font-weight: 600; box-shadow: 0 1px 4px -2px var(--glass-drop); }
+.seg button.active[data-type="WYDATEK"] { background: color-mix(in oklch, var(--expense) 16%, var(--surface)); color: var(--expense); }
+.seg button.active[data-type="PRZYCHÓD"] { background: color-mix(in oklch, var(--income) 16%, var(--surface)); color: var(--income); }
+.seg button.active[data-type="TRANSFER"] { background: color-mix(in oklch, var(--transfer) 16%, var(--surface)); color: var(--transfer); }
 
 .msg { min-height: 1.2em; margin: 0; font-size: var(--text-sm); color: var(--muted); }
 .msg.ok { color: var(--income); }
 .msg.err { color: var(--danger); }
 
-/* Tęczowy rant — światło rozszczepione na krawędzi tafli. Trik „gradient border":
-   barwa pod maską, która wycina środek i zostawia sam obrys. Sygnaturowy detal
-   referencyjnego studium UI; siła sterowana tokenem --iris (mniejsza w ciemnym). */
-.card::after,
-.btn:not(.primary)::after,
-.btn-glass::after,
-.kpi .tile::after,
-nav button.active::after,
-.seg button.active::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  pointer-events: none;
-  background: conic-gradient(from 200deg,
-    oklch(72% 0.17 25 / .9), oklch(78% 0.14 95 / .45), oklch(74% 0.15 200 / .9),
-    oklch(72% 0.17 305 / .45), oklch(72% 0.17 25 / .9));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  opacity: var(--iris);
-}
-/* Pod tekstem karty rant nie może odciągać uwagi — tam tylko delikatny błysk. */
-.card::after { opacity: calc(var(--iris) * .5); }
+/* Tęczowy rant („iris") WYCOFANY 2026-07-25: na produkcji czytał się jako artefakt
+   renderowania, nie detal. Token --iris zostaje na 0 — gdyby kiedyś wracał, wraca
+   świadomą decyzją, nie kopiuj-wklej. */
 
 /* ---------- 8. Dane: tabele, KPI, słupki ---------- */
 h2 { font-size: var(--text-xs); margin: var(--space-6) 0 var(--space-2); color: var(--muted);
@@ -465,8 +466,9 @@ td.exp { color: var(--expense); } td.inc { color: var(--income); } td.trf { colo
   display: block;
   font-family: var(--font-display);
   font-size: clamp(1.6rem, 4vw, 2rem);
-  font-weight: 400;
-  letter-spacing: 0;
+  font-weight: 600;
+  letter-spacing: var(--track-display);
+  font-variant-numeric: tabular-nums;
   margin-bottom: var(--space-1);
 }
 .kpi .tile span { color: var(--muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
