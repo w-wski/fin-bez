@@ -4,18 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Finansowa</title>
+<meta name="description" content="Finansowa — pieniądze rodziny i spółki PERSEVERA w jednym miejscu. Aplikacja prywatna.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Finansowa">
+<link rel="preload" href="fonts/instrument-serif-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-serif-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="css/logowanie.css">
 <link rel="stylesheet" href="css/historia.css">
 <link rel="stylesheet" href="css/kategorie.css">
 <link rel="stylesheet" href="css/paragon.css">
 <link rel="stylesheet" href="css/przydzial.css">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#1f6f43">
+<meta name="theme-color" content="#f4ece9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1b20" media="(prefers-color-scheme: dark)">
+<script>
+/* Motyw ustawiony PRZED pierwszym malowaniem — bez mignięcia (FOUC).
+   AUTO = wg pory dnia: 07:00–18:59 jasny, 19:00–06:59 ciemny. Patrz theme.js. */
+(function () {
+  var mode = 'auto';
+  try { var v = localStorage.getItem('fin-theme'); if (v === 'light' || v === 'dark' || v === 'auto') mode = v; } catch (e) {}
+  var h = new Date().getHours();
+  document.documentElement.dataset.themeMode = mode;
+  document.documentElement.dataset.theme = mode === 'auto' ? (h >= 7 && h < 19 ? 'light' : 'dark') : mode;
+})();
+</script>
 </head>
 <body>
 <header>
-  <h1>💰 Finansowa</h1>
+  <h1>Finansowa</h1>
   <nav id="nav" hidden>
     <button data-view="wpis" class="active">Wpis</button>
     <button data-view="historia">Historia</button>
@@ -26,15 +46,56 @@
     <button data-view="admin" data-admin hidden>Admin</button>
   </nav>
   <span id="netBadge" class="pill net" hidden></span>
+  <div class="theme-switch"></div>
   <div id="who"></div>
 </header>
 
 <main>
-  <!-- LOGOWANIE -->
+  <!-- LOGOWANIE — scena szkła (docs/design/DESIGN-SPEC-GLASS.md §4) -->
   <section id="view-login" hidden>
-    <div class="card center">
-      <p>Finanse rodziny i spółki PERSEVERA.</p>
-      <a class="btn primary" href="/auth/login">Zaloguj przez Google</a>
+    <div class="login" tabindex="0" role="group" aria-label="Ekran powitalny">
+
+      <!-- Faza A + faza D: jeden blok treści, przenikające się warstwy -->
+      <div class="login__inner">
+        <p class="login__hero">Spokój w finansach zaczyna się tutaj.</p>
+        <div class="login__mark" aria-hidden="true"></div>
+        <h2 class="login__title">Finansowa.</h2>
+        <p class="login__sub">Pieniądze rodziny i spółki.</p>
+      </div>
+
+      <div class="login__bubbles" aria-hidden="true"></div>
+
+      <!-- Soczewka: kopia sceny załamana filtrem #fin-refract -->
+      <div class="lens" aria-hidden="true">
+        <div class="lens__scene">
+          <div class="lens__world">
+            <div class="login__inner">
+              <p class="login__hero">Spokój w finansach zaczyna się tutaj.</p>
+              <div class="login__mark"></div>
+              <h2 class="login__title">Finansowa.</h2>
+              <p class="login__sub">Pieniądze rodziny i spółki.</p>
+            </div>
+          </div>
+        </div>
+        <div class="lens__glass"></div>
+        <div class="lens__caustic"></div>
+      </div>
+
+      <div class="theme-switch login__switch"></div>
+
+      <p class="login__hint">Przesuń w górę</p>
+
+      <div class="login__actions">
+        <a class="btn-glass" href="/auth/login">
+          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          Zaloguj przez Google
+        </a>
+      </div>
     </div>
   </section>
 
@@ -72,9 +133,9 @@
         <span id="histTools"></span>
         <button class="btn" id="fGo">Filtruj</button>
       </div>
-      <table id="txTable"><thead>
+      <div class="overflow"><table id="txTable"><thead>
         <tr><th>Data</th><th>Typ</th><th>Kategoria</th><th class="num">Kwota</th><th>Opis</th><th>Kto</th><th></th></tr>
-      </thead><tbody></tbody></table>
+      </thead><tbody></tbody></table></div>
       <button class="btn" id="more" hidden>Pokaż więcej</button>
     </div>
   </section>
@@ -94,7 +155,7 @@
       <h2>Do uzgodnienia <span id="unCount" class="pill"></span></h2>
       <div id="unmatched"></div>
       <h2>Historia importów</h2>
-      <table id="impTable"><thead><tr><th>Kiedy</th><th>Bank</th><th>Plik</th><th class="num">+</th><th class="num">dup</th><th class="num">błędy</th><th>Kto</th></tr></thead><tbody></tbody></table>
+      <div class="overflow"><table id="impTable"><thead><tr><th>Kiedy</th><th>Bank</th><th>Plik</th><th class="num">+</th><th class="num">dup</th><th class="num">błędy</th><th>Kto</th></tr></thead><tbody></tbody></table></div>
     </div>
   </section>
 
@@ -139,7 +200,7 @@
       <h2>Wydatki wg kategorii</h2>
       <div id="byCat"></div>
       <h2>Trend 6 miesięcy</h2>
-      <table id="trend"><thead><tr><th>Miesiąc</th><th class="num">Przychody</th><th class="num">Wydatki</th><th class="num">Bilans</th></tr></thead><tbody></tbody></table>
+      <div class="overflow"><table id="trend"><thead><tr><th>Miesiąc</th><th class="num">Przychody</th><th class="num">Wydatki</th><th class="num">Bilans</th></tr></thead><tbody></tbody></table></div>
       <div id="fvp"></div>
       <div id="telemetria"></div>
     </div>
@@ -155,6 +216,34 @@
     <div class="card"><div id="adminBox"></div></div>
   </section>
 </main>
+<!-- Filtr refrakcji soczewki. Mapa przemieszczenia (href) jest generowana raz przez glass.js.
+     Trzy przebiegi o różnej sile + rozdzielenie kanałów = aberracja chromatyczna przy rancie.
+     color-interpolation-filters="sRGB" — bez tego linearRGB przekłamuje barwy.
+     feImage bez x/y/width/height: podobszar domyślnie równy regionowi filtra (= bbox soczewki). -->
+<svg class="fin-defs" width="0" height="0" aria-hidden="true" focusable="false"
+     style="position:absolute;width:0;height:0;overflow:hidden">
+  <defs>
+    <filter id="fin-refract" x="0%" y="0%" width="100%" height="100%"
+            color-interpolation-filters="sRGB">
+      <feImage id="fin-refract-map" preserveAspectRatio="none" result="lensmap"/>
+      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="137" xChannelSelector="R" yChannelSelector="G" result="dR"/>
+      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="133" xChannelSelector="R" yChannelSelector="G" result="dG"/>
+      <feDisplacementMap in="SourceGraphic" in2="lensmap" scale="129" xChannelSelector="R" yChannelSelector="G" result="dB"/>
+      <feColorMatrix in="dR" type="matrix" result="cR"
+        values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/>
+      <feColorMatrix in="dG" type="matrix" result="cG"
+        values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0"/>
+      <feColorMatrix in="dB" type="matrix" result="cB"
+        values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
+      <feComposite in="cR" in2="cG" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="cRG"/>
+      <feComposite in="cRG" in2="cB" operator="arithmetic" k1="0" k2="1" k3="1" k4="0"/>
+    </filter>
+  </defs>
+</svg>
+
+<script type="module" src="theme.js"></script>
+<script type="module" src="typografia.js"></script>
+<script type="module" src="glass.js"></script>
 <script type="module" src="main.js"></script>
 </body>
 </html>

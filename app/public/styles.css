@@ -1,82 +1,581 @@
+/* ============================================================================
+   finansowa — tokeny systemu „Szkło" + komponenty WSPÓLNE (wiele widoków).
+   Styl pojedynczego widoku mieszka w css/<widok>.css (scena logowania:
+   css/logowanie.css). Źródło prawdy designu: repo finansowe,
+   docs/design/DESIGN-SPEC-GLASS.md. Komponenty nie znają wartości — tokeny.
+   ========================================================================== */
+/* Display: Instrument Serif (self-host, OFL) — hero, wordmark, kwoty-bohaterki.
+   Body: system-ui — na sprzęcie Apple daje SF Pro, naturę „Apple look".
+   Para zamiast jednego kroju (Hallmark: single-font page = slop). */
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('fonts/instrument-serif-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2212;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('fonts/instrument-serif-latin-ext.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C0;
+}
+
+/* ---------- 1. Tokeny wspólne (motyw-niezależne) ---------- */
 :root {
-  --bg: #f7f7f5; --fg: #1a1a1a; --muted: #6b6b6b; --card: #ffffff;
-  --line: #e4e4e0; --primary: #1f6f43; --primary-fg: #ffffff;
-  --danger: #a4262c; --income: #1f6f43; --expense: #a4262c; --bar: #cfe3d8;
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+
+  --r-sm: 8px; --r-md: 12px; --r-lg: 20px; --r-pill: 999px;
+
+  --font: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Instrument Serif', ui-serif, Georgia, serif;
+
+  /* Skala 1,25 (tercja wielka) od 16 px — max 5 rozmiarów na ekran. */
+  --text-xs: .72rem;
+  --text-sm: .875rem;
+  --text-base: 1rem;
+  --text-md: 1.25rem;
+  --text-display: clamp(2rem, 5vw + 1rem, 2.6rem);
+
+  /* Stos szkła: dwa przeciwstawne rozświetlenia (bevel) + ostry rant + cień pod spodem.
+     Odpowiednik warstw z przepisu Apo, ale jako jeden box-shadow — bez mnożenia elementów. */
+  --glass-stack:
+    inset 2px -1px 5px -1px var(--glass-rim-a),
+    inset -4px 4px 12px -3px var(--glass-rim-b),
+    inset 0 0 0 .5px var(--glass-hairline),
+    0 4px 22px -10px var(--glass-drop),
+    0 1px 2px -1px var(--glass-drop);
+  --glass-blur: blur(16px) saturate(1.8);
+
+  /* Ziarno + siatka: powierzchnia, którą szkło rozmywa i załamuje. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
+  /* Splot o okresie ~4,2 px — na tyle drobny, że mieści się w krążku 64 px,
+     i na tyle regularny, że soczewka ma co powiększyć. */
+  --paper:
+    repeating-linear-gradient(45deg,  transparent 0 2px, var(--paper-weave) 2px 3px),
+    repeating-linear-gradient(-45deg, transparent 0 2px, var(--paper-weave) 2px 3px),
+    var(--grain);
+
+  --ease-glass: cubic-bezier(.22, 1, .36, 1);
+  --ease-soft: cubic-bezier(.4, 0, .2, 1);
+  --t-fast: 150ms; --t-base: 240ms; --t-slow: 380ms;
+
 }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #161615; --fg: #ececea; --muted: #9d9d98; --card: #1f1f1e;
-    --line: #33332f; --primary: #3f9d68; --primary-fg: #0c130f;
-    --income: #56b884; --expense: #e0766c; --bar: #2c4638; }
+
+/* ---------- 2. Motyw jasny (kotwica z referencji: ciepła pudrowa biel) ---------- */
+:root, :root[data-theme="light"] {
+  --bg:        oklch(97.5% 0.008 40);
+  --bg-sunk:   oklch(95.5% 0.010 40);
+  --surface:   oklch(99.2% 0.004 40);
+  --fg:        oklch(24% 0.012 40);
+  --muted:     oklch(52% 0.010 40);
+  --line:        oklch(89% 0.008 40);   /* włoskowate linie dekoracyjne */
+  --line-strong: oklch(62% 0.014 40);   /* granice kontrolek — 3.4:1 na --bg */
+  --line-soft:   oklch(93% 0.007 40);
+
+  --accent:    oklch(48% 0.10 240);
+  --accent-fg: oklch(99% 0 0);
+
+  --glass-bg:     oklch(99% 0.004 40 / .62);
+  --glass-tint:   oklch(99% 0.004 40 / .10);
+  --glass-rim:    oklch(100% 0 0 / .9);
+  --glass-edge:   oklch(24% 0.012 40 / .10);
+  --glass-shadow: oklch(24% 0.012 40 / .16);
+  --glass-hi:     oklch(100% 0 0 / .30);
+  --glass-horizon: oklch(30% 0.05 280 / .30);
+  --glass-fill:    oklch(100% 0 0 / .10);
+  --glass-rim-a:   oklch(100% 0 0 / .55);
+  --glass-rim-b:   oklch(100% 0 0 / .85);
+  --glass-hairline: oklch(100% 0 0 / .70);
+  --glass-drop:    oklch(24% 0.012 40 / .28);
+  --paper-weave:   oklch(24% 0.012 40 / .022);
+  --iris:          .17;
+  --caustic:      oklch(48% 0.27 268);
+  --caustic-hot:  oklch(66% 0.21 243);
+  --caustic-far:  oklch(52% 0.22 275 / .35);
+
+  --income:  oklch(46% 0.11 155);
+  --expense: oklch(48% 0.15 25);
+  --transfer: oklch(46% 0.09 250);   /* przesunięcie własnych pieniędzy — neutralne, nie ± */
+
+  /* Aliasy zgodności: css/<widok>.css używa historycznych nazw. */
+  --card: var(--surface);
+  --primary: var(--accent);
+  --primary-fg: var(--accent-fg);
+  --bar:     oklch(72% 0.090 220);
+  --danger:  oklch(48% 0.15 25);
+  color-scheme: light;
 }
+
+/* ---------- 3. Motyw ciemny (osobna scena, nie przyciemniony jasny) ---------- */
+:root[data-theme="dark"] {
+  --bg:        oklch(17% 0.010 265);
+  --bg-sunk:   oklch(14% 0.010 265);
+  --surface:   oklch(21% 0.012 265);
+  --fg:        oklch(94% 0.006 265);
+  --muted:     oklch(69% 0.012 265);
+  --line:        oklch(30% 0.012 265);
+  --line-strong: oklch(56% 0.014 265);  /* granice kontrolek — 3.4:1 na --bg */
+  --line-soft:   oklch(25% 0.012 265);
+
+  --accent:    oklch(72% 0.13 240);
+  --accent-fg: oklch(16% 0.02 265);
+
+  /* Szkło na ciemnym: korpus ciemnieje, rant jaśnieje, cień ustępuje poświacie. */
+  --glass-bg:     oklch(70% 0.02 265 / .14);
+  --glass-tint:   oklch(80% 0.02 265 / .07);
+  --glass-rim:    oklch(100% 0 0 / .44);
+  --glass-edge:   oklch(100% 0 0 / .10);
+  --glass-shadow: oklch(0% 0 0 / .48);
+  --glass-hi:     oklch(100% 0 0 / .19);
+  --glass-horizon: oklch(72% 0.05 250 / .26);
+  --glass-fill:    oklch(100% 0 0 / .05);
+  --glass-rim-a:   oklch(100% 0 0 / .22);
+  --glass-rim-b:   oklch(100% 0 0 / .18);
+  --glass-hairline: oklch(100% 0 0 / .26);
+  --glass-drop:    oklch(0% 0 0 / .55);
+  --paper-weave:   oklch(100% 0 0 / .020);
+  --iris:          .13;
+  --caustic:      oklch(62% 0.24 258);
+  --caustic-hot:  oklch(80% 0.18 232);
+  --caustic-far:  oklch(60% 0.20 268 / .35);
+
+  --income:  oklch(76% 0.13 155);
+  --expense: oklch(72% 0.15 25);
+  --transfer: oklch(74% 0.09 250);
+  --bar:     oklch(58% 0.100 220);
+  --danger:  oklch(72% 0.15 25);
+  color-scheme: dark;
+}
+
+/* ---------- 4. Podstawy ---------- */
 * { box-sizing: border-box; }
-body { margin: 0; font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
-  background: var(--bg); color: var(--fg); }
-header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-  padding: .7rem 1rem; border-bottom: 1px solid var(--line); }
-header h1 { font-size: 1.1rem; margin: 0; }
-#who { margin-left: auto; color: var(--muted); font-size: .85rem; }
-nav { display: flex; gap: .25rem; }
-nav button { border: 1px solid var(--line); background: var(--card); color: var(--fg);
-  padding: .45rem .8rem; border-radius: .5rem; cursor: pointer; font-size: .95rem; }
-nav button.active { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
-main { max-width: 760px; margin: 1rem auto; padding: 0 .8rem; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: .8rem;
-  padding: 1rem; display: flex; flex-direction: column; gap: .6rem; }
-.card.center { align-items: center; text-align: center; padding: 2.5rem 1rem; }
-.row { display: flex; gap: .5rem; }
+
+html, body { min-height: 100%; }
+
+body {
+  margin: 0;
+  font: 400 16px/1.5 var(--font);
+  background-color: var(--bg);
+  background-image: var(--paper);
+  background-attachment: fixed;
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color var(--t-base) var(--ease-soft), color var(--t-base) var(--ease-soft);
+  overflow-x: hidden;
+}
+
+:where(h1, h2, h3) { font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+p { text-wrap: pretty; max-width: 65ch; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+::selection { background: color-mix(in oklch, var(--accent) 28%, transparent); }
+
+/* ---------- 5. Nagłówek i nawigacja (jedna z nielicznych warstw ze szkłem) ---------- */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-5);
+  background: var(--glass-fill);
+  border-bottom: 1px solid var(--line-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 -1px 0 var(--glass-hairline), 0 6px 24px -18px var(--glass-drop);
+}
+
+header h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 400;
+  margin: 0;
+  letter-spacing: 0;
+}
+
+#who { color: var(--muted); font-size: var(--text-xs); }
+
+nav { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+
+nav button {
+  position: relative;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  min-height: 36px;
+  transition: color var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
+}
+nav button:hover { color: var(--fg); background: var(--bg-sunk); }
+nav button.active {
+  color: var(--fg);
+  background: var(--glass-fill);
+  border-color: var(--line-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-stack);
+}
+
+main {
+  max-width: 660px;
+  margin: var(--space-7) auto var(--space-8);
+  padding: 0 var(--space-5);
+}
+
+/* `both` zostawiłoby sekcję na zawsze w stanie animowanej opacity — a element
+   z animowaną opacity jest korzeniem tła, więc backdrop-filter w środku nie ma
+   czego próbkować. `backwards` zwalnia element zaraz po wejściu. */
+main > section { animation: view-in var(--t-base) var(--ease-glass) backwards; }
+@keyframes view-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* ---------- 6. Przełącznik motywu — jedna kropka ----------
+   To nie jest funkcja do eksponowania: żadnych stałych napisów. Kropka pokazuje stan
+   samym wypełnieniem (pusta = jasny, pełna = ciemny, pół na pół = auto), a nazwa trybu
+   pojawia się na chwilę dopiero po kliknięciu. */
+.theme-switch {
+  display: inline-flex;
+  flex-direction: row-reverse;   /* ulotna etykieta wychodzi w lewo, nie poza ekran */
+  align-items: center;
+  gap: var(--space-2);
+}
+.theme-dot {
+  width: 44px; height: 44px;     /* cel dotykowy, choć sama kropka jest mała */
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-dot__i {
+  width: 17px; height: 17px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: transparent;
+  transition: background-color var(--t-base) var(--ease-soft),
+              border-color var(--t-base) var(--ease-soft);
+}
+.theme-dot:hover .theme-dot__i { border-color: var(--fg); }
+.theme-dot:active .theme-dot__i { transform: scale(.92); }
+
+:root[data-theme-mode="dark"] .theme-dot__i { background: var(--fg); border-color: var(--fg); }
+:root[data-theme-mode="auto"] .theme-dot__i {
+  border-color: var(--fg);
+  background: linear-gradient(90deg, transparent 0 50%, var(--fg) 50% 100%);
+}
+
+/* Etykieta zostaje w drzewie dostępności (aria-live ją czyta), a widoczna jest
+   tylko przez chwilę po kliknięciu. */
+.theme-switch__now {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(4px);
+  pointer-events: none;
+  transition: opacity var(--t-base) var(--ease-soft), transform var(--t-base) var(--ease-soft);
+}
+.theme-switch.is-showing .theme-switch__now { opacity: 1; transform: none; }
+
+header .theme-switch { margin-left: auto; }
+header .theme-switch + #who { margin-left: 0; }
+
+/* ---------- 7. Karty, pola, przyciski ---------- */
+.card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim-a),
+    0 1px 2px -1px var(--glass-drop),
+    0 12px 32px -24px var(--glass-drop);
+}
+.card.center { align-items: center; text-align: center; padding: var(--space-7) var(--space-4); }
+
+.row { display: flex; gap: var(--space-3); }
 .row.wrap { flex-wrap: wrap; }
 .row > * { flex: 1; min-width: 8rem; }
-input, select { padding: .6rem .7rem; border: 1px solid var(--line); border-radius: .5rem;
-  background: var(--bg); color: var(--fg); font-size: 1rem; width: 100%; }
-input#amount { font-size: 1.6rem; text-align: center; }
-.btn { display: inline-block; text-align: center; padding: .55rem 1rem; border-radius: .5rem;
-  border: 1px solid var(--line); background: var(--card); color: var(--fg);
-  cursor: pointer; text-decoration: none; font-size: 1rem; }
-.btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
-.btn.big { padding: .8rem; font-size: 1.1rem; }
-.seg button { flex: 1; padding: .6rem; border: 1px solid var(--line); background: var(--card);
-  color: var(--fg); cursor: pointer; font-size: 1rem; }
-.seg button:first-child { border-radius: .5rem 0 0 .5rem; }
-.seg button:last-child { border-radius: 0 .5rem .5rem 0; }
-.seg button.active[data-type="WYDATEK"] { background: var(--expense); color: #fff; border-color: var(--expense); }
-.seg button.active[data-type="PRZYCHÓD"] { background: var(--income); color: #fff; border-color: var(--income); }
-.seg button.active[data-type="TRANSFER"] { background: var(--muted); color: var(--card); border-color: var(--muted); }
-.seg button:not(:first-child):not(:last-child) { border-radius: 0; }
-.msg { min-height: 1.2em; margin: 0; font-size: .9rem; color: var(--muted); }
-.msg.ok { color: var(--income); } .msg.err { color: var(--danger); }
-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
-th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--line); }
-th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
-td.exp { color: var(--expense); } td.inc { color: var(--income); }
-.overflow { overflow-x: auto; }
-.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .6rem; }
-.kpi .tile { border: 1px solid var(--line); border-radius: .6rem; padding: .6rem .8rem; }
-.kpi .tile b { display: block; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
-.kpi .tile span { color: var(--muted); font-size: .8rem; }
-.barrow { display: grid; grid-template-columns: minmax(7rem, 14rem) 1fr auto; gap: .5rem;
-  align-items: center; font-size: .9rem; padding: .15rem 0; }
-.barrow .bar { height: .9rem; background: var(--bar); border-radius: .25rem; min-width: 2px; }
-.barrow .val { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pill { background: var(--bar); border-radius: 1rem; padding: .05rem .5rem; font-size: .8rem; }
-.un { border: 1px solid var(--line); border-radius: .5rem; padding: .5rem .7rem; margin: .3rem 0;
-  display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; font-size: .9rem; }
-.un .grow { flex: 1; min-width: 12rem; }
-h2 { font-size: 1rem; margin: .6rem 0 .1rem; }
-a.small, button.small { font-size: .8rem; padding: .25rem .5rem; }
-.pill.net { margin-left: auto; background: var(--bar); }
-.pill.net.off { background: var(--expense); color: #fff; }
-.pill.net + #who { margin-left: .6rem; }
-.rcv { width: 100%; height: auto; border: 1px solid var(--line); border-radius: .5rem; touch-action: none; }
-tr.lowconf td { background: color-mix(in srgb, var(--expense) 12%, transparent); }
-label { font-size: .9rem; display: flex; align-items: center; gap: .4rem; }
 
-/* Toast: krótki komunikat u dołu ekranu, opcjonalnie z akcją („Cofnij").
-   Tworzony z core.js, jeden naraz. Na wąskim ekranie ciągnie się na całą szerokość. */
-.toast { position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%);
-  display: flex; align-items: center; gap: .8rem; max-width: min(34rem, calc(100vw - 1.6rem));
-  background: var(--fg); color: var(--bg); padding: .6rem .9rem; border-radius: .6rem;
-  box-shadow: 0 .4rem 1.2rem rgb(0 0 0 / .28); font-size: .92rem; z-index: 50; }
+input, select {
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  width: 100%;
+  min-height: 44px;
+  box-shadow: inset 0 1px 2px var(--glass-rim-a), inset 0 0 0 .5px var(--glass-hairline);
+  transition: border-color var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
+}
+input:hover, select:hover { border-color: var(--muted); }
+input:focus-visible, select:focus-visible { border-color: var(--accent); }
+input::placeholder { color: var(--muted); }
+input:disabled, select:disabled, .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+input#amount {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 8vw, 3rem);
+  font-weight: 400;
+  text-align: center;
+  letter-spacing: 0;
+  min-height: 64px;
+  padding-top: var(--space-3);
+  border: 0;
+  background: transparent;
+  box-shadow: inset 0 -1.5px 0 var(--line-strong);
+  border-radius: 0;
+  caret-color: var(--accent);
+}
+input#amount:hover { border: 0; box-shadow: inset 0 -1.5px 0 var(--muted); }
+input#amount:focus-visible { outline: none; box-shadow: inset 0 -2px 0 var(--accent); }
+/* Podpowiedź nie może udawać wpisanej kwoty — wartość jest wielka, podpowiedź cicha. */
+input#amount::placeholder {
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: var(--text-md);
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  text-align: center;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-strong);
+  background: var(--glass-fill);
+  color: var(--fg);
+  cursor: pointer;
+  text-decoration: none;
+  font: inherit;
+  min-height: 44px;
+  box-shadow: var(--glass-stack);
+  transition: transform var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft),
+              border-color var(--t-fast) var(--ease-soft);
+}
+.btn:hover { border-color: var(--muted); }
+.btn:active { transform: scale(.985); }
+.btn.primary { background: color-mix(in oklch, var(--fg) 92%, transparent); color: var(--bg);
+  border-color: color-mix(in oklch, var(--fg) 60%, transparent);
+  box-shadow: 0 1px 2px -1px var(--glass-drop); }
+.btn.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.big { padding: var(--space-4) var(--space-5); font-size: var(--text-base); min-height: 52px; }
+
+.seg { gap: 0; padding: 3px; background: var(--glass-fill); border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 1px 3px var(--glass-drop), inset 0 0 0 .5px var(--glass-hairline); }
+.seg button {
+  position: relative;
+  flex: 1;
+  padding: var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  min-height: 44px;
+  border-radius: var(--r-pill);
+  transition: color var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
+}
+.seg button:first-child, .seg button:last-child { border-radius: var(--r-pill); }
+/* Trzy przyciski (Wydatek/Przychód/Transfer) muszą zmieścić się na 320 px:
+   dziedziczone z .row > * min-width 8rem rozsadzało wiersz. */
+.seg > button { min-width: 0; flex: 1 1 0; padding-inline: var(--space-2); }
+.seg button:hover { color: var(--fg); }
+.seg button.active[data-type="WYDATEK"] { background: var(--glass-fill); color: var(--expense); box-shadow: var(--glass-stack); }
+.seg button.active[data-type="PRZYCHÓD"] { background: var(--glass-fill); color: var(--income); box-shadow: var(--glass-stack); }
+.seg button.active[data-type="TRANSFER"] { background: var(--glass-fill); color: var(--transfer); box-shadow: var(--glass-stack); }
+
+.msg { min-height: 1.2em; margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.msg.ok { color: var(--income); }
+.msg.err { color: var(--danger); }
+
+/* Tęczowy rant — światło rozszczepione na krawędzi tafli. Trik „gradient border":
+   barwa pod maską, która wycina środek i zostawia sam obrys. Sygnaturowy detal
+   referencyjnego studium UI; siła sterowana tokenem --iris (mniejsza w ciemnym). */
+.card::after,
+.btn:not(.primary)::after,
+.btn-glass::after,
+.kpi .tile::after,
+nav button.active::after,
+.seg button.active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: conic-gradient(from 200deg,
+    oklch(72% 0.17 25 / .9), oklch(78% 0.14 95 / .45), oklch(74% 0.15 200 / .9),
+    oklch(72% 0.17 305 / .45), oklch(72% 0.17 25 / .9));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: var(--iris);
+}
+/* Pod tekstem karty rant nie może odciągać uwagi — tam tylko delikatny błysk. */
+.card::after { opacity: calc(var(--iris) * .5); }
+
+/* ---------- 8. Dane: tabele, KPI, słupki ---------- */
+h2 { font-size: var(--text-xs); margin: var(--space-6) 0 var(--space-2); color: var(--muted);
+     text-transform: uppercase; letter-spacing: .11em; font-weight: 600; }
+
+table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+th, td { text-align: left; padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--line-soft); }
+th { font-size: var(--text-sm); text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 500; }
+tbody tr:last-child td { border-bottom: 0; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.exp { color: var(--expense); } td.inc { color: var(--income); } td.trf { color: var(--transfer); }
+/* Szerokie tabele przewijają się WEWNĄTRZ karty — strona nigdy nie jedzie w bok. */
+.overflow { overflow-x: auto; max-width: 100%; overscroll-behavior-x: contain; }
+.overflow table { min-width: max-content; }
+
+.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); }
+.kpi .tile { position: relative; border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--space-4);
+  background: var(--bg-sunk);
+  box-shadow: inset 0 1px 0 var(--glass-rim-a); }
+.kpi .tile b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4vw, 2rem);
+  font-weight: 400;
+  letter-spacing: 0;
+  margin-bottom: var(--space-1);
+}
+.kpi .tile span { color: var(--muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
+
+.barrow { display: grid; grid-template-columns: minmax(7rem, 14rem) 1fr auto; gap: var(--space-3);
+  align-items: center; font-size: var(--text-sm); padding: var(--space-1) 0; }
+.barrow .bar { height: 8px; background: var(--bar); border-radius: var(--r-pill); min-width: 2px; }
+.barrow .val { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.pill { background: var(--glass-fill); border: 1px solid var(--line); border-radius: var(--r-pill);
+  padding: 2px var(--space-3); font-size: var(--text-xs); color: var(--muted);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-stack); }
+.pill.bank {
+  background: color-mix(in oklch, var(--accent) 12%, transparent);
+  border-color: color-mix(in oklch, var(--accent) 36%, transparent);
+  color: var(--accent);
+  font-weight: 500;
+}
+.pill.net { margin-left: auto; }
+.pill.net.off { background: var(--expense); border-color: var(--expense); color: var(--bg); }
+.pill.net + #who { margin-left: var(--space-3); }
+
+.un { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--space-3) var(--space-4);
+  margin: var(--space-2) 0; display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; font-size: var(--text-sm); }
+.un .grow { flex: 1; min-width: 12rem; }
+
+/* Puste stany — checklista wymaga `—`, nie milczącej pustki. */
+.overflow:has(tbody:empty)::after,
+#kpi:empty::before,
+#byCat:empty::before {
+  content: "— brak danych w\00a0tym zakresie";
+  display: block;
+  padding: var(--space-5) var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+a.small, button.small { font-size: var(--text-xs); padding: var(--space-1) var(--space-3); min-height: 32px; }
+
+/* Puste elementy nie rezerwują miejsca — rytm karty kończy się tam, gdzie treść. */
+.msg:empty, #fvp:empty, #telemetria:empty { display: none; }
+.rcv { width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--r-md); touch-action: none; }
+tr.lowconf td { background: color-mix(in oklch, var(--expense) 12%, transparent); }
+label { font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-2); color: var(--muted); }
+
+/* ---------- 10. Responsywność ---------- */
+@media (max-width: 640px) {
+  header { gap: var(--space-2); row-gap: var(--space-2); padding: var(--space-2) var(--space-3); }
+  header h1 { font-size: var(--text-base); }
+
+  header .theme-switch { margin-left: auto; }
+
+
+  nav {
+    order: 10;
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 calc(-1 * var(--space-3));
+    padding: 0 var(--space-3);
+  }
+  nav::-webkit-scrollbar { display: none; }
+  nav button { white-space: nowrap; flex: none; min-height: 44px; }
+
+  #who { display: none; }
+  main { padding: 0 var(--space-4); margin-top: var(--space-5); }
+  .card { padding: var(--space-5); border-radius: var(--r-md); gap: var(--space-3); }
+}
+
+/* ---------- 11. Ruch ograniczony ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+
+/* ---------- Toast (core.js) — komunikat z akcją „Cofnij", okno 12 s ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: min(34rem, calc(100vw - var(--space-5) * 2));
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-pill);
+  background: var(--glass-fill);
+  color: var(--fg);
+  border: 1px solid var(--line-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-stack);
+  font-size: var(--text-sm);
+  animation: toast-in var(--t-base) var(--ease-glass);
+}
 .toast[hidden] { display: none; }
 .toast span { overflow-wrap: anywhere; }
-.toast .btn { background: transparent; color: var(--bg); border-color: currentColor;
-  white-space: nowrap; }
+.toast .btn { flex: 0 0 auto; white-space: nowrap; color: var(--accent); border-color: var(--line-strong); font-weight: 600; }
+@keyframes toast-in { from { opacity: 0; transform: translateX(-50%) translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* Kosz: wpis usunięty — wyciszony, kwota przekreślona, „Przywróć" zostaje pełnosprawne */
+tr.del td { color: var(--muted); }
+tr.del td[data-label="Kwota"], tr.del td.num { text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--muted) 60%, transparent); }
