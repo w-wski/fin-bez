@@ -21,21 +21,41 @@ function summaryAuth(req, res, next) {
   return res.status(401).json({ error: 'auth_required' });
 }
 
-// GET /api/v1/summary?ledger=1&month=2026-07
+// Okres raportu: albo ?month=RRRR-MM (domyślnie bieżący — kontrakt widgetu dashboardu),
+// albo ?from=RRRR-MM-DD&to=RRRR-MM-DD (dowolny zakres: kwartał, rok, własny).
+// Zwraca warunek SQL + parametry + miesiąc-kotwicę dla trendu (miesiąc końca zakresu).
+// Data musi ISTNIEĆ, nie tylko wyglądać: „2026-02-31" przechodzi regex, a w MySQL 8
+// BETWEEN z taką pseudo-datą kończy się błędem (500) zamiast fallbackiem do miesiąca.
+// Test istnienia: JS normalizuje datę (31 lutego → 3 marca) — porównanie łapie różnicę.
+const ISO_D = /^\d{4}-\d{2}-\d{2}$/;
+function dataOK(s) {
+  if (!ISO_D.test(s || '')) return false;
+  const d = new Date(s + 'T00:00:00Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+function okres(query) {
+  const { from, to } = query;
+  if (dataOK(from) && dataOK(to) && from <= to) {
+    return { from, to, m: to.slice(0, 7), sql: 't.tx_date BETWEEN :d1 AND :d2', p: { d1: from, d2: to } };
+  }
+  const m = /^\d{4}-\d{2}$/.test(query.month || '') ? query.month : new Date().toISOString().slice(0, 7);
+  return { month: m, m, sql: "DATE_FORMAT(t.tx_date,'%Y-%m') = :m2", p: { m2: m } };
+}
+
+// GET /api/v1/summary?ledger=1&month=2026-07 albo ?ledger=1&from=2026-01-01&to=2026-06-30
 router.get('/summary', summaryAuth, async (req, res, next) => {
   try {
     const scope = ledgerScope(req.user);
     const ledger = parseInt(req.query.ledger || 1, 10);
     if (!scope.ledgers.includes(ledger)) return res.status(403).json({ error: 'ledger_forbidden' });
-    const month = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month
-      : new Date().toISOString().slice(0, 7);
+    const o = okres(req.query);
     const own = scope.ownOnly ? 'AND t.user_id = :uid' : '';
-    const p = { l: ledger, m: month, uid: req.user.uid };
+    const p = { l: ledger, m: o.m, uid: req.user.uid, ...o.p };
 
     const totals = await q(
       `SELECT t.type, ROUND(SUM(t.amount),2) AS total, COUNT(*) AS n
        FROM transactions t
-       WHERE t.ledger_id=:l AND t.deleted_at IS NULL AND DATE_FORMAT(t.tx_date,'%Y-%m')=:m ${own}
+       WHERE t.ledger_id=:l AND t.deleted_at IS NULL AND ${o.sql} ${own}
        GROUP BY t.type`, p);
     // Grupujemy po IDENTYFIKATORZE kategorii, nie po nazwie: w nowym drzewie są i
     // „Transport > Bilety", i „Bartuś > Bilety" — po nazwie skleiłyby się w jeden wiersz
@@ -48,7 +68,7 @@ router.get('/summary', summaryAuth, async (req, res, next) => {
        LEFT JOIN categories c ON c.id=t.category_id AND c.ledger_id=t.ledger_id
        LEFT JOIN categories p ON p.id=c.parent_id
        WHERE t.ledger_id=:l AND t.deleted_at IS NULL AND t.type='WYDATEK'
-         AND DATE_FORMAT(t.tx_date,'%Y-%m')=:m ${own}
+         AND ${o.sql} ${own}
        GROUP BY t.category_id, category ORDER BY total DESC LIMIT 12`, p);
     // trend[] jest kontraktem widgetu dashboardu (kod poza tym repo): wyłącznie WYDATEK
     // i PRZYCHÓD. TRANSFER powstał dopiero przy reorganizacji — widget takiej serii nigdy
@@ -69,12 +89,12 @@ router.get('/summary', summaryAuth, async (req, res, next) => {
        FROM transactions t LEFT JOIN categories c ON c.id=t.category_id AND c.ledger_id=t.ledger_id
        LEFT JOIN categories p ON p.id=c.parent_id
        WHERE t.ledger_id=:l AND t.deleted_at IS NULL AND t.type='TRANSFER'
-         AND DATE_FORMAT(t.tx_date,'%Y-%m')=:m ${own}
+         AND ${o.sql} ${own}
        GROUP BY grupa, category ORDER BY total DESC`, p);
 
     const get = (type) => totals.find((x) => x.type === type) || { total: 0, n: 0 };
     res.json({
-      ledger, month,
+      ledger, month: o.month || o.m, from: o.from, to: o.to,
       expenses: Number(get('WYDATEK').total) || 0,
       income: Number(get('PRZYCHÓD').total) || 0,
       balance: Math.round(((Number(get('PRZYCHÓD').total) || 0) - (Number(get('WYDATEK').total) || 0)) * 100) / 100,
@@ -201,14 +221,13 @@ router.get('/reports/family-vs-persevera', requireAuth, async (req, res, next) =
     if (!(scope.ledgers.includes(1) && scope.ledgers.includes(2))) {
       return res.status(403).json({ error: 'forbidden' });
     }
-    const month = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month
-      : new Date().toISOString().slice(0, 7);
+    const o = okres(req.query);
     const rows = await q(
       `SELECT l.name AS ledger, t.type, ROUND(SUM(t.amount),2) AS total, COUNT(*) AS n
        FROM transactions t JOIN ledgers l ON l.id=t.ledger_id
-       WHERE t.deleted_at IS NULL AND DATE_FORMAT(t.tx_date,'%Y-%m')=:m
-       GROUP BY l.name, t.type ORDER BY l.name, t.type`, { m: month });
-    res.json({ month, rows });
+       WHERE t.deleted_at IS NULL AND ${o.sql}
+       GROUP BY l.name, t.type ORDER BY l.name, t.type`, { m: o.m, ...o.p });
+    res.json({ month: o.month || o.m, from: o.from, to: o.to, rows });
   } catch (e) { next(e); }
 });
 
@@ -238,3 +257,4 @@ module.exports = router;
 // Czysta logika §7.5 wystawiona do testów (wzorzec z src/routes/categories.js).
 module.exports.kubelBartusia = kubelBartusia;
 module.exports.miesiaceBartusia = miesiaceBartusia;
+module.exports.okres = okres;

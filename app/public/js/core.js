@@ -112,13 +112,39 @@ export async function api(path, opts = {}) {
   return data;
 }
 
+// Czas na karcie liczymy WYŁĄCZNIE, gdy aplikacja jest na ekranie. Karta w tle
+// (przełączenie na inną aplikację, zablokowany telefon, inna zakładka) nie nabija
+// licznika — inaczej „minuty na karcie" mierzyły czas otwartej zakładki, nie użycia.
+let widoczneOd = document.visibilityState === 'visible' ? Date.now() : null;
+let widoczneMs = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (widoczneOd !== null) { widoczneMs += Date.now() - widoczneOd; widoczneOd = null; }
+    // Zejście do tła bywa OSTATNIM momentem życia strony (telefon: schowana aplikacja
+    // ginie bez ostrzeżenia) — wysyłamy nabity czas od razu (sendBeacon działa i tutaj)
+    // i zerujemy. Bez tego karta odwiedzona raz i schowana nie zostawiała ani minuty.
+    if (state.me && widoczneMs >= 1000) {
+      track('Zamknięcie karty', state.view, { duration_s: Math.round(widoczneMs / 100) / 10 });
+      widoczneMs = 0;
+    }
+  } else if (widoczneOd === null) widoczneOd = Date.now();
+});
+function czasNaEkranie() {
+  return widoczneMs + (widoczneOd !== null ? Date.now() - widoczneOd : 0);
+}
+function zerujCzas() {
+  widoczneMs = 0;
+  if (widoczneOd !== null) widoczneOd = Date.now();
+}
+
 export function show(view) {
   // telemetria czasu na karcie (odpowiednik LOGI ze starej aplikacji, ale poza księgą)
   if (state.me && state.view !== view) {
-    const dur = (Date.now() - state.openedAt) / 1000;
+    const dur = czasNaEkranie() / 1000;
     track('Zamknięcie karty', state.view, { duration_s: Math.round(dur * 10) / 10 });
     track('Otwarcie karty', view);
     state.openedAt = Date.now();
+    zerujCzas();
   }
   state.view = view;
   document.querySelectorAll('main > section').forEach((s) => { s.hidden = s.id !== `view-${view}`; });
@@ -188,7 +214,14 @@ export async function wyloguj() {
   track('Wylogowanie', state.view, { detail: n ? `porzucona kolejka: ${n}` : 'kolejka pusta' });
   await flushTelemetry();                        // póki sesja żyje — inaczej zdarzenia przepadną
   try {
-    await fetch('/auth/logout', { method: 'POST' });
+    const res = await fetch('/auth/logout', { method: 'POST' });
+    // Serwer odpowiedział, ale sesji nie zakończył (np. stary proces bez tej trasy — 404).
+    // Czyszczenie urządzenia i przeładowanie NIC by nie dało: ciasteczko httpOnly zostaje
+    // i strona zalogowałaby się z powrotem, udając, że przycisk nie działa. Mówimy wprost.
+    if (!res.ok) {
+      toast(`Serwer nie zakończył sesji (błąd ${res.status}). Spróbuj za chwilę — jeśli to się powtarza, aplikacja na serwerze wymaga restartu.`);
+      return false;
+    }
   } catch { /* brak sieci: ciasteczko zostaje po stronie serwera, ale urządzenie czyścimy tak samo */ }
   // Czyścimy WSZYSTKO nasze: tożsamość, kategorie per księga, telemetrię i kolejkę.
   try {

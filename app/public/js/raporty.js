@@ -1,10 +1,31 @@
 // Raporty: KPI miesiąca, wydatki wg kategorii, trend 6 miesięcy, widoki admina.
 import { $, el, zl, api, state, refreshers } from './core.js';
 
+// Okres z kontrolek: miesiąc (parametr month) albo zakres dat (from/to) wyliczony
+// z pola miesiąca (kwartał/rok, w którym ten miesiąc leży) lub wpisany ręcznie.
+// null = zakres niekompletny/odwrócony — nie strzelamy do API z bezsensownym okresem.
+export function okresRaportu(tryb, month, from, to) {
+  if (tryb === 'miesiac') return { month, qs: 'month=' + month };
+  if (tryb === 'wlasny') {
+    if (!from || !to || from > to) return null;
+    return { from, to, qs: `from=${from}&to=${to}` };
+  }
+  const [r, m] = month.split('-').map(Number);
+  const p = (n) => String(n).padStart(2, '0');
+  const start = tryb === 'rok' ? 1 : m - ((m - 1) % 3);
+  const kon = tryb === 'rok' ? 12 : start + 2;
+  // ostatni dzień miesiąca `kon`: dzień 0 miesiąca następnego
+  const f = `${r}-${p(start)}-01`, t = `${r}-${p(kon)}-${p(new Date(r, kon, 0).getDate())}`;
+  return { from: f, to: t, qs: `from=${f}&to=${t}` };
+}
+
 export async function loadReport() {
   const ledger = $('#rLedger').value || state.me.scope.ledgers[0];
   const month = $('#rMonth').value || new Date().toISOString().slice(0, 7);
-  const s = await api(`/api/v1/summary?ledger=${ledger}&month=${month}`);
+  const tryb = $('#rZakres')?.value || 'miesiac';
+  const o = okresRaportu(tryb, month, $('#rFrom')?.value, $('#rTo')?.value);
+  if (!o) return;                                  // własny zakres jeszcze niekompletny
+  const s = await api(`/api/v1/summary?ledger=${ledger}&${o.qs}`);
   $('#kpi').innerHTML = '';
   const tiles = [
     ['Przychody', zl(s.income)], ['Wydatki', zl(s.expenses)],
@@ -36,13 +57,15 @@ export async function loadReport() {
     tb.append(tr);
   }
   await loadTransfery(s);
-  if (String(ledger) === '1') { await loadBartus(month); await loadNajem(month); }
+  // Konto Bartusia i najem są zakotwiczone w miesiącu (saldo narastająco „do miesiąca X",
+  // czynsz płacony miesięcznie) — przy kwartale/roku/zakresie te sekcje się chowają.
+  if (String(ledger) === '1' && tryb === 'miesiac') { await loadBartus(month); await loadNajem(month); }
   else { sekcja('bartus'); sekcja('najem'); }
   // Zestawienie obu ksiąg widzi ten, kto ma obie w zasięgu (admin i dorosły współprowadzący).
   // Telemetria to osobna sprawa — zostaje wyłącznie przy adminie.
   const obieKsiegi = state.me.scope.ledgers.includes(1) && state.me.scope.ledgers.includes(2);
   if (obieKsiegi) {
-    const { rows } = await api('/api/v1/reports/family-vs-persevera?month=' + month);
+    const { rows } = await api('/api/v1/reports/family-vs-persevera?' + o.qs);
     const f = $('#fvp'); f.innerHTML = '<h2>Rodzina vs PERSEVERA</h2>';
     const t = el('table');
     t.innerHTML = '<thead><tr><th>Księga</th><th>Typ</th><th class="num">Suma</th><th class="num">Wpisy</th></tr></thead>';
@@ -177,5 +200,25 @@ export function initRaporty() {
   $('#rMonth').value = new Date().toISOString().slice(0, 7);
   $('#rLedger').onchange = loadReport;
   $('#rMonth').onchange = loadReport;
+  // Przełącznik okresu: „Własny zakres" podmienia pole miesiąca na parę dat od–do.
+  const zakres = $('#rZakres');
+  if (zakres) {
+    zakres.onchange = () => {
+      const wlasny = zakres.value === 'wlasny';
+      $('#rMonth').hidden = wlasny;
+      $('#rFrom').hidden = $('#rTo').hidden = !wlasny;
+      // Puste daty przy wejściu w tryb własny wypełniamy bieżącym miesiącem — inaczej na
+      // ekranie zostawał raport poprzedniego trybu pod etykietą „Własny zakres".
+      if (wlasny && (!$('#rFrom').value || !$('#rTo').value)) {
+        const m = $('#rMonth').value || new Date().toISOString().slice(0, 7);
+        const [r, mies] = m.split('-').map(Number);
+        if (!$('#rFrom').value) $('#rFrom').value = m + '-01';
+        if (!$('#rTo').value) $('#rTo').value = `${m}-${String(new Date(r, mies, 0).getDate()).padStart(2, '0')}`;
+      }
+      loadReport();
+    };
+    $('#rFrom').onchange = loadReport;
+    $('#rTo').onchange = loadReport;
+  }
   refreshers.raporty = loadReport;
 }

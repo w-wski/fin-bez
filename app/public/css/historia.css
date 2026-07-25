@@ -21,6 +21,24 @@
 #txTable td.edycja .row { margin-bottom: .4rem; }
 #txTable td.edycja .row:last-child { margin-bottom: 0; }
 
+/* >640 px: tabela ma się mieścić w karcie, nie rozpychać jej w poziomie.
+   Globalne `.overflow table { min-width: max-content }` każe tabeli NIGDY nie zawijać
+   treści — długi opis wypychał Historię poza ekran nawet na komputerze. Tu nadpisujemy:
+   stałe szerokości wąskich kolumn, Opis bierze resztę i się zawija (table-layout: fixed,
+   bez niego przeglądarka ignoruje szerokości i wraca do rozpychania). */
+@media (min-width: 641px) {
+  #txTable { min-width: 100%; table-layout: fixed; }
+  #txTable th:nth-child(1) { width: 6.8rem; }   /* Data (+pill „z banku" łamie się pod datą) */
+  #txTable th:nth-child(2) { width: 2.6rem; }   /* Typ (znak) */
+  #txTable th:nth-child(3) { width: 19%; }      /* Kategoria (ścieżka się zawija) */
+  #txTable th:nth-child(4) { width: 6.5rem; }   /* Kwota */
+  /* Opis: cała reszta szerokości */
+  #txTable th:nth-child(6) { width: 5.5rem; }   /* Kto */
+  #txTable th:nth-child(7) { width: 6.8rem; }   /* Akcje */
+  #txTable td { overflow-wrap: anywhere; }
+  #txTable .pill.bank { display: inline-block; margin-left: 0; }
+}
+
 /* ≤640 px: każdy wpis to karta — bez poziomego przewijania i bez ucinania treści.
    Nagłówki tabeli zastępuje etykieta z data-label (dokładana w historia.js). */
 @media (max-width: 640px) {

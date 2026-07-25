@@ -193,9 +193,17 @@
   <!-- RAPORTY -->
   <section id="view-raporty" hidden>
     <div class="card">
-      <div class="row">
+      <div class="row wrap">
         <select id="rLedger"></select>
+        <!-- Okres: miesiąc (domyślnie) / kwartał / rok / własny zakres dat -->
+        <select id="rZakres" title="Okres raportu">
+          <option value="miesiac">Miesiąc</option>
+          <option value="kwartal">Kwartał</option>
+          <option value="rok">Rok</option>
+          <option value="wlasny">Własny zakres</option>
+        </select>
         <input id="rMonth" type="month">
+        <input id="rFrom" type="date" hidden title="Od"><input id="rTo" type="date" hidden title="Do">
       </div>
       <div id="kpi" class="kpi"></div>
       <h2>Wydatki wg kategorii</h2>
