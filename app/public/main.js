@@ -9,12 +9,14 @@ import { initImport, loadImports, loadUnmatched } from './js/import.js';
 import { initRaporty, loadReport } from './js/raporty.js';
 import { initParagon } from './js/paragon.js';
 import { initAdmin } from './js/admin.js';
+import { initPrzydzial } from './js/przydzial.js';
 
 const OPEN = {
   historia: () => loadHist(true),
   import: () => { loadImports(); loadUnmatched(); },
   raporty: () => loadReport(),
   admin: () => refreshers.admin?.(),
+  przydzial: () => refreshers.przydzial?.(),
   // 'paragon' celowo nie ma wpisu: js/paragon-lista.js sam nasłuchuje kliknięcia w kartę.
   // Wpis tutaj powodowałby drugie, identyczne pobranie listy przy każdym wejściu.
 };
@@ -28,6 +30,7 @@ async function init() {
   initImport();
   initRaporty();
   initAdmin();
+  initPrzydzial();
   $('#catMain').onchange = onCatMain;
   initParagon();
 

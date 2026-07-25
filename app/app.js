@@ -43,6 +43,7 @@ app.use('/api/v1/transactions', auth.requireAuth, require('./src/routes/transact
 app.use('/api/v1/categories', auth.requireAuth, require('./src/routes/categories'));
 app.use('/api/v1/imports', auth.requireAuth, require('./src/routes/imports'));
 app.use('/api/v1/receipts', auth.requireAuth, require('./src/routes/receipts'));
+app.use('/api/v1/proposals', auth.requireAuth, require('./src/routes/proposals'));
 
 // --- szczegółowa telemetria (następca arkusza LOGI; poza księgą) ---
 // Przyjmuje pojedyncze zdarzenie LUB batch {events:[...]} (kolejka offline).

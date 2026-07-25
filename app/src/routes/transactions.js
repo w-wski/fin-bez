@@ -10,16 +10,17 @@ const router = express.Router();
 // inaczej każda ręcznie wpisana rata wpada do wydatków i psuje raport miesiąca.
 const TYPY = ['WYDATEK', 'PRZYCHÓD', 'TRANSFER'];
 
-// Zasięg wierszy księgi. Księgi bierzemy z ledgerScope(), ale WŁASNOŚĆ liczymy tutaj lokalnie:
-// w Historii każdy widzi wyłącznie swoje wpisy, tylko admin widzi cudze. ledgerScope().ownOnly
-// zostaje nietknięte — steruje też raportami i uzgadnianiem importów.
+// Zasięg wierszy księgi — jedno źródło prawdy: ledgerScope() z auth.js.
+// Decyzja Szymona (2026-07-24): DOROSŁY widzi całą historię i raporty swojej księgi (Anna
+// współprowadzi finanse rodziny), ograniczony do własnych wpisów jest tylko `junior`.
+// Telemetria zostaje wyłącznie dla admina — pilnuje tego osobno /reports/telemetry.
 // deleted=true odwraca filtr kosza: zamiast wpisów żywych zwraca wyłącznie usunięte miękko.
 function scopeWhere(user, params, deleted = false) {
   const scope = ledgerScope(user);
   if (!scope.ledgers.length) return null;
   let where = `t.ledger_id IN (${scope.ledgers.join(',')})`;
   where += deleted ? ' AND t.deleted_at IS NOT NULL' : ' AND t.deleted_at IS NULL';
-  if (user.role !== 'admin') { where += ' AND t.user_id = :uid'; params.uid = user.uid; }
+  if (scope.ownOnly) { where += ' AND t.user_id = :uid'; params.uid = user.uid; }
   return where;
 }
 

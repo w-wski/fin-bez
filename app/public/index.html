@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="css/historia.css">
 <link rel="stylesheet" href="css/kategorie.css">
 <link rel="stylesheet" href="css/paragon.css">
+<link rel="stylesheet" href="css/przydzial.css">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#1f6f43">
@@ -21,6 +22,7 @@
     <button data-view="paragon">Paragon</button>
     <button data-view="import">Import</button>
     <button data-view="raporty">Raporty</button>
+    <button data-view="przydzial" data-admin hidden>Przydział</button>
     <button data-view="admin" data-admin hidden>Admin</button>
   </nav>
   <span id="netBadge" class="pill net" hidden></span>
@@ -141,6 +143,11 @@
       <div id="fvp"></div>
       <div id="telemetria"></div>
     </div>
+  </section>
+
+  <!-- PRZYDZIAŁ (propozycje reorganizacji kategorii do przyjęcia przez człowieka) -->
+  <section id="view-przydzial" hidden>
+    <div class="card"><div id="przydzialBox"></div></div>
   </section>
 
   <!-- ADMIN (tylko rola admin; treść renderowana z js/admin.js) -->
