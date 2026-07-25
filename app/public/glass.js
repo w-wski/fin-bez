@@ -4,7 +4,7 @@
  * bąbelków, napisy zniekształcają się pod szkłem); zjazd w dół = droga powrotna.
  * Pion soczewki JEST postępem: p = f(y), plateau p=1 u góry; reszta z klatek glass-mapa.js. */
 
-import { LENS_BASE, installLensMap, clamp01, trackPoint, anchorCenter, emitBubble, keepActiveTabVisible } from './glass-mapa.js';
+import { LENS_BASE, LENS_M, installLensMap, clamp01, trackPoint, anchorCenter, emitBubble, keepActiveTabVisible } from './glass-mapa.js';
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const K_DRAG = 0.34;   // podążanie za wskaźnikiem: żwawe, ale z masą
 const K_SNAP = 0.06;   // dojazd po puszczeniu: powolny, „estetyczny" (~1 s)
@@ -57,7 +57,12 @@ class LoginStage {
     // na .login unieważniała style całej sceny co klatkę — główny powód klatkowania.
     this.lens.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${tp.s.toFixed(4)})`;
     if (this.world) {
-      this.world.style.transform = `scale(${(1 / tp.s).toFixed(5)}) translate(${(-tx).toFixed(2)}px, ${(-ty).toFixed(2)}px)`;
+      // Prawdziwa wypukła soczewka = ODBICIE świata przez środek szkła × LENS_M:
+      // punkt C+d widać w C−M·d (na dole → u góry tafli). Czysty transform (GPU),
+      // działa też na iOS — WebKit nie realizował tego w mapie displacement.
+      const ux = (this.x * LENS_M) / tp.s + LENS_BASE / 2;
+      const uy = (this.y * LENS_M) / tp.s + LENS_BASE / 2;
+      this.world.style.transform = `translate(${ux.toFixed(2)}px, ${uy.toFixed(2)}px) scale(${(-LENS_M / tp.s).toFixed(5)})`;
     }
     // Wszystkie widoczności wprost z toru (czysta funkcja p — zero zatrzasków,
     // więc zjazd w dół jest z definicji tą samą drogą wstecz): --dest-lens to

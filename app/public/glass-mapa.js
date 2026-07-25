@@ -10,16 +10,16 @@ export const RELEASE_THRESHOLD = 0.4;       // powyżej — dobiega do 1, poniż
 
 /* ---------- 1. Mapa przemieszczenia (generowana RAZ) ---------- */
 
-/** Profil PRAWDZIWEJ wypukłej soczewki (Szymon 07-25 nocą): obraz ODWRÓCONY —
- *  próbkujemy ZA środkiem (offset > r), więc to, co jest pod soczewką na dole,
- *  widać u góry tafli, i odwrotnie. M(r) = powiększenie odwróconego obrazu:
- *  większe w środku (mocna wypukłość), mniejsze przy rancie — daje bańkę.
+/** ODWRÓCENIE obrazu (prawdziwa wypukła soczewka) NIE siedzi w tej mapie —
+ *  robi je transform kopii świata w glass.js (odbicie przez środek soczewki ×
+ *  LENS_M): czysta geometria na GPU, działa identycznie na iOS. WebKit nie
+ *  realizował offsetów mapy > promień (nagranie 07-25 23:10 — napis w soczewce
+ *  zwykły), więc filtr wraca do sprawdzonego, łagodnego profilu: powiększenie +
+ *  beczka, offsety ≤ 1, atrybut scale=84 jak przed odwróceniem.
  *  R = przesunięcie X, G = przesunięcie Y, 128 = zero. Alfa zawsze 255 — filtry
  *  SVG liczą na kanałach premultiplikowanych, alfa 0 dałaby ogromny skok zamiast
  *  zera. Koło wycina border-radius soczewki, nie mapa. */
-const M_CENTER = 3.4;                // powiększenie odwróconego obrazu w środku
-const M_EDGE = 1.2;                  // …i przy rancie
-export const MAP_OMAX = 1 + 1 / M_EDGE; // maks. offset (w jednostkach promienia) — do atrybutu scale
+export const LENS_M = 1.8;           // powiększenie odwróconego obrazu (transform świata)
 
 export function buildLensMap(size = MAP_SIZE) {
   const canvas = document.createElement('canvas');
@@ -39,15 +39,16 @@ export function buildLensMap(size = MAP_SIZE) {
       let oy = 0;
 
       if (r <= 1) {
-        // Piksel tafli w promieniu r pokazuje źródło w -r/M(r) (odwrócenie przez środek).
-        // Przy rancie przesunięcie WYGASA do zera — czysty obrys koła: skrajny piksel
-        // zostaje na miejscu, nic (ani refleks) nie wyjeżdża poza soczewkę.
-        const M = M_CENTER - (M_CENTER - M_EDGE) * r * r;
-        const f = r < 0.94 ? 1 : Math.max(0, 1 - (r - 0.94) / 0.06);
-        const mag = r * (1 + 1 / M) * f * f;
+        // Powiększenie + beczka; przy rancie przesunięcie WYGASA do zera —
+        // czysty obrys koła: skrajny piksel zostaje na miejscu, nic nie
+        // wyjeżdża poza soczewkę.
+        const lens = r * 0.55;
+        const barrel = Math.pow(r, 2.6) * 0.20;
+        const f = r < 0.90 ? 1 : Math.max(0, 1 - (r - 0.90) / 0.10);
+        const mag = Math.min(1, lens + barrel) * f * f;
         const inv = r > 1e-6 ? 1 / r : 0;
-        ox = -dx * inv * mag / MAP_OMAX;   // normalizacja do [-1,1]; skalę oddaje atrybut scale
-        oy = -dy * inv * mag / MAP_OMAX;
+        ox = -dx * inv * mag;
+        oy = -dy * inv * mag;
       }
 
       px[i] = Math.round(128 + ox * 127);
@@ -67,10 +68,6 @@ export function installLensMap() {
   const url = buildLensMap();
   node.setAttribute('href', url);
   node.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); // starsze WebKit
-  // scale tak, by pełny offset mapy = MAP_OMAX promieni w px: D = scale·(C−0,5),
-  // C koduje ox·127/255 → scale = OMAX·R·255/127. Nadal JEDEN przebieg — koszt bez zmian.
-  const disp = document.querySelector('#fin-refract feDisplacementMap');
-  if (disp) disp.setAttribute('scale', String(Math.round(MAP_OMAX * (LENS_BASE / 2) * 255 / 127)));
   return true;
 }
 
@@ -92,15 +89,18 @@ export const KEYFRAMES = [
   { p: 0.00, cx: 0.5, cy: 1.08, s: 1.85, hero: 1, dest: 0, dlens: 0, dsl: 0, cta: 0 },
   { p: 0.30, cx: 0.5, cy: 0.86, s: 1.42, hero: 0.7, dest: 0, dlens: 0, dsl: 0, cta: 0 },
   { p: 0.36, cx: 0.5, cy: 0.80, s: 1.32, hero: 0.5, dest: 0, dlens: 1, dsl: 0.10, cta: 0 },
-  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.12, hero: 0, dest: 0, dlens: 1, dsl: 0.48, cta: 0 },
-  { p: 0.58, cx: 0.5, cy: 0.545, s: 1.00, hero: 0, dest: 0, dlens: 1, dsl: 0.62, cta: 0 },
-  { p: 0.80, anchor: true, s: 0.55, hero: 0, dest: 0, dlens: 1, dsl: 1.27, cta: 0 },
-  // Wyjście spod kamyka DOPIERO przy samym szczycie: górna część słowa jest
-  // wtedy jeszcze schowana za kamykiem (dsl>1 = powyżej celu), rampa opacity
-  // biegnie, gdy słowo wysuwa się w dół spod dolnej krawędzi szkła.
-  { p: 0.88, anchor: true, s: 0.40, hero: 0, dest: 0, dlens: 1, dsl: 1.14, cta: 0 },
-  { p: 0.94, anchor: true, s: 0.31, hero: 0, dest: 1, dlens: 1, dsl: 1.05, cta: 0 },
-  { p: 0.985, anchor: true, s: 0.26, hero: 0, dest: 1, dlens: 1, dsl: 1.01, cta: 0 },
+  // dsl prowadzi słowo TUŻ POD ŚRODKIEM soczewki przez całą wspinaczkę — okno
+  // źródła odbicia to R/M wokół środka, więc smuga w tafli żyje tylko wtedy,
+  // gdy słowo trzyma się blisko osi szkła (wartości = tor soczewki w vh).
+  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.12, hero: 0, dest: 0, dlens: 1, dsl: 0.70, cta: 0 },
+  { p: 0.58, cx: 0.5, cy: 0.545, s: 1.00, hero: 0, dest: 0, dlens: 1, dsl: 0.85, cta: 0 },
+  { p: 0.80, anchor: true, s: 0.55, hero: 0, dest: 0, dlens: 1, dsl: 1.30, cta: 0 },
+  { p: 0.88, anchor: true, s: 0.40, hero: 0, dest: 0, dlens: 1, dsl: 1.30, cta: 0 },
+  // Prawdziwy tytuł wychodzi DOPIERO, gdy soczewka realnie dojechała (uwaga
+  // 07-25 23:10: „pojawia się zanim soczewka dojedzie") — rampa .935→.985,
+  // słowo wysuwa się w dół spod dolnej krawędzi kamyka (dsl>1 → 1).
+  { p: 0.935, anchor: true, s: 0.33, hero: 0, dest: 0, dlens: 1, dsl: 1.26, cta: 0 },
+  { p: 0.985, anchor: true, s: 0.26, hero: 0, dest: 1, dlens: 1, dsl: 1.03, cta: 0 },
   { p: 1.00, anchor: true, s: 0.25, hero: 0, dest: 1, dlens: 1, dsl: 1, cta: 1 },
 ];
 

@@ -24,7 +24,7 @@
 
   --r-sm: 8px; --r-md: 12px; --r-lg: 20px; --r-pill: 999px;
 
-  --font: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, "Segoe UI", Roboto, sans-serif;
+  --font: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif; /* SF Pro z serwera NA KAŻDEJ platformie (Szymon 07-25) */
   /* Display = ten sam krój, inna waga i tracking (tokeny niżej) — Apple-like, nie para krojów. */
   --font-display: var(--font);
   --track-display: -0.022em;
