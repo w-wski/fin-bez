@@ -19,6 +19,7 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
   --p: 0;
   --hero-a: 1;
   --dest-a: 0;
+  --dest-lens: 0;
   --dest-s: 0;
   --cta-a: 0;
 
@@ -72,10 +73,15 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 .login__title, .login__sub { margin: 0; text-wrap: balance; }
 .login__title {
   opacity: var(--dest-a);
-  /* 30vh poślizgu: tytuł rodzi się NISKO, pod wielką soczewką (bramka w glass.js),
-     i wynurza się spod jej dolnej krawędzi przez całą wspinaczkę. */
+  /* 30vh poślizgu; --dest-s > 1 = słowo schowane ZA kamykiem, lekko powyżej celu.
+     Przez wspinaczkę jedzie tuż pod środkiem soczewki — widać je wyłącznie jako
+     odwróconą smugę w tafli; na samej górze wysuwa się spod kamyka na miejsce. */
   transform: translateY(calc((1 - var(--dest-s)) * 30vh));
 }
+/* Kopia słowa POD SZKŁEM żyje własnym życiem: widoczna przez całą jazdę (smuga
+   w soczewce), niezależnie od prawdziwego tytułu — kopię i tak widać tylko
+   przez wycięte koło soczewki. */
+.lens__world .login__title { opacity: var(--dest-lens); }
 .login__sub {
   opacity: var(--cta-a);
   /* Bez ruchu: element stoi na miejscu i tylko blaknie do widoczności — żadnego

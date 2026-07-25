@@ -59,19 +59,14 @@ class LoginStage {
     if (this.world) {
       this.world.style.transform = `scale(${(1 / tp.s).toFixed(5)}) translate(${(-tx).toFixed(2)}px, ${(-ty).toFixed(2)}px)`;
     }
-    // Tytuł zapala się WYŁĄCZNIE w pełni zakryty: klatki uzbrajają narodziny (dest>0),
-    // decyduje geometria — cały prostokąt tytułu (rect liczy aktualny slide) musi
-    // mieścić się w kole. Zatrzask do zjazdu (dest==0); awaryjnie p>0.8.
-    if (tp.dest <= 0) this.born = false;
-    else if (!this.born && this.title) {
-      const r = this.title.getBoundingClientRect();
-      const dx = Math.max(Math.abs(r.left - this.x), Math.abs(r.right - this.x));
-      const dy = Math.max(Math.abs(r.top - this.y), Math.abs(r.bottom - this.y));
-      this.born = Math.hypot(dx, dy) <= (LENS_BASE * tp.s) / 2 - 4 || this.p > 0.8;
-    }
+    // Wszystkie widoczności wprost z toru (czysta funkcja p — zero zatrzasków,
+    // więc zjazd w dół jest z definicji tą samą drogą wstecz): --dest-lens to
+    // słowo w kopii pod szkłem (smuga w soczewce), --dest-a — prawdziwy tytuł,
+    // który istnieje dopiero przy samej górze (wysuwa się spod kamyka).
     const st = this.root.style;
     st.setProperty('--hero-a', tp.hero.toFixed(3));
-    st.setProperty('--dest-a', this.born ? '1' : '0');
+    st.setProperty('--dest-a', tp.dest.toFixed(3));
+    st.setProperty('--dest-lens', tp.dlens.toFixed(3));
     st.setProperty('--dest-s', tp.dsl.toFixed(3));
     st.setProperty('--cta-a', tp.cta.toFixed(3));
 

@@ -17,8 +17,8 @@ export const RELEASE_THRESHOLD = 0.4;       // powyżej — dobiega do 1, poniż
  *  R = przesunięcie X, G = przesunięcie Y, 128 = zero. Alfa zawsze 255 — filtry
  *  SVG liczą na kanałach premultiplikowanych, alfa 0 dałaby ogromny skok zamiast
  *  zera. Koło wycina border-radius soczewki, nie mapa. */
-const M_CENTER = 2.3;                // powiększenie odwróconego obrazu w środku
-const M_EDGE = 1.4;                  // …i przy rancie
+const M_CENTER = 3.4;                // powiększenie odwróconego obrazu w środku
+const M_EDGE = 1.2;                  // …i przy rancie
 export const MAP_OMAX = 1 + 1 / M_EDGE; // maks. offset (w jednostkach promienia) — do atrybutu scale
 
 export function buildLensMap(size = MAP_SIZE) {
@@ -79,29 +79,29 @@ export function installLensMap() {
 /** Klatki kluczowe: cx/cy to ułamki viewportu, s — skala pudełka bazowego;
  *  `anchor` = środek .login__mark z żywego DOM.
  *
- *  Model z referencji Wabi (Szymon, 07-25 wieczór): soczewka NIE rośnie na
- *  wysokości tekstu — to TYTUŁ wjeżdża od dołu (pole `dsl`: 0 = nisko, 1 = na
- *  miejscu) i przechodzi przez szkło wolniej, niż jedzie soczewka; różnica
- *  prędkości robi efekt „soczewka wynosi napis". Hero gaśnie slide+blur+fade
- *  (jedna zmienna --hero-a napędza wszystkie trzy). Podtytuł i przyciski
- *  pojawiają się dopiero, gdy tytuł osiądzie (`cta`). W dół — wszystko wstecz. */
+ *  Model z referencji Wabi (Szymon, 07-25 nocą, runda 3): tytuł ma DWIE warstwy.
+ *  `dlens` — słowo w kopii sceny POD SZKŁEM (widoczne wyłącznie przez soczewkę,
+ *  jako nieczytelna, odwrócona smuga wędrująca po przeciwnej stronie tafli).
+ *  `dest` — PRAWDZIWY tytuł: nie istnieje przez całą wspinaczkę, wysuwa się
+ *  spod kamyka dopiero na samej górze (rampa .80→.88 + zjazd dsl 1.27→1).
+ *  `dsl` prowadzi pozycję OBU warstw: 0 = 30vh poniżej celu, 1 = na miejscu,
+ *  >1 = schowany ZA kamykiem, lekko powyżej celu — przez wspinaczkę słowo jedzie
+ *  tuż pod środkiem soczewki, więc smuga cały czas jest w polu tafli.
+ *  W dół — dokładnie ta sama droga wstecz (zero zatrzasków, czysta funkcja p). */
 export const KEYFRAMES = [
-  { p: 0.00, cx: 0.5, cy: 1.08, s: 1.85, hero: 1, dest: 0, dsl: 0, cta: 0 },
-  // Narodziny tytułu przesunięte NISKO (07-25 nocą): soczewka i tytuł mijają się
-  // ok. p .3–.45, gdy szkło jest jeszcze WIELKIE i nisko — tam tytuł (30vh poślizgu,
-  // logowanie.css) mieści się w kole w całości i rodzi się pod taflą, odwrócony
-  // i powiększony przez mapę. Potem szkło ucieka w górę szybciej niż napis (dsl
-  // zostaje w tyle — „nie może mieć tej samej prędkości"), więc słowo wynurza się
-  // spod DOLNEJ krawędzi soczewki i jedzie na miejsce. `dest` tylko UZBRAJA
-  // narodziny — zapala je bramka geometryczna w glass.js (pełne zakrycie koła).
-  { p: 0.36, cx: 0.5, cy: 0.80, s: 1.32, hero: 0.5, dest: 1, dsl: 0.05, cta: 0 },
-  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.12, hero: 0, dest: 1, dsl: 0.22, cta: 0 },
-  { p: 0.58, cx: 0.5, cy: 0.545, s: 1.00, hero: 0, dest: 1, dsl: 0.35, cta: 0 },
-  { p: 0.82, anchor: true, s: 0.52, hero: 0, dest: 1, dsl: 0.78, cta: 0 },
-  // cta = 0 aż do pełnego osadzenia: podtytuł i przyciski wchodzą DOPIERO, gdy
-  // tytuł stoi, a soczewka siedzi na kotwicy (płynność robi transition w CSS).
-  { p: 0.985, anchor: true, s: 0.26, hero: 0, dest: 1, dsl: 0.97, cta: 0 },
-  { p: 1.00, anchor: true, s: 0.25, hero: 0, dest: 1, dsl: 1, cta: 1 },
+  { p: 0.00, cx: 0.5, cy: 1.08, s: 1.85, hero: 1, dest: 0, dlens: 0, dsl: 0, cta: 0 },
+  { p: 0.30, cx: 0.5, cy: 0.86, s: 1.42, hero: 0.7, dest: 0, dlens: 0, dsl: 0, cta: 0 },
+  { p: 0.36, cx: 0.5, cy: 0.80, s: 1.32, hero: 0.5, dest: 0, dlens: 1, dsl: 0.10, cta: 0 },
+  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.12, hero: 0, dest: 0, dlens: 1, dsl: 0.48, cta: 0 },
+  { p: 0.58, cx: 0.5, cy: 0.545, s: 1.00, hero: 0, dest: 0, dlens: 1, dsl: 0.62, cta: 0 },
+  { p: 0.80, anchor: true, s: 0.55, hero: 0, dest: 0, dlens: 1, dsl: 1.27, cta: 0 },
+  // Wyjście spod kamyka DOPIERO przy samym szczycie: górna część słowa jest
+  // wtedy jeszcze schowana za kamykiem (dsl>1 = powyżej celu), rampa opacity
+  // biegnie, gdy słowo wysuwa się w dół spod dolnej krawędzi szkła.
+  { p: 0.88, anchor: true, s: 0.40, hero: 0, dest: 0, dlens: 1, dsl: 1.14, cta: 0 },
+  { p: 0.94, anchor: true, s: 0.31, hero: 0, dest: 1, dlens: 1, dsl: 1.05, cta: 0 },
+  { p: 0.985, anchor: true, s: 0.26, hero: 0, dest: 1, dlens: 1, dsl: 1.01, cta: 0 },
+  { p: 1.00, anchor: true, s: 0.25, hero: 0, dest: 1, dlens: 1, dsl: 1, cta: 1 },
 ];
 
 export function anchorCenter(root) {
@@ -124,7 +124,7 @@ export function trackPoint(root, p) {
   return {
     x: lerp(ca.cx, cb.cx, t), y: lerp(ca.cy, cb.cy, t), s: lerp(a.s, b.s, t),
     hero: lerp(a.hero, b.hero, t), dest: lerp(a.dest, b.dest, t),
-    dsl: lerp(a.dsl, b.dsl, t), cta: lerp(a.cta, b.cta, t),
+    dlens: lerp(a.dlens, b.dlens, t), dsl: lerp(a.dsl, b.dsl, t), cta: lerp(a.cta, b.cta, t),
   };
 }
 
