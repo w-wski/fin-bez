@@ -38,8 +38,10 @@ export async function loadReport() {
   await loadTransfery(s);
   if (String(ledger) === '1') { await loadBartus(month); await loadNajem(month); }
   else { sekcja('bartus'); sekcja('najem'); }
-  // admin: rodzina vs spółka + telemetria
-  if (state.me.role === 'admin') {
+  // Zestawienie obu ksiąg widzi ten, kto ma obie w zasięgu (admin i dorosły współprowadzący).
+  // Telemetria to osobna sprawa — zostaje wyłącznie przy adminie.
+  const obieKsiegi = state.me.scope.ledgers.includes(1) && state.me.scope.ledgers.includes(2);
+  if (obieKsiegi) {
     const { rows } = await api('/api/v1/reports/family-vs-persevera?month=' + month);
     const f = $('#fvp'); f.innerHTML = '<h2>Rodzina vs PERSEVERA</h2>';
     const t = el('table');
@@ -52,8 +54,9 @@ export async function loadReport() {
       tb2.append(tr);
     }
     t.append(tb2); f.append(t);
-    loadTelemetry();
-  } else $('#telemetria').innerHTML = '';
+  } else $('#fvp').innerHTML = '';
+  if (state.me.role === 'admin') loadTelemetry();
+  else $('#telemetria').innerHTML = '';
 }
 
 // Sekcje raportu dokładane z JS — index.html należy do innego zlecenia, więc go nie ruszamy.

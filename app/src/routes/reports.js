@@ -195,7 +195,12 @@ router.get('/reports/najem', requireAuth, async (req, res, next) => {
 // ustawia req.user; router jest montowany bez globalnego auth ze względu na /summary)
 router.get('/reports/family-vs-persevera', requireAuth, async (req, res, next) => {
   try {
-    if (req.user.role !== 'admin') return res.status(403).json({ error: 'admin_only' });
+    // Raport zestawia obie księgi, więc warunkiem jest MIEĆ OBIE W ZASIĘGU — nie bycie adminem.
+    // Dzięki temu dorosły współprowadzący finanse (Anna) go widzi, a rola junior i company nie.
+    const scope = ledgerScope(req.user);
+    if (!(scope.ledgers.includes(1) && scope.ledgers.includes(2))) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
     const month = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month
       : new Date().toISOString().slice(0, 7);
     const rows = await q(

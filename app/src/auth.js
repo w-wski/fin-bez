@@ -75,12 +75,16 @@ async function requireAuth(req, res, next) {
 }
 
 // Które księgi widzi użytkownik i czy tylko własne wpisy.
-// admin: obie księgi, wszystko. adult: RODZINA, wszystko. junior: RODZINA, tylko własne.
+// admin:   obie księgi, wszystko + telemetria i edycja słownika kategorii.
+// adult:   obie księgi, wszystko — dorosły WSPÓŁPROWADZĄCY finanse (Anna: RODZINA plus
+//          działalność szkoleniowa w PERSEVERZE), więc raporty i wpisy spółki też.
+//          Bez telemetrii i bez edycji kategorii — te zostają przy adminie (decyzja 2026-07-24).
+// junior:  RODZINA, tylko własne wpisy.
 // company: PERSEVERA, wszystko.
 function ledgerScope(user) {
   switch (user.role) {
     case 'admin': return { ledgers: [1, 2], ownOnly: false };
-    case 'adult': return { ledgers: [1], ownOnly: false };
+    case 'adult': return { ledgers: [1, 2], ownOnly: false };
     case 'junior': return { ledgers: [1], ownOnly: true };
     case 'company': return { ledgers: [2], ownOnly: false };
     case 'widget': return { ledgers: [1], ownOnly: false }; // read-only widget: tylko RODZINA
