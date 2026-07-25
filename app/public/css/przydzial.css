@@ -1,0 +1,5 @@
+/* Style widoku przydział — właściciel: zlecenie Z5.
+   Plik był linkowany z index.html i listowany w sw.js, a nie istniał —
+   404 na nim wywracał instalację service workera (cache.addAll odrzuca całość).
+   Reguły dla listy decyzyjnej (grupy propozycji, akcje Przyjmij/Zmień cel/Odrzuć)
+   dojdą wraz z markupem Z5; kontrakt wizualny w DESIGN-SPEC-GLASS §5.6 (repo finansowe). */
