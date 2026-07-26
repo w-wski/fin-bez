@@ -23,7 +23,11 @@ app.get('/auth/callback', async (req, res) => {
     if (!user) return res.status(403).send(`Brak dostępu dla ${email}. Poproś administratora o dodanie konta.`);
     auth.setCookie(res, auth.signSession(user));
     const next = String(req.query.state || '/');
-    res.redirect(next.startsWith('/') ? next : '/');
+    const cel = next.startsWith('/') ? next : '/';
+    // `witaj=1` = znacznik ŚWIEŻEGO logowania dla frontendu (plansza powitalna grana
+    // tylko po powrocie z Google, nie przy każdym starcie aplikacji). Frontend zjada
+    // go przez history.replaceState, więc nie zostaje w adresie.
+    res.redirect(cel + (cel.includes('?') ? '&' : '?') + 'witaj=1');
   } catch (e) {
     console.error('auth callback:', e.message);
     res.status(500).send('Błąd logowania Google. Spróbuj ponownie.');

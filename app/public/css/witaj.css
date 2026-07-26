@@ -1,0 +1,69 @@
+/* Plansza powitalna (witaj.js). Ładowana WYŁĄCZNIE dla użytkownika, który ją
+   dostaje — arkusz wstrzykuje moduł, nie index.html. Tokeny tylko ze styles.css. */
+
+.witaj {
+  position: fixed;
+  inset: 0;
+  z-index: 90;                 /* nad nawigacją i arkuszami, pod nic */
+  overflow: hidden;
+  /* Docelowe tło aplikacji — Bartuś: „nie widać jeszcze formularzy, ale jest już
+     docelowe tło". Zasłona jest z tej samej materii co strona pod nią. */
+  background-color: var(--bg);
+  background-image: var(--paper);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;             /* tap w dowolnym miejscu pomija */
+}
+
+/* Scena wektorowa: pełna szerokość, kucyk przy dolnej krawędzi kadru, nad nim
+   zapas na łuk tęczy. `meet` + xMidYMax trzyma proporcje i przykleja go do dołu. */
+.witaj__scena {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6vh;
+  bottom: 14vh;
+}
+.witaj__scena svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Konfetti i napis — jeden canvas na całą warstwę, nad kucykiem. */
+.witaj__konf {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Napis dla czytnika ekranu: plansza jest ozdobą, ale powitanie to treść. */
+.witaj__czytnik {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Wyjście: przy pominięciu tapem gasimy krótkim przejściem, nie skokiem. */
+.witaj--gasnie {
+  opacity: 0;
+  transition: opacity 220ms cubic-bezier(.32, .72, 0, 1);
+}
+
+/* Podpowiedzi dla kompozytora tylko na czas planszy — element i tak zaraz zniknie. */
+.witaj__scena svg,
+.witaj__konf { will-change: transform, opacity; }
+
+/* Bez ruchu: żadnych sztuczek, sam napis i spokojne wyjście. */
+@media (prefers-reduced-motion: reduce) {
+  .witaj--gasnie { transition: opacity 400ms linear; }
+}

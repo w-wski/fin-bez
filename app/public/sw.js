@@ -1,6 +1,6 @@
 // Service worker „finansowej" — offline-ready (app shell w cache, API zawsze z sieci).
 // Po każdym deployu podbij CACHE_VERSION (RUNBOOK) — stary cache zostanie usunięty.
-const CACHE_VERSION = 'finansowa-v24';
+const CACHE_VERSION = 'finansowa-v25';
 const SHELL = [
   '/', '/index.html', '/manifest.webmanifest', '/icon.svg',
   '/styles.css', '/css/wpis.css', '/css/historia.css', '/css/raporty.css',
@@ -14,6 +14,9 @@ const SHELL = [
   // (poza gitem, kwestia licencji Apple), a addAll wywala instalację SW przy 404.
   // Cache'ują się runtime'owo przy pierwszym pobraniu (fetch handler niżej).
   '/js/paragon.js', '/js/paragon-edit.js', '/js/paragon-poz.js', '/js/paragon-lista.js',
+  // Plansza powitalna: ładowana importem dynamicznym, ale w SHELL musi być, bo
+  // grana jest zaraz po powrocie z logowania — także przy słabej sieci.
+  '/witaj.js', '/witaj-kucyk.js', '/witaj-konfetti.js', '/css/witaj.css',
 ];
 
 self.addEventListener('install', (e) => {

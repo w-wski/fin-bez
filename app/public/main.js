@@ -2,7 +2,7 @@
 // Ten plik TYLKO spina moduły widoków. Logika widoku należy do js/<widok>.js.
 import { $, api, show, track, state, cacheMe, cachedMe, fillLedgerSelects,
          updateNetBadge, syncQueue, flushTelemetry, refreshers, wyloguj,
-         otworzArkusz, zamknijArkusz } from './js/core.js';
+         otworzArkusz, zamknijArkusz, swiezeLogowanie, imieDoPowitania } from './js/core.js';
 import { loadCats, onCatMain } from './js/kategorie.js';
 import { initWpis, initKsiegi } from './js/wpis.js';
 import { initHistoria, loadHist } from './js/historia.js';
@@ -61,6 +61,13 @@ async function init() {
     initKsiegi(state.me.scope.ledgers);
     await loadCats();
     show('wpis');
+    // Plansza powitalna: TYLKO po świeżym logowaniu Google i tylko wtedy, gdy znamy
+    // imię. Import dynamiczny — kto planszy nie dostaje, nie ściąga nawet kodu.
+    // Bez `await`: aplikacja doczytuje się pod zasłoną, a plansza sama ją gasi.
+    const imie = imieDoPowitania(state.me);
+    if (imie && swiezeLogowanie()) {
+      import('./witaj.js').then((w) => w.zagraj(imie)).catch(() => {});
+    }
     track('Start aplikacji', 'wpis', { detail: 'online' });
     syncQueue(); // wyślij zaległą kolejkę offline od razu po starcie online
     flushTelemetry();

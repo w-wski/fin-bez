@@ -275,3 +275,24 @@ export async function wyloguj() {
   location.reload();
   return true;
 }
+
+/** Czy to POWRÓT ZE ŚWIEŻEGO LOGOWANIA Google. Callback OAuth dokłada `?witaj=1`
+ *  (app.js) — tylko wtedy gra plansza powitalna. Znacznik konsumujemy od razu,
+ *  żeby odświeżenie strony ani powrót „wstecz" nie odtwarzały jej ponownie. */
+export function swiezeLogowanie() {
+  try {
+    const u = new URL(window.location.href);
+    if (u.searchParams.get('witaj') !== '1') return false;
+    u.searchParams.delete('witaj');
+    history.replaceState(null, '', u.pathname + (u.search ? u.search : '') + u.hash);
+    return true;
+  } catch {
+    return false;                 // nietypowe środowisko: brak planszy jest bezpieczny
+  }
+}
+
+/** Imię do powitania: kolumna `name` trzyma jedno imię, ale bierzemy pierwszy
+ *  wyraz na wypadek wpisanego nazwiska. Puste = brak planszy (patrz main.js). */
+export function imieDoPowitania(me) {
+  return String(me?.name || '').trim().split(/\s+/)[0] || '';
+}
