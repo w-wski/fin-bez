@@ -1,9 +1,9 @@
 /* witaj.js — plansza powitalna między logowaniem Google a aplikacją (zamówienie
  * Bartusia, 2026-07-26). Kucyk wbiega, staje, patrzy na widza, PODNOSI OGON, z zadu
- * leci strumień konfetti, który składa się w napis „Witaj <Imię>!", OGON OPADA, kucyk
- * się uśmiecha i wybiega, napis zsypuje się poza ekran, formularze wchodzą fadeinem.
- * Tęcza była tu wcześniej — wypadła 07-26 na życzenie Szymona („zbędna"), konfetti
- * idzie wprost z zadu.
+ * wydobywa się wąskim otworem konfetti, rozchodzi się w chmurę, z chmury składa się
+ * napis „Witaj <Imię>!", OGON OPADA, kucyk się uśmiecha, stoi jeszcze chwilę i wybiega,
+ * a POTEM napis zsypuje się poza dolną krawędź i wchodzą formularze.
+ * Tęcza była tu wcześniej — wypadła 07-26 na życzenie Szymona („zbędna").
  * Kolejność taktów z ogonem jest wymogiem Szymona (07-26) — dlatego są osobnymi
  * aktami osi czasu, a nie efektem ubocznym innego ruchu.
  *
@@ -17,14 +17,18 @@ import { sceneSVG, zbierz } from './witaj-kucyk.js';
 import { silnik } from './witaj-konfetti.js';
 import { track } from './js/core.js';
 
-/* Osada czasowa (ms od startu). Sumuje się do 4600 — długość zatwierdzona 07-26. */
+/* Osada czasowa (ms od startu). 6,2 s — Szymon 07-26: „raczej 6 s". */
 const A = {
-  wbieg: [0, 650], spojrzy: [650, 1050], ogonUp: [1050, 1350], strumien: [1350, 2950],
-  ogonDown: [2950, 3250], usmiech: [3250, 3550], wybieg: [3550, 4000], zsyp: [4000, 4600],
+  wbieg: [0, 800], spojrzy: [800, 1250], ogonUp: [1250, 1600],
+  struga: [1600, 2350],        // wyrzut wąskim otworem w lewo
+  chmura: [2350, 3150],        // rozejście się w chmurę
+  napis: [3150, 4100],         // z chmury składa się powitanie
+  ogonDown: [4100, 4400], usmiech: [4400, 4800],
+  // 4800–5150: POSTÓJ na uśmiechu (Szymon: „konik powinien zostać chwilę dłużej")
+  wybieg: [5150, 5600], zsyp: [5600, 6200],   // zsyp DOPIERO po wyjściu kucyka
 };
-const KONIEC = 4600;
+const KONIEC = 6200;
 const FADE = 340;                  // ostatnie ms: gaśnie zasłona, wchodzą formularze
-const WEJSCIE = 300;               // jednostki viewBoxa: skąd wbiega i gdzie wybiega
 
 const f = (t, [a, b]) => (t <= a ? 0 : t >= b ? 1 : (t - a) / (b - a));
 const easeOut = (x) => 1 - Math.pow(1 - x, 3);
@@ -78,8 +82,13 @@ class Plansza {
   /** Wszystko, co zależy od układu strony — mierzone RAZ (i po zmianie rozmiaru
       oraz po doładowaniu fontu, bo od niego zależy wysokość napisu). */
   przemierz() {
+    // preserveAspectRatio="meet": skala = mniejsze z dopasowań kadru 320×380.
+    const s = this.el.querySelector('.w-scena').getBoundingClientRect();
+    const skala = Math.max(0.01, Math.min(s.width / 320, s.height / 380));
+    this.droga = (window.innerWidth / 2 + 90) / skala + 72;   // 72 = pół szerokości kucyka
     const r = this.fx.rump.getBoundingClientRect();
     this.konf.przemierz(this.tekst, window.innerHeight * 0.24);
+    this.konf.osCzasu(A);
     this.konf.zrodlo(r.left + r.width / 2, r.top + r.height / 2);
   }
 
@@ -90,7 +99,7 @@ class Plansza {
 
     // 1+8. Wbieg i wybieg: pozycja + kłus. Amplituda kroku gaśnie razem z dojazdem,
     // więc nogi nie zatrzymują się w losowym wychyleniu.
-    const x = -WEJSCIE * (1 - easeOut(wb)) + WEJSCIE * easeIO(wy);
+    const x = -this.droga * (1 - easeOut(wb)) + this.droga * easeIO(wy);
     const amp = 17 * Math.max(1 - wb * wb, Math.min(1, wy * 3));
     const faza = t / 125;
     const bob = amp > 1 ? -Math.abs(Math.sin(faza)) * 3 : 0;
@@ -107,18 +116,20 @@ class Plansza {
     const mrug = fr > 0.58 && fr < 0.76 ? 1 - Math.sin((fr - 0.58) / 0.18 * Math.PI) * 0.92 : 1;
     for (const e of fx.eyes) e.style.transform = `scaleY(${mrug.toFixed(3)})`;
 
-    // 3+6. OGON: w górę przed tęczą, w dół po niej — nigdy jednocześnie z uśmiechem.
+    // 3+7. OGON: w górę PRZED konfetti, w dół PO napisie — nigdy razem z uśmiechem.
     const ogon = zOdbiciem(f(t, A.ogonUp)) - easeIO(f(t, A.ogonDown));
     if (fx.tail) fx.tail.style.transform = `rotate(${(85 * ogon).toFixed(2)}deg)`;
 
-    // 4+9. Konfetti: strumień z zadu składa się w napis, na końcu zsypuje się poza ekran.
+    // 4+5+6+9. Konfetti: wyrzut wąskim otworem → chmura → napis → zsyp poza ekran.
+    // Trzy pierwsze fazy prowadzi silnik z jednego czasu (czysta funkcja t), zsyp
+    // całkuje, bo jest jednokierunkowy i zaczyna się po wyjściu kucyka.
     if (t >= A.zsyp[0]) {
       this.konf.zsyp(dt, !this.wysypStart);
       this.wysypStart = true;
-    } else if (t >= A.strumien[0] - 16) {
-      this.konf.lot(f(t, A.strumien));
+    } else if (t >= A.struga[0] - 16) {
+      this.konf.rusz(t);
     }
-    if (t >= A.strumien[0] - 16) this.konf.rysuj();
+    if (t >= A.struga[0] - 16) this.konf.rysuj();
 
     // 7. Uśmiech — dopiero po opadnięciu ogona.
     const sm = f(t, A.usmiech);
@@ -160,7 +171,7 @@ class Plansza {
       if (window.__stopKlatki) return;   // rig: zegar prowadzi test, nie przeglądarka
       // Font zmienia szerokość napisu, a od niej zależą cele cząstek — przemierz po
       // doładowaniu, ale tylko dopóki konfetti jeszcze nie wystartowało.
-      document.fonts?.ready?.then(() => { if (this.t < A.strumien[0]) this.przemierz(); });
+      document.fonts?.ready?.then(() => { if (this.t < A.struga[0]) this.przemierz(); });
       if (reduceMotion.matches) return this.bezRuchu();
       this.raf = requestAnimationFrame(this.frame);
     });
@@ -169,7 +180,7 @@ class Plansza {
   /** prefers-reduced-motion: sam napis, bez ruchu, krótko. */
   bezRuchu() {
     this.klatka(A.usmiech[1], 16.7);
-    this.konf.lot(1);
+    this.konf.rusz(A.napis[1]);
     this.konf.rysuj();
     setTimeout(() => this.finisz(false), 1200);
   }

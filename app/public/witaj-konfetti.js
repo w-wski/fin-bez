@@ -14,6 +14,11 @@ const STRIDE = 5;               // co ile pikseli maski bierzemy cząstkę
 const HUES = [15, 45, 95, 160, 205, 260, 300, 335];
 const TAU = Math.PI * 2;
 const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const easeIO = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const WYRZUT_MS = 300;          // ile trwa sam wyrzut jednej cząstki przez otwór
+/* Deterministyczny szum z indeksu: chmura ma wyglądać na przypadkową, ale plansza
+   musi być powtarzalna (i odporna na pominięcie tapem w dowolnej chwili). */
+const los = (i, k) => { const s = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return s - Math.floor(s); };
 
 export function silnik(canvas) {
   const ctx = canvas.getContext('2d', { alpha: true });
@@ -21,10 +26,13 @@ export function silnik(canvas) {
     n: 0, tx: new Float32Array(MAX), ty: new Float32Array(MAX),
     sx: new Float32Array(MAX), sy: new Float32Array(MAX),
     x: new Float32Array(MAX), y: new Float32Array(MAX),
+    jx: new Float32Array(MAX), jy: new Float32Array(MAX),
+    cx: new Float32Array(MAX), cy: new Float32Array(MAX),
+    ur: new Float32Array(MAX),
     vx: new Float32Array(MAX), vy: new Float32Array(MAX),
     op: new Float32Array(MAX), del: new Float32Array(MAX),
     r: new Float32Array(MAX), h: new Uint8Array(MAX),
-    w: 0, hgt: 0, dpr: 1, sypie: false,
+    w: 0, hgt: 0, dpr: 1, sypie: false, os: null,
   };
 
   /** Maska napisu → cele cząstek. Wołane na starcie, po doładowaniu fontów
@@ -75,36 +83,70 @@ export function silnik(canvas) {
       st.ty[i] = kotwicaY - off.height / 2 + trafienia[j + 1];
       st.r[i] = 2.8 + (i % 5) * 0.26;
       st.h[i] = i % HUES.length;
-      st.del[i] = (i / Math.max(1, st.n)) * 0.62;   // strumień: wychodzą kolejno, nie salwą
       st.op[i] = 1;
     }
     return { px, n: st.n };
   }
 
-  /** Punkt wysypu = koniec tęczy (mierzony na ekranie, nie zgadywany). */
+  /** Źródło = zad kucyka. WĄSKI OTWÓR: rozrzut startowy jest prawie zerowy
+   *  w pionie (Szymon 07-26: „cienkim otworem"), a strumień idzie w LEWO.
+   *  Tu też losujemy — deterministycznie, z indeksu — resztę drogi cząstki:
+   *  koniec wyrzutu (jx, jy), miejsce w chmurze (cx, cy) i czas narodzin. */
   function zrodlo(x, y) {
+    const os = st.os;
+    const rozrzut = Math.min(st.w, st.hgt) * 0.17;
+    const chmuraX = st.w * 0.34;
+    const chmuraY = st.hgt * 0.355;
+    const okno = (os.struga[1] - os.struga[0]) * 0.86;
     for (let i = 0; i < st.n; i++) {
-      const a = (i / Math.max(1, st.n)) * TAU;
-      st.sx[i] = x + Math.cos(a * 3.1) * 7 - 4;
-      st.sy[i] = y + Math.sin(a * 2.7) * 7;
+      const a = los(i, 1), b = los(i, 2), c2 = los(i, 3), d = los(i, 4);
+      st.sx[i] = x - 2;
+      st.sy[i] = y + (a - 0.5) * 3.5;              // otwór: ~3,5 px wysokości
+      st.jx[i] = x - 40 - b * 46;                  // wyrzut w lewo, różne długości
+      st.jy[i] = st.sy[i] + (c2 - 0.5) * 14;
+      // Chmura: gęstsza w środku (pierwiastek z promienia daje równomierne pole)
+      const kat = a * TAU + b;
+      const prom = Math.sqrt(c2) * rozrzut;
+      st.cx[i] = chmuraX + Math.cos(kat) * prom * 1.25;
+      st.cy[i] = chmuraY + Math.sin(kat) * prom * 0.8;
+      st.ur[i] = os.struga[0] + (i / Math.max(1, st.n)) * okno;
+      st.del[i] = d * 0.32;                        // rozłożenie składania napisu
       st.x[i] = st.sx[i];
       st.y[i] = st.sy[i];
+      st.op[i] = 0;
     }
     st.sypie = false;
   }
 
-  /** Lot do liter: czysta funkcja postępu (p 0→1), więc pominięcie tapem
-   *  nie zostawia cząstek w losowym miejscu. */
-  function lot(p) {
+  function osCzasu(os) { st.os = os; }
+
+  /** Cały ruch przed zsypem: czysta funkcja czasu planszy.
+   *  1. wyrzut wąskim otworem w lewo, 2. rozejście się w chmurę, 3. napis. */
+  function rusz(t) {
     st.sypie = false;
+    const napisA = st.os.napis[0], napisB = st.os.napis[1];
     for (let i = 0; i < st.n; i++) {
-      const pi = Math.max(0, Math.min(1, (p - st.del[i]) / (1 - st.del[i])));
-      const e = easeOut(pi);
-      st.x[i] = st.sx[i] + (st.tx[i] - st.sx[i]) * e;
-      // lekki łuk: cząstka wznosi się nad prostą i dopiero spada na literę
-      const luk = Math.min(90, Math.abs(st.ty[i] - st.sy[i]) * 0.16);
-      st.y[i] = st.sy[i] + (st.ty[i] - st.sy[i]) * e - Math.sin(e * Math.PI) * luk;
-      st.op[i] = pi > 0 ? 1 : 0;
+      const ur = st.ur[i];
+      if (t < ur) { st.op[i] = 0; continue; }
+      st.op[i] = 1;
+      const koniecWyrzutu = ur + WYRZUT_MS;
+      if (t < koniecWyrzutu) {
+        const e = easeOut((t - ur) / WYRZUT_MS);
+        st.x[i] = st.sx[i] + (st.jx[i] - st.sx[i]) * e;
+        st.y[i] = st.sy[i] + (st.jy[i] - st.sy[i]) * e;
+        continue;
+      }
+      // Kołysanie chmury: drobne, deterministyczne, gaśnie przy składaniu napisu.
+      const kol = Math.sin(t / 620 + i * 0.7) * 4.5;
+      const kol2 = Math.cos(t / 540 + i * 1.1) * 3.5;
+      const eCh = Math.min(1, (t - koniecWyrzutu) / Math.max(1, napisA - koniecWyrzutu));
+      const chX = st.jx[i] + (st.cx[i] - st.jx[i]) * easeOut(eCh);
+      const chY = st.jy[i] + (st.cy[i] - st.jy[i]) * easeOut(eCh);
+      if (t < napisA) { st.x[i] = chX + kol; st.y[i] = chY + kol2; continue; }
+      const p = (t - napisA) / (napisB - napisA);
+      const e = easeIO(Math.max(0, Math.min(1, (p - st.del[i]) / (1 - st.del[i]))));
+      st.x[i] = chX + kol * (1 - e) + (st.tx[i] - chX) * e;
+      st.y[i] = chY + kol2 * (1 - e) + (st.ty[i] - chY) * e;
     }
   }
 
@@ -147,5 +189,5 @@ export function silnik(canvas) {
     return true;
   }
 
-  return { przemierz, zrodlo, lot, zsyp, rysuj, pusto, stan: st };
+  return { przemierz, zrodlo, osCzasu, rusz, zsyp, rysuj, pusto, stan: st };
 }
