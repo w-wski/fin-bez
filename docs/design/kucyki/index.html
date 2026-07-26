@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kucyk do planszy powitalnej — trzy warianty</title>
+<link rel="stylesheet" href="../../../app/public/styles.css">
+<style>
+  body { margin: 0; padding: 24px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -.02em; }
+  .lead { color: var(--muted); margin: 0 0 24px; max-width: 62ch; }
+  .grid { display: grid; gap: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .kol h2 { font-size: 1.05rem; margin: 0 0 10px; letter-spacing: -.01em; }
+  .scena {
+    position: relative; border-radius: 20px; border: 1px solid var(--line-soft);
+    background: var(--bg); background-image: var(--paper); overflow: hidden;
+    margin-bottom: 10px; color: var(--fg);
+  }
+  .scena--dark { color-scheme: dark; }
+  .scena svg { display: block; width: 100%; height: auto; }
+  .podpis { font-size: .78rem; color: var(--muted); letter-spacing: .02em; text-transform: uppercase; margin: 0 0 6px; }
+  /* Cykl kłusa: nogi obracają się w biodrze, korpus lekko podskakuje.
+     Tu jako pętla CSS — w planszy to samo prowadzi jeden postęp. */
+  .biegnie .pony { animation: bob .46s ease-in-out infinite; }
+  .biegnie .leg { transform-box: view-box; transform-origin: var(--ox) var(--oy); animation: krok .46s ease-in-out infinite; }
+  .biegnie .leg--br, .biegnie .leg--fl { animation-delay: -.23s; }
+  .biegnie .tail { transform-box: view-box; transform-origin: 64px 88px; animation: ogon .62s ease-in-out infinite; }
+  .biegnie .mane { transform-box: view-box; transform-origin: 176px 30px; animation: ogon .52s ease-in-out infinite; }
+  @keyframes krok { 0%, 100% { transform: rotate(-17deg) } 50% { transform: rotate(17deg) } }
+  @keyframes bob  { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
+  @keyframes ogon { 0%, 100% { transform: rotate(-6deg) } 50% { transform: rotate(7deg) } }
+  .patrzy .face--side { opacity: 0 }
+  .patrzy .face--front { opacity: 1 }
+  .usmiech .smile { opacity: 1 }
+</style>
+</head>
+<body>
+<h1>Kucyk-jednorożec — trzy warianty do wyboru</h1>
+<p class="lead">Ten sam szkielet i te same proporcje w każdym wariancie (nogi, ogon, grzywa, głowa
+w profilu i na widza, uśmiech, punkt zaczepienia tęczy) — różni je rysunek. Kolory grzywy, ogona
+i tęczy to ta sama paleta, co bąbelki na ekranie logowania. Górny rząd: kłus wejściowy.
+Środkowy: staje i patrzy na widza. Dolny: uśmiech i tęcza z zadu. Arkusz jest też w motywie ciemnym.</p>
+
+<div class="grid" id="grid"></div>
+
+<script type="module">
+import { PONIES, NAZWY, rainbow } from './kucyki.js';
+
+const RZEDY = [
+  ['kłus wejściowy', 'biegnie', false],
+  ['staje i patrzy na widza', 'patrzy', false],
+  ['uśmiech + tęcza z zadu', 'patrzy usmiech', false],
+];
+
+document.getElementById('grid').innerHTML = Object.keys(PONIES).map((k) => `
+  <div class="kol">
+    <h2>${NAZWY[k]}</h2>
+    ${RZEDY.map(([opis, klasy, dark]) => `
+      <p class="podpis">${opis}</p>
+      <div class="scena ${dark ? 'scena--dark' : ''}" ${dark ? 'data-theme="dark"' : ''}>
+        <svg viewBox="0 0 240 180" class="${klasy}" aria-hidden="true">
+          ${klasy.includes('usmiech') ? rainbow() : ''}
+          ${PONIES[k]}
+        </svg>
+      </div>`).join('')}
+  </div>`).join('');
+</script>
+</body>
+</html>
