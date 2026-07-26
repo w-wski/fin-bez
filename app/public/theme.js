@@ -10,6 +10,8 @@
  */
 
 const KEY = 'fin-theme';
+const KEY_SKIN = 'fin-skin';
+const SKINS = ['sygnal', 'tafla'];
 const MODES = ['light', 'dark', 'auto'];
 const LABEL = { light: 'Jasny', dark: 'Ciemny', auto: 'Auto' };
 const DAY_FROM = 7;   // włącznie — od 07:00 jasny
@@ -82,6 +84,47 @@ function sync(announce = false) {
   });
 }
 
+/* ---------- Skóra wnętrza: „Sygnał" (duotone, płasko) albo „Tafla" (szkło) ----------
+   To NIE to samo co motyw: motyw to jasny/ciemny, skóra to cały język wizualny.
+   Ekran logowania jest poza tym wyborem — jest CELOWO inny niż wnętrze (Szymon 07-26).
+   Pierwsze ustawienie robi skrypt inline w <head>; tu jest zmiana i kontrolka. */
+
+export function readSkin() {
+  try {
+    const v = localStorage.getItem(KEY_SKIN);
+    return SKINS.includes(v) ? v : 'sygnal';
+  } catch { return 'sygnal'; }
+}
+
+export function applySkin(skin) {
+  const s = SKINS.includes(skin) ? skin : 'sygnal';
+  try { localStorage.setItem(KEY_SKIN, s); } catch { /* tryb prywatny — zostaje na tę sesję */ }
+  document.documentElement.dataset.skin = s;
+  syncSkin();
+}
+
+function syncSkin() {
+  const teraz = document.documentElement.dataset.skin || 'sygnal';
+  for (const b of document.querySelectorAll('[data-skin-set]')) {
+    const wybrany = b.dataset.skinSet === teraz;
+    b.classList.toggle('is-on', wybrany);
+    b.setAttribute('aria-pressed', String(wybrany));
+  }
+}
+
+/** Delegacja na dokumencie: przełączniki skóry są w arkuszu „Więcej" ORAZ w Adminie,
+    a ten drugi jest budowany dynamicznie — nasłuch per element by go nie objął. */
+function bootSkin() {
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-skin-set]');
+    if (!b) return;
+    e.preventDefault();
+    applySkin(b.dataset.skinSet);
+  });
+  new MutationObserver(syncSkin).observe(document.body, { childList: true, subtree: true });
+  applySkin(readSkin());
+}
+
 /** Jeden guzik-kropka, cyklicznie: jasny → ciemny → auto → jasny. */
 function buildSwitch(group) {
   group.removeAttribute('role');
@@ -98,6 +141,7 @@ function buildSwitch(group) {
 function boot() {
   document.querySelectorAll('.theme-switch').forEach(buildSwitch);
   applyMode(readMode());
+  bootSkin();
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

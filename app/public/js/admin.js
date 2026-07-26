@@ -176,9 +176,23 @@ function wiersz(c, pod) {
   return w;
 }
 
+/** Wygląd: ten sam wybór skóry, co w arkuszu „Więcej". Tam jest dla WSZYSTKICH
+    (Bartuś nie widzi Administracji), tutaj — bo to naturalne miejsce na ustawienia.
+    Stan podświetlenia i zapis prowadzi theme.js przez delegację na dokumencie. */
+function blokWygladu() {
+  const grupa = el('div', { class: 'skora', role: 'group', 'aria-label': 'Wygląd aplikacji' });
+  const opcje = el('div', { class: 'skora__opcje' });
+  for (const [id, nazwa] of [['sygnal', 'Sygnał'], ['tafla', 'Tafla']]) {
+    opcje.append(el('button', { class: 'skora__opcja', type: 'button', 'data-skin-set': id }, nazwa));
+  }
+  grupa.append(el('span', { class: 'skora__label' }, 'Wygląd'), opcje);
+  return grupa;
+}
+
 function rysuj() {
   const box = $('#adminBox');
   box.innerHTML = '';
+  box.append(el('h2', {}, 'Wygląd'), blokWygladu());
   box.append(el('h2', {}, 'Kategorie'), pasekNarzedzi());
   const lista = el('div', { class: 'cat-tree' });
   for (const k of drzewo) {

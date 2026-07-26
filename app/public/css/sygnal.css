@@ -1,0 +1,464 @@
+/* ============================================================================
+   SKÓRA „SYGNAŁ" — wnętrze aplikacji. Kierunek wizualny 03 z Canvas (Szymon 07-26).
+   Duotone: JEDNA farba i czerń, nic pomiędzy. Hierarchię robi skala typografii,
+   nie kolor ani cień. Kwota jest największą rzeczą na ekranie, etykiety to
+   rozstrzelony mono w wersalikach, element aktywny dostaje OBRYS-PIGUŁKĘ zamiast
+   wypełnienia. Powierzchnie płaskie, krawędzie twarde, promienie duże.
+   Zero rozmycia, zero gradientów, zero cieni — budżet renderowania prawie pusty.
+
+   Arkusz jest BEZCZYNNY bez `data-skin="sygnal"` na <html>, więc wisi w index.html
+   na stałe: przełączenie skóry nie dogrywa plików i nie mruga. Druga skóra („Tafla",
+   szkło) siedzi w styles.css i css/<widok>.css — tu tylko ją przykrywamy.
+   Scena logowania jest POZA tym wyborem: jest celowo inna niż wnętrze.
+   ========================================================================== */
+
+:root[data-skin="sygnal"] {
+  --font: 'Archivo', system-ui, sans-serif;
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --mono: 'Plex Mono', ui-monospace, Menlo, monospace;
+
+  /* Dzień: farba jako TŁO, czerń jako atrament. */
+  --bg: oklch(0.685 0.175 42);
+  --panel: oklch(0.715 0.160 42);
+  --panel-deep: oklch(0.630 0.165 42);
+  --card: oklch(0.225 0.015 45);
+  --card-ink: oklch(0.945 0.035 70);
+  --card-muted: oklch(0.790 0.055 55);
+  --ink: oklch(0.185 0.015 45);
+  --ink-muted: oklch(0.300 0.030 45);
+  --ink-faint: oklch(0.365 0.045 45);
+  --ink-on-accent: oklch(0.945 0.035 70);
+  --accent: oklch(0.185 0.015 45);
+  --accent-quiet: oklch(0.185 0.015 45 / 0.10);
+  --line: oklch(0.185 0.015 45 / 0.34);
+  --line-strong: oklch(0.185 0.015 45 / 0.75);
+  --focus: oklch(0.185 0.015 45);
+  --focus-halo: oklch(0.185 0.015 45 / 0.22);
+  --minus: oklch(0.315 0.085 30);
+  --plus: oklch(0.335 0.075 140);
+  --flow: oklch(0.300 0.030 45);
+  --warn: oklch(0.300 0.070 60);
+  --danger: oklch(0.335 0.110 28);
+  --overlay: oklch(0.185 0.015 45 / 0.42);
+
+  --r-sm: 12px; --r-md: 20px; --r-lg: 28px; --r-xl: 28px; --r-pill: 999px;
+  --t-micro: 11.5px; --t-cap: 13px; --t-body: 15px; --t-body-lg: 17px;
+  --num-md: 17px; --num-lg: 22px; --num-xl: 42px;
+
+  /* Tokeny „Tafli", których Sygnał nie używa — gasimy je, żeby nie przeciekały. */
+  --paper: none;
+  --glass-drop: transparent;
+  --surface: transparent;
+  --line-soft: var(--line);
+  --muted: var(--ink-muted);
+  --fg: var(--ink);
+}
+
+/* Noc = zamiana ról: farba przechodzi z tła na akcent. */
+:root[data-skin="sygnal"][data-theme="dark"] {
+  --bg: oklch(0.185 0.012 45);
+  --panel: oklch(0.230 0.016 45);
+  --panel-deep: oklch(0.155 0.010 45);
+  --card: oklch(0.685 0.175 42);
+  --card-ink: oklch(0.170 0.015 45);
+  --card-muted: oklch(0.300 0.050 45);
+  --ink: oklch(0.930 0.045 60);
+  --ink-muted: oklch(0.780 0.060 52);
+  --ink-faint: oklch(0.640 0.070 48);
+  --ink-on-accent: oklch(0.170 0.015 45);
+  --accent: oklch(0.685 0.175 42);
+  --accent-quiet: oklch(0.685 0.175 42 / 0.16);
+  --line: oklch(0.90 0.05 55 / 0.22);
+  --line-strong: oklch(0.90 0.05 55 / 0.60);
+  --focus: oklch(0.685 0.175 42);
+  --focus-halo: oklch(0.685 0.175 42 / 0.30);
+  --minus: oklch(0.760 0.150 38);
+  --plus: oklch(0.800 0.120 145);
+  --flow: oklch(0.780 0.060 52);
+  --warn: oklch(0.800 0.120 70);
+  --danger: oklch(0.740 0.160 30);
+  --overlay: oklch(0.08 0.01 45 / 0.62);
+}
+
+/* ---------- 1. Powierzchnia i chrom ---------- */
+
+/* Najpierw GASIMY szkło „Tafli": cztery radialne plamy tła (body::before), blask
+   edytowanego pola (::before z --glow), wypełnienia i ranty. Bez tego przez duotone
+   przeciekają różowe poświaty — Sygnał ma zero gradientów i zero cieni.
+   Scena logowania jest WYŁĄCZONA z tej kosiarki: ma własny język i zostaje szklana. */
+:root[data-skin="sygnal"] body::before,
+:root[data-skin="sygnal"] main > section:not(#view-login) *::before,
+:root[data-skin="sygnal"] body > header::before,
+:root[data-skin="sygnal"] #nav::before,
+:root[data-skin="sygnal"] .sheet::before { background: none; opacity: 0; content: none; }
+:root[data-skin="sygnal"] main > section:not(#view-login) *,
+:root[data-skin="sygnal"] body > header *,
+:root[data-skin="sygnal"] #nav *,
+:root[data-skin="sygnal"] .sheet * {
+  background-image: none;
+  box-shadow: none;
+  text-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-skin="sygnal"] body {
+  background: var(--bg);
+  background-image: none;          /* ziarno i plamy „Tafli" nie istnieją w duotone */
+  color: var(--ink);
+  font-family: var(--font);
+}
+/* Płasko znaczy płasko: żadnego rozmycia i cienia w całym wnętrzu. */
+:root[data-skin="sygnal"] body > header,
+:root[data-skin="sygnal"] #nav,
+:root[data-skin="sygnal"] .sheet,
+:root[data-skin="sygnal"] .card,
+:root[data-skin="sygnal"] .amount-card,
+:root[data-skin="sygnal"] .kpi,
+:root[data-skin="sygnal"] .overflow {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  background-image: none;
+}
+
+:root[data-skin="sygnal"] body > header {
+  background: var(--bg);
+  border-bottom: 2px solid var(--line-strong);
+  border-radius: 0;
+  align-items: flex-end;
+  gap: 10px;
+}
+:root[data-skin="sygnal"] #viewTitle {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-stretch: 110%;               /* oś szerokości Archivo — sedno tej typografii */
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+:root[data-skin="sygnal"] #who,
+:root[data-skin="sygnal"] .amount-hint,
+:root[data-skin="sygnal"] .note {
+  font-family: var(--mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+:root[data-skin="sygnal"] .note {
+  letter-spacing: normal;
+  text-transform: none;
+  font-family: var(--font);
+  font-size: var(--t-cap);
+  line-height: 1.45;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+}
+:root[data-skin="sygnal"] .page-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-stretch: 110%;
+  text-transform: uppercase;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+/* ---------- 2. Nawigacja: obrys-pigułka, nie wypełnienie ---------- */
+:root[data-skin="sygnal"] #nav {
+  background: var(--bg);
+  border-top: 2px solid var(--line-strong);
+  border-radius: 0;
+  gap: 4px;
+}
+:root[data-skin="sygnal"] #nav button {
+  min-height: 52px;
+  border: 2px solid transparent;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-faint);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+:root[data-skin="sygnal"] #nav button.active {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: transparent;
+}
+:root[data-skin="sygnal"] #nav .nav-i { font-size: 15px; }
+
+/* ---------- 3. Panele: obrys, zero wypełnienia ---------- */
+:root[data-skin="sygnal"] .card,
+:root[data-skin="sygnal"] .overflow,
+:root[data-skin="sygnal"] .kpi,
+:root[data-skin="sygnal"] .sheet {
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: transparent;
+}
+:root[data-skin="sygnal"] .sheet { background: var(--bg); }
+
+/* ---------- 4. Kwota: największa rzecz na ekranie ---------- */
+:root[data-skin="sygnal"] .amount-card {
+  padding: 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: transparent;
+  transition: background .16s ease-out, color .16s ease-out;
+}
+/* Pole w edycji = INWERSJA całej karty. To jedyny „blask" w tej skórze. */
+:root[data-skin="sygnal"] .amount-card:has(#amount:focus) {
+  border-color: var(--card);
+  background: var(--card);
+  color: var(--card-ink);
+}
+:root[data-skin="sygnal"] .amount-card:has(#amount:focus) .fld > span,
+:root[data-skin="sygnal"] .amount-card:has(#amount:focus) .amount-hint { color: var(--card-muted); }
+:root[data-skin="sygnal"] .amount-card:has(#amount:focus) #amount,
+:root[data-skin="sygnal"] .amount-card:has(#amount:focus) .amount-cur { color: var(--card-ink); }
+:root[data-skin="sygnal"] #amount {
+  min-height: 48px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 600 var(--num-xl)/1.05 var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding: 2px 0;
+}
+:root[data-skin="sygnal"] #amount:focus { outline: none; box-shadow: none; }
+:root[data-skin="sygnal"] .amount-cur {
+  font: 600 20px/1 var(--mono);
+  color: var(--ink-muted);
+}
+
+/* ---------- 5. Etykiety i pola ---------- */
+:root[data-skin="sygnal"] .fld > span:first-child {
+  font: 500 var(--t-micro)/1 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+:root[data-skin="sygnal"] .fld.quiet > span:first-child {
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+}
+:root[data-skin="sygnal"] input:not([type="file"]),
+:root[data-skin="sygnal"] select,
+:root[data-skin="sygnal"] textarea {
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+  background-image: none;
+  color: var(--ink);
+  font: 400 var(--t-body-lg)/1.2 var(--font);
+  box-shadow: none;
+}
+:root[data-skin="sygnal"] textarea { padding: 12px 13px; line-height: 1.4; }
+/* Chevron selecta jest rysowany dwoma gradientami — kosiarka wyżej go zdjęła,
+   więc przywracamy go tutaj, w barwie atramentu skóry. */
+:root[data-skin="sygnal"] select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
+    linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
+  background-position: calc(100% - 22px) calc(50% + 2px), calc(100% - 16px) calc(50% + 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+:root[data-skin="sygnal"] input:focus,
+:root[data-skin="sygnal"] select:focus,
+:root[data-skin="sygnal"] textarea:focus {
+  outline: none;
+  border: 2px solid var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+
+/* ---------- 6. Segmenty: tor z obrysem, aktywny w pigułce ---------- */
+:root[data-skin="sygnal"] .seg {
+  display: grid;
+  gap: 4px;
+  padding: 4px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+}
+:root[data-skin="sygnal"] .seg-2 { grid-template-columns: 1fr 1fr; }
+:root[data-skin="sygnal"] .seg-3 { grid-template-columns: repeat(3, 1fr); }
+:root[data-skin="sygnal"] .seg button {
+  min-height: 46px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 2px solid transparent;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-muted);
+  font: 700 var(--t-micro)/1.15 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+:root[data-skin="sygnal"] .seg button.active { border-color: var(--ink); color: var(--ink); }
+/* Semantyka +/− zostaje, ale ŚCISZONA do dwóch ciemnych odcieni w gamie farby. */
+:root[data-skin="sygnal"] #segType button[data-type="WYDATEK"].active { border-color: var(--minus); color: var(--minus); }
+:root[data-skin="sygnal"] #segType button[data-type="PRZYCHÓD"].active { border-color: var(--plus); color: var(--plus); }
+:root[data-skin="sygnal"] #segType button[data-type="TRANSFER"].active { border-color: var(--flow); color: var(--flow); }
+:root[data-skin="sygnal"] .seg .sig { font: 600 var(--t-body)/1 var(--mono); }
+
+/* ---------- 7. Przyciski ---------- */
+:root[data-skin="sygnal"] .btn {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  background-image: none;
+  color: var(--ink);
+  font: 700 var(--t-micro)/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: none;
+}
+:root[data-skin="sygnal"] .btn.primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+:root[data-skin="sygnal"] .btn.small { min-height: 36px; padding: 0 12px; font-size: 11px; }
+:root[data-skin="sygnal"] .btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------- 8. Historia: lista bez kart wokół wpisu ---------- */
+:root[data-skin="sygnal"] #txTable { border-collapse: collapse; font-family: var(--font); }
+:root[data-skin="sygnal"] #txTable th {
+  font: 500 var(--t-micro)/1 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: transparent;
+  border-bottom: 2px solid var(--line-strong);
+}
+:root[data-skin="sygnal"] #txTable tbody tr {
+  border-bottom: 1.5px solid var(--line);
+  background-image: none;            /* mgiełka kategorii z „Tafli" — w Sygnale to KRESKA */
+}
+:root[data-skin="sygnal"] #txTable td { border: 0; color: var(--ink); font-size: var(--t-body); }
+:root[data-skin="sygnal"] #txTable .num {
+  font: 600 var(--num-md)/1.15 var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+/* Kolor kategorii jako DROBNY ZNAK: kreska przy krawędzi CAŁEGO wiersza, nie mgiełka
+   pod nim (DECYZJE #89 zostaje w mocy — kolor nadal wyróżnia całą transakcję, tylko
+   ciszej). Inset zamiast border-left, bo w trybie kart wiersz jest gridem i dodatkowa
+   krawędź przesunęłaby kolumny. */
+:root[data-skin="sygnal"] #txTable tbody tr {
+  box-shadow: inset 3px 0 0 0 var(--cat-c, transparent);
+}
+:root[data-skin="sygnal"] .catdot { display: none; }
+/* Znacznik typu: OBRYS w barwie znaczenia, nigdy wypełnienie. Selektory muszą
+   zawierać #txTable, bo „Tafla" maluje te plakietki regułą z ID (`#txTable td.exp
+   .typ`) i bez tego wygrywałaby specyficznością. */
+:root[data-skin="sygnal"] #txTable .typ,
+:root[data-skin="sygnal"] #txTable td.exp .typ,
+:root[data-skin="sygnal"] #txTable td.inc .typ,
+:root[data-skin="sygnal"] #txTable td.trf .typ {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border: 1.5px solid currentColor;
+  border-radius: var(--r-pill);
+  background: transparent;
+  font: 600 var(--t-micro)/1 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+:root[data-skin="sygnal"] #txTable td.exp .typ { color: var(--minus); }
+:root[data-skin="sygnal"] #txTable td.inc .typ { color: var(--plus); }
+:root[data-skin="sygnal"] #txTable td.trf .typ { color: var(--flow); }
+/* Kwoty w kolumnie liczbowej też chodzą przez #txTable w „Tafli". */
+:root[data-skin="sygnal"] #txTable td.exp.num { color: var(--minus); }
+:root[data-skin="sygnal"] #txTable td.inc.num { color: var(--plus); }
+:root[data-skin="sygnal"] #txTable td.trf.num { color: var(--flow); }
+:root[data-skin="sygnal"] .pill,
+:root[data-skin="sygnal"] #txTable .pill.bank {
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink);
+  font: 600 var(--t-micro)/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:root[data-skin="sygnal"] .theme-dot {
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink);
+}
+:root[data-skin="sygnal"] .theme-dot__i {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  background-image: linear-gradient(90deg, currentColor 50%, transparent 50%);
+}
+:root[data-skin="sygnal"] .theme-switch__now {
+  font: 600 var(--t-micro)/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-pill);
+}
+
+/* ---------- 9. Wybór skóry (arkusz „Więcej" i Administracja) ---------- */
+.skora { display: flex; flex-direction: column; gap: 8px; padding: 10px 4px 4px; }
+.skora__label {
+  font: 500 11.5px/1 var(--mono, ui-monospace);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted, var(--ink-muted));
+}
+.skora__opcje { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.skora__opcja {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--line, currentColor);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: 700 11.5px/1 var(--mono, ui-monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.skora__opcja.is-on { border-color: currentColor; font-weight: 800; }
+
+/* ---------- 10. Ruch: tyle, ile potrzeba ---------- */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin="sygnal"] * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+}

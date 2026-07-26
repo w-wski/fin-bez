@@ -1,6 +1,6 @@
 // Service worker „finansowej" — offline-ready (app shell w cache, API zawsze z sieci).
 // Po każdym deployu podbij CACHE_VERSION (RUNBOOK) — stary cache zostanie usunięty.
-const CACHE_VERSION = 'finansowa-v27';
+const CACHE_VERSION = 'finansowa-v28';
 const SHELL = [
   '/', '/index.html', '/manifest.webmanifest', '/icon.svg',
   '/styles.css', '/css/wpis.css', '/css/historia.css', '/css/raporty.css',
@@ -8,7 +8,7 @@ const SHELL = [
   '/main.js',
   '/js/core.js', '/js/kwota.js', '/js/kategorie.js', '/js/wpis.js', '/js/historia.js',
   '/js/import.js', '/js/raporty.js', '/js/admin.js', '/js/paleta.js',
-  '/js/przydzial.js', '/css/przydzial.css',
+  '/js/przydzial.js', '/css/przydzial.css', '/css/sygnal.css',
   '/glass.js', '/glass-mapa.js', '/theme.js', '/typografia.js', '/css/logowanie.css',
   // UWAGA: fontów sf-pro-*.woff2 celowo NIE ma w SHELL — leżą tylko na serwerze
   // (poza gitem, kwestia licencji Apple), a addAll wywala instalację SW przy 404.

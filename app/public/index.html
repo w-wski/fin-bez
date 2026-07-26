@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="css/kategorie.css">
 <link rel="stylesheet" href="css/paragon.css">
 <link rel="stylesheet" href="css/przydzial.css">
+<link rel="stylesheet" href="css/sygnal.css">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#f4ece9" media="(prefers-color-scheme: light)">
@@ -30,6 +31,11 @@
   var h = new Date().getHours();
   document.documentElement.dataset.themeMode = mode;
   document.documentElement.dataset.theme = mode === 'auto' ? (h >= 7 && h < 19 ? 'light' : 'dark') : mode;
+  // SKÓRA wnętrza: 'sygnal' (duotone, płasko) albo 'tafla' (szkło). Ustawiana tutaj,
+  // przed pierwszym malowaniem — inaczej wnętrze mrugnęłoby poprzednią skórą.
+  var sk = 'sygnal';
+  try { var s = localStorage.getItem('fin-skin'); if (s === 'sygnal' || s === 'tafla') sk = s; } catch (e) {}
+  document.documentElement.dataset.skin = sk;
 })();
 </script>
 </head>
@@ -279,6 +285,14 @@
     <button class="sheet-item" data-view="import">Import z banku</button>
     <button class="sheet-item" data-view="przydzial" data-admin hidden>Przydział</button>
     <button class="sheet-item" data-view="admin" data-admin hidden>Administracja</button>
+    <div class="sheet-sep" aria-hidden="true"></div>
+    <div class="skora" role="group" aria-label="Wygląd aplikacji">
+      <span class="skora__label">Wygląd</span>
+      <div class="skora__opcje">
+        <button class="skora__opcja" type="button" data-skin-set="sygnal">Sygnał</button>
+        <button class="skora__opcja" type="button" data-skin-set="tafla">Tafla</button>
+      </div>
+    </div>
     <div class="sheet-sep" aria-hidden="true"></div>
     <button class="sheet-item quiet" id="sheetLogout">Wyloguj</button>
   </div>
