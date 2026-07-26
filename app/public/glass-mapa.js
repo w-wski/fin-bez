@@ -73,35 +73,50 @@ export function installLensMap() {
 
 /* ---------- 2. Choreografia ---------- */
 
-/** Klatki kluczowe: cx/cy to ułamki viewportu, s — skala pudełka bazowego;
- *  `anchor` = środek .login__mark z żywego DOM.
- *
- *  Model z referencji Wabi (Szymon, 07-25 nocą, runda 3): tytuł ma DWIE warstwy.
- *  `dlens` — słowo w kopii sceny POD SZKŁEM (widoczne wyłącznie przez soczewkę,
- *  jako nieczytelna, odwrócona smuga wędrująca po przeciwnej stronie tafli).
- *  `dest` — PRAWDZIWY tytuł: nie istnieje przez całą wspinaczkę, wysuwa się
- *  spod kamyka dopiero na samej górze (rampa .80→.88 + zjazd dsl 1.27→1).
- *  `dsl` prowadzi pozycję OBU warstw: 0 = 30vh poniżej celu, 1 = na miejscu,
- *  >1 = schowany ZA kamykiem, lekko powyżej celu — przez wspinaczkę słowo jedzie
- *  tuż pod środkiem soczewki, więc smuga cały czas jest w polu tafli.
- *  W dół — dokładnie ta sama droga wstecz (zero zatrzasków, czysta funkcja p). */
+/** POZYCJA nie stoi w klatkach: soczewka jedzie PROSTO od spoczynku pod ekranem
+ *  do kotwicy (.login__mark z żywego DOM), liniowo w p. To celowe — `p` liczy się
+ *  z wysokości soczewki (pFromY w glass.js), więc liniowy tor jest dokładną
+ *  odwrotnością tamtego wzoru i chwyt palcem ma tę samą skalę co dojazd sam.
+ *  Poprzednio klatki stawiały soczewkę na kotwicy już przy p=0.80, a p=1 wypadało
+ *  0.16vh PONIŻEJ kotwicy — w geście soczewka miała więc rozmiar docelowy (i napis!)
+ *  jeszcze w połowie ekranu i przez napis „Finansowa" jechała już malutka
+ *  (uwaga Szymona 07-26 wieczorem). p = po prostu „ile drogi do domu". */
+export const START_CY = 1.08;               // spoczynek: środek soczewki pod krawędzią ekranu
+
+export function trackPos(root, p) {
+  const home = anchorCenter(root);
+  const y0 = window.innerHeight * START_CY;
+  return { x: lerp(window.innerWidth / 2, home.cx, p), y: lerp(y0, home.cy, p) };
+}
+
+/** Klatki kluczowe: s — skala pudełka bazowego, resztę patrz applyFx.
+ *  `hero` — pierwszy napis (gaśnie, gdy szkło się zbliża).
+ *  `dest`  — tytuł „Finansowa": nie istnieje przez CAŁĄ wspinaczkę (także w kopii
+ *  pod szkłem — smuga pod soczewką WYCOFANA 07-26, życzenie Szymona), wyłania się
+ *  spod kamyka dopiero na samej górze; `dsl` prowadzi jego pozycję (1 = na miejscu,
+ *  >1 = schowany ZA kamykiem, lekko powyżej celu).
+ *  `cta` — podtytuł + przyciski, dopiero gdy tytuł stoi już w miejscu.
+ *  Pomniejszanie ROZŁOŻONE na sam koniec drogi: do p=0.86 soczewka trzyma się
+ *  wielkości ~1 (przez napis przechodzi duża), rozmiar docelowy osiąga dopiero
+ *  siadając na kotwicy. Ta sama krzywa w dół = zabrana z domu rośnie natychmiast.
+ *  W dół dokładnie ta sama droga wstecz (zero zatrzasków, czysta funkcja p). */
 export const KEYFRAMES = [
-  { p: 0.00, cx: 0.5, cy: 1.08, s: 1.85, hero: 1, dest: 0, dlens: 0, dsl: 0, cta: 0 },
-  { p: 0.30, cx: 0.5, cy: 0.86, s: 1.42, hero: 0.7, dest: 0, dlens: 0, dsl: 0, cta: 0 },
-  { p: 0.36, cx: 0.5, cy: 0.80, s: 1.32, hero: 0.5, dest: 0, dlens: 1, dsl: 0.10, cta: 0 },
-  // dsl prowadzi słowo TUŻ POD ŚRODKIEM soczewki przez całą wspinaczkę — okno
-  // źródła odbicia to R/M wokół środka, więc smuga w tafli żyje tylko wtedy,
-  // gdy słowo trzyma się blisko osi szkła (wartości = tor soczewki w vh).
-  { p: 0.50, cx: 0.5, cy: 0.585, s: 1.12, hero: 0, dest: 0, dlens: 1, dsl: 0.70, cta: 0 },
-  { p: 0.58, cx: 0.5, cy: 0.545, s: 1.00, hero: 0, dest: 0, dlens: 1, dsl: 0.85, cta: 0 },
-  { p: 0.80, anchor: true, s: 0.55, hero: 0, dest: 0, dlens: 1, dsl: 1.30, cta: 0 },
-  { p: 0.88, anchor: true, s: 0.40, hero: 0, dest: 0, dlens: 1, dsl: 1.30, cta: 0 },
-  // Prawdziwy tytuł wychodzi DOPIERO, gdy soczewka realnie dojechała (uwaga
-  // 07-25 23:10: „pojawia się zanim soczewka dojedzie") — rampa .935→.985,
-  // słowo wysuwa się w dół spod dolnej krawędzi kamyka (dsl>1 → 1).
-  { p: 0.935, anchor: true, s: 0.33, hero: 0, dest: 0, dlens: 1, dsl: 1.26, cta: 0 },
-  { p: 0.985, anchor: true, s: 0.26, hero: 0, dest: 1, dlens: 1, dsl: 1.03, cta: 0 },
-  { p: 1.00, anchor: true, s: 0.25, hero: 0, dest: 1, dlens: 1, dsl: 1, cta: 1 },
+  { p: 0.00, s: 1.85, hero: 1, dest: 0, dsl: 1.30, cta: 0 },
+  { p: 0.20, s: 1.70, hero: 0.92, dest: 0, dsl: 1.30, cta: 0 },
+  { p: 0.40, s: 1.52, hero: 0.62, dest: 0, dsl: 1.30, cta: 0 },
+  { p: 0.56, s: 1.36, hero: 0.28, dest: 0, dsl: 1.30, cta: 0 },
+  { p: 0.70, s: 1.22, hero: 0, dest: 0, dsl: 1.30, cta: 0 },
+  { p: 0.86, s: 1.02, hero: 0, dest: 0, dsl: 1.30, cta: 0 },
+  { p: 0.94, s: 0.78, hero: 0, dest: 0, dsl: 1.30, cta: 0 },
+  // Tytuł wychodzi DOPIERO tutaj — i nie „pojawia się", a wysuwa spod kamyka
+  // (zasłona, patrz applyFx). Kamyk jest wtedy jeszcze 2–3× większy od docelowego,
+  // rozmiar docelowy bierze na ostatnich pikselach drogi.
+  { p: 0.955, s: 0.68, hero: 0, dest: 1, dsl: 1.29, cta: 0 },
+  { p: 0.975, s: 0.55, hero: 0, dest: 1, dsl: 1.28, cta: 0 },
+  { p: 0.985, s: 0.44, hero: 0, dest: 1, dsl: 1.22, cta: 0 },
+  { p: 0.992, s: 0.36, hero: 0, dest: 1, dsl: 1.14, cta: 0 },
+  { p: 0.997, s: 0.29, hero: 0, dest: 1, dsl: 1.06, cta: 0.4 },
+  { p: 1.00, s: 0.25, hero: 0, dest: 1, dsl: 1.00, cta: 1 },
 ];
 
 export function anchorCenter(root) {
@@ -112,19 +127,14 @@ export function anchorCenter(root) {
   return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
 }
 
-function resolveK(root, k) {
-  if (k.anchor) return anchorCenter(root);
-  return { cx: (k.cx ?? 0.5) * window.innerWidth, cy: (k.cy ?? 0.5) * window.innerHeight };
-}
-
 /** Pełny punkt toru dla postępu p: pozycja, skala, przezroczystości i slide tytułu. */
 export function trackPoint(root, p) {
   const { a, b, t } = sampleTrack(p);
-  const ca = resolveK(root, a), cb = resolveK(root, b);
+  const pos = trackPos(root, p);
   return {
-    x: lerp(ca.cx, cb.cx, t), y: lerp(ca.cy, cb.cy, t), s: lerp(a.s, b.s, t),
+    x: pos.x, y: pos.y, s: lerp(a.s, b.s, t),
     hero: lerp(a.hero, b.hero, t), dest: lerp(a.dest, b.dest, t),
-    dlens: lerp(a.dlens, b.dlens, t), dsl: lerp(a.dsl, b.dsl, t), cta: lerp(a.cta, b.cta, t),
+    dsl: lerp(a.dsl, b.dsl, t), cta: lerp(a.cta, b.cta, t),
   };
 }
 
@@ -146,6 +156,18 @@ export function sampleTrack(p) {
    Zmiana custom property na .login unieważnia style całej sceny co klatkę (główne
    źródło klatkowania na iOS). Zamiast tego trzymamy uchwyty i piszemy opacity/
    transform wprost, wyłącznie gdy wartość faktycznie się zmieniła. */
+export const SLIDE = 0.30;      // skala poślizgu tytułu (dsl=0 → 30vh pod celem)
+
+/** Pomiar POZYCJI SPOCZYNKOWEJ tytułu (bez transformu) — potrzebny do zasłony.
+ *  Osobno, bo w chwili budowy sceny sekcja logowania jest jeszcze `hidden`
+ *  (offsetTop = 0); glass.js woła to z jump(), czyli przy wejściu na widok,
+ *  po zmianie rozmiaru okna i po doładowaniu fontów. */
+export function measureFx(fx) {
+  if (!fx.titleR || !fx.titleR.offsetHeight) return;
+  fx.titleY0 = fx.titleR.offsetTop;
+  fx.titleH = fx.titleR.offsetHeight;
+}
+
 export function collectFx(root) {
   const q = (s) => root.querySelector(s);
   return {
@@ -154,7 +176,8 @@ export function collectFx(root) {
     titleR: q('.login__inner .login__title'), titleC: q('.lens__world .login__title'),
     subR: q('.login__inner .login__sub'), subC: q('.lens__world .login__sub'),
     acts: q('.login__actions'), sw: q('.login__switch'),
-    hero: -1, dsl: -1, dest: -1, dlens: -1, cta: -1,
+    titleY0: 0, titleH: 0,
+    hero: -1, dsl: -1, dest: -1, cta: -1, cut: -1,
   };
 }
 
@@ -168,12 +191,30 @@ export function applyFx(fx, tp, vh) {
   }
   if (Math.abs(fx.dsl - tp.dsl) > 0.0005) {
     fx.dsl = tp.dsl;
-    const t = `translateY(${((1 - tp.dsl) * 0.30 * vh).toFixed(1)}px)`;
+    const t = `translateY(${((1 - tp.dsl) * SLIDE * vh).toFixed(1)}px)`;
     if (fx.titleR) fx.titleR.style.transform = t;
     if (fx.titleC) fx.titleC.style.transform = t;
   }
-  if (fx.titleR && Math.abs(fx.dest - tp.dest) > 0.001) { fx.dest = tp.dest; fx.titleR.style.opacity = tp.dest.toFixed(3); }
-  if (fx.titleC && Math.abs(fx.dlens - tp.dlens) > 0.001) { fx.dlens = tp.dlens; fx.titleC.style.opacity = tp.dlens.toFixed(3); }
+  // WYSUNIĘCIE spod kamyka to ZASŁONA, nie pojawianie się: słowo jest przycięte do
+  // tej części, która wystaje poniżej dolnej krawędzi soczewki. Napis jest szerszy
+  // niż kamyk, więc sam fade byłoby widać po bokach („nie może być widać fadein");
+  // przy zjeżdżaniu w dół chowa się z powrotem tą samą drogą. Geometria liczona
+  // z toru (zero odczytów DOM na klatkę), zapis tylko przy realnej zmianie.
+  const cut = Math.min(fx.titleH, tp.y + (LENS_BASE * tp.s) / 2 - (fx.titleY0 + (1 - tp.dsl) * SLIDE * vh));
+  if (Math.abs(fx.cut - cut) > 0.5) {
+    fx.cut = cut;
+    const v = cut > 0 ? `inset(${cut.toFixed(1)}px 0 0 0)` : 'none';
+    for (const n of [fx.titleR, fx.titleC]) if (n) n.style.clipPath = v;
+  }
+  // Jedna widoczność dla obu warstw tytułu: w oryginale i w kopii pod szkłem.
+  // Osobny kanał `dlens` (nieczytelna smuga wędrująca pod soczewką w czasie
+  // wspinaczki) WYCOFANY 07-26 — Szymon: „usuń ten pierwszy napis". Kopia zostaje,
+  // bo dzięki niej osiadły kamyk nadal załamuje napis, gdy się nim machnie.
+  if (Math.abs(fx.dest - tp.dest) > 0.001) {
+    fx.dest = tp.dest;
+    const o = tp.dest.toFixed(3);
+    for (const n of [fx.titleR, fx.titleC]) if (n) n.style.opacity = o;
+  }
   if (Math.abs(fx.cta - tp.cta) > 0.001) {
     fx.cta = tp.cta;
     const o = tp.cta.toFixed(3);

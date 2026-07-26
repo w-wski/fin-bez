@@ -64,17 +64,18 @@ body:has(#view-login:not([hidden])) > main { max-width: none; margin: 0; padding
 /* Kotwica pozycji docelowej krążka — niewidoczna, ale trzyma miejsce w przepływie. */
 .login__mark { width: 64px; height: 64px; flex: none; }
 
-/* Tytuł WJEŻDŻA od dołu (referencja: soczewka „wynosi" napis — tekst jedzie wolniej
-   niż szkło, różnicę widać w powiększeniu pod taflą). Podtytuł czeka, aż tytuł
-   osiądzie, i dopiero wtedy pojawia się razem z przyciskami (--cta-a). */
+/* Tytuł WYSUWA SIĘ spod kamyka na samym końcu drogi (referencja: szkło wynosi napis
+   i zostawia go na miejscu). Podtytuł czeka, aż tytuł stanie, i dopiero wtedy
+   pojawia się razem z przyciskami. */
 .login__title, .login__sub { margin: 0; text-wrap: balance; }
 .login__title {
-  /* Stan wyjściowy; w ruchu opacity/transform pisze JS inline (30vh poślizgu,
-     wartości >1 toru = słowo schowane ZA kamykiem, lekko powyżej celu). Kopia
-     pod szkłem (.lens__world) dostaje własne opacity — widać ją tylko przez
-     wycięte koło soczewki, jako smugę wędrującą z szybą. */
+  /* Stan wyjściowy = miejsce postoju ZA kamykiem, lekko powyżej celu (skala poślizgu
+     to 30vh, wartość toru dsl=1.30 → -9vh). W ruchu opacity/transform pisze JS
+     inline. Kopia pod szkłem (.lens__world) dostaje TĘ SAMĄ widoczność: dzięki niej
+     osiadły kamyk załamuje napis, gdy się nim machnie. Osobnej, nieczytelnej smugi
+     wędrującej pod soczewką w czasie wspinaczki już nie ma — wycofana 07-26. */
   opacity: 0;
-  transform: translateY(30vh);
+  transform: translateY(-9vh);
 }
 .login__sub {
   opacity: 0;

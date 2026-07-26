@@ -2,20 +2,22 @@
  * Interakcje (Szymon 07-25): klik chwyta soczewkę na kursor (drugi puszcza; drag też działa);
  * po puszczeniu powolny dojazd do bliższej pozycji; osiadłą można machać po ekranie (dym
  * bąbelków, napisy zniekształcają się pod szkłem); zjazd w dół = droga powrotna.
- * Pion soczewki JEST postępem: p = f(y), plateau p=1 u góry; reszta z klatek glass-mapa.js. */
+ * Pion soczewki JEST postępem: p = f(y), p=1 dokładnie na kotwicy (plateau wyżej),
+ * tor liniowy w p — gest i dojazd sam mają tę samą skalę. Reszta w glass-mapa.js. */
 
-import { LENS_BASE, installLensMap, clamp01, trackPoint, anchorCenter, emitBubble, keepActiveTabVisible, collectFx, applyFx } from './glass-mapa.js';
+import { LENS_BASE, START_CY, installLensMap, clamp01, trackPoint, anchorCenter, emitBubble,
+         keepActiveTabVisible, collectFx, measureFx, applyFx } from './glass-mapa.js';
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const K_DRAG = 0.34;   // podążanie za wskaźnikiem: żwawe, ale z masą
 const K_SNAP = 0.06;   // dojazd po puszczeniu: powolny, „estetyczny" (~1 s)
 const CLICK_MS = 300; const CLICK_PX = 6; // klik vs przeciągnięcie
+const BUBBLE_P = 0.96; // niżej bąbelki milkną — a soczewka zaczyna rosnąć (Szymon 07-26)
 
 class LoginStage {
   constructor(root) {
     this.root = root;
     this.lens = root.querySelector('.lens');
     this.world = root.querySelector('.lens__world');
-    this.title = root.querySelector('.login__inner .login__title');
     this.bubbles = root.querySelector('.login__bubbles');
     this.fx = collectFx(root);
 
@@ -44,10 +46,13 @@ class LoginStage {
   /* Geometria toru mieszka w glass-mapa.js (trackPoint/anchorCenter na żywym DOM). */
   trackPoint(p) { return trackPoint(this.root, p); }
 
-  // spoczynek fazy 1 (jak klatka p=0) / górna strefa zabawy, gdzie p trzyma 1
-  yStart() { return window.innerHeight * 1.08; }
-  yPlay() { return anchorCenter(this.root).cy + window.innerHeight * 0.16; }
-  pFromY(y) { return clamp01((this.yStart() - y) / Math.max(1, this.yStart() - this.yPlay())); }
+  /* p = ułamek drogi do domu. Koniec toru (p=1) to DOKŁADNIE kotwica — nie punkt
+     0.16vh pod nią, jak było do 07-26: przy tamtym wzorze soczewka ciągnięta palcem
+     miała rozmiar docelowy i wypuszczała napis, będąc jeszcze w połowie ekranu.
+     Wyżej niż kotwica p trzyma 1 (clamp) — tam jest strefa zabawy osiadłym kamykiem. */
+  yStart() { return window.innerHeight * START_CY; }
+  yHome() { return anchorCenter(this.root).cy; }
+  pFromY(y) { return clamp01((this.yStart() - y) / Math.max(1, this.yStart() - this.yHome())); }
 
   apply() {
     const tp = this.trackPoint(this.p);
@@ -83,13 +88,12 @@ class LoginStage {
     }
   }
 
-  /* Emisja dymu: bąbelki rodzą się przy górnej krawędzi soczewki, ale WYŁĄCZNIE
-     nad linią tytułu (referencja: poniżej napisu ich nie ma). Im szybszy ruch,
-     tym gęstsza emisja i większe bąble — „namnażają się" przy machaniu. */
+  /* Bąbelki rodzą się przy górnej krawędzi soczewki, ale WYŁĄCZNIE na końcówce drogi
+     i w domu (referencja: poniżej napisu ich nie ma). Próg na p, nie na prostokącie
+     tytułu — ten stoi teraz schowany za kamykiem, a odczyt rect co klatkę był kosztem.
+     Im szybszy ruch, tym gęstsza emisja i większe bąble („namnażają się"). */
   emitOne(burst) {
-    if (reduceMotion.matches || !this.bubbles) return;
-    const t = this.title && this.title.getBoundingClientRect();
-    if (t && t.height && this.y > t.top - 8) return;
+    if (reduceMotion.matches || !this.bubbles || this.p < BUBBLE_P) return;
     emitBubble(this.bubbles, this.x, this.y - (LENS_BASE * (this.s || 1)) * 0.28, burst);
   }
 
@@ -151,6 +155,7 @@ class LoginStage {
 
   jump(v) {
     if (this.raf) { cancelAnimationFrame(this.raf); this.raf = 0; this.last = 0; }
+    measureFx(this.fx);          // pozycja spoczynkowa tytułu do zasłony (poza klatkami)
     this.p = this.pTarget = clamp01(v);
     const tp = this.trackPoint(this.p);
     this.x = tp.x; this.y = tp.y;
@@ -267,6 +272,8 @@ function boot() {
   };
   settle();
   reduceMotion.addEventListener?.('change', settle);
+  // Font zmienia wysokość tytułu, a od niej zależy zasłona — przemierz po doładowaniu.
+  document.fonts?.ready?.then(() => { if (!stage.grab && !stage.raf) stage.jump(stage.pTarget); });
 
   let resizeTimer;
   window.addEventListener('resize', () => {
