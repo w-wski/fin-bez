@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const config = require('../config');
 const { q } = require('../db');
 const { readSession, ledgerScope, requireAuth } = require('../auth');
+const { okres, poprzedniOkres, koniecOkresu, delta } = require('../okresy');
 
 const router = express.Router();
 
@@ -21,27 +22,8 @@ function summaryAuth(req, res, next) {
   return res.status(401).json({ error: 'auth_required' });
 }
 
-// Okres raportu: albo ?month=RRRR-MM (domyślnie bieżący — kontrakt widgetu dashboardu),
-// albo ?from=RRRR-MM-DD&to=RRRR-MM-DD (dowolny zakres: kwartał, rok, własny).
-// Zwraca warunek SQL + parametry + miesiąc-kotwicę dla trendu (miesiąc końca zakresu).
-// Data musi ISTNIEĆ, nie tylko wyglądać: „2026-02-31" przechodzi regex, a w MySQL 8
-// BETWEEN z taką pseudo-datą kończy się błędem (500) zamiast fallbackiem do miesiąca.
-// Test istnienia: JS normalizuje datę (31 lutego → 3 marca) — porównanie łapie różnicę.
-const ISO_D = /^\d{4}-\d{2}-\d{2}$/;
-function dataOK(s) {
-  if (!ISO_D.test(s || '')) return false;
-  const d = new Date(s + 'T00:00:00Z');
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-}
-function okres(query) {
-  const { from, to } = query;
-  if (dataOK(from) && dataOK(to) && from <= to) {
-    return { from, to, m: to.slice(0, 7), sql: 't.tx_date BETWEEN :d1 AND :d2', p: { d1: from, d2: to } };
-  }
-  const m = /^\d{4}-\d{2}$/.test(query.month || '') ? query.month : new Date().toISOString().slice(0, 7);
-  return { month: m, m, sql: "DATE_FORMAT(t.tx_date,'%Y-%m') = :m2", p: { m2: m } };
-}
-
+// Arytmetyka okresów (bieżący, poprzedni do porównań, koniec okresu) siedzi w
+// src/okresy.js — czysta funkcja z własnymi testami (scripts/test-okresy.js).
 // GET /api/v1/summary?ledger=1&month=2026-07 albo ?ledger=1&from=2026-01-01&to=2026-06-30
 router.get('/summary', summaryAuth, async (req, res, next) => {
   try {
@@ -92,7 +74,29 @@ router.get('/summary', summaryAuth, async (req, res, next) => {
          AND ${o.sql} ${own}
        GROUP BY grupa, category ORDER BY total DESC`, p);
 
+    // Porównanie z POPRZEDNIM okresem (kafle KPI: „−4,2 % m/m"). Osobne nazwy
+    // parametrów (:pd1/:pd2/:pm2) — inaczej to zapytanie zjadłoby parametry bieżącego.
+    const po = poprzedniOkres(o);
+    const prevTotals = await q(
+      `SELECT t.type, ROUND(SUM(t.amount),2) AS total
+       FROM transactions t
+       WHERE t.ledger_id=:l AND t.deleted_at IS NULL AND ${po.sql} ${own}
+       GROUP BY t.type`, { ...p, ...po.p });
+    // Saldo NARASTAJĄCE: od pierwszego wpisu w księdze do końca okresu. Nie zależy
+    // od okresu raportu, więc nie da się go policzyć z `totals` — to inny zbiór.
+    const narast = await q(
+      `SELECT ROUND(SUM(CASE WHEN t.type='PRZYCHÓD' THEN t.amount
+                             WHEN t.type='WYDATEK' THEN -t.amount ELSE 0 END),2) AS saldo
+       FROM transactions t
+       WHERE t.ledger_id=:l AND t.deleted_at IS NULL AND t.tx_date <= :koniec ${own}`,
+      { ...p, koniec: koniecOkresu(o) });
+
     const get = (type) => totals.find((x) => x.type === type) || { total: 0, n: 0 };
+    const getPrev = (type) => prevTotals.find((x) => x.type === type) || { total: 0 };
+    const wyd = Number(get('WYDATEK').total) || 0;
+    const przy = Number(get('PRZYCHÓD').total) || 0;
+    const pWyd = Number(getPrev('WYDATEK').total) || 0;
+    const pPrzy = Number(getPrev('PRZYCHÓD').total) || 0;
     res.json({
       ledger, month: o.month || o.m, from: o.from, to: o.to,
       expenses: Number(get('WYDATEK').total) || 0,
@@ -106,6 +110,19 @@ router.get('/summary', summaryAuth, async (req, res, next) => {
       unmatched_bank_rows: unmatched[0].n,
       transfers,
       transfers_total: Number(get('TRANSFER').total) || 0,
+      // Baza porównania + zmiany procentowe. `null` w delcie = NIE MA z czym porównać
+      // (pierwszy okres w bazie) — interfejs musi to pokazać jako brak, nie jako 0 %.
+      prev: {
+        month: po.month, from: po.from, to: po.to,
+        expenses: pWyd, income: pPrzy,
+        balance: Math.round((pPrzy - pWyd) * 100) / 100,
+      },
+      delta: {
+        expenses_pct: delta(wyd, pWyd),
+        income_pct: delta(przy, pPrzy),
+        balance_pct: delta(przy - wyd, pPrzy - pWyd),
+      },
+      cumulative_balance: Number(narast[0] && narast[0].saldo) || 0,
     });
   } catch (e) { next(e); }
 });
