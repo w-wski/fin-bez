@@ -1,0 +1,259 @@
+<!-- Makieta konceptu C „Redakcja szklana" (autor: google/gemini-3.1-pro przez OpenRouter,
+     2026-07-26). Statyczna, na danych demonstracyjnych — NIE jest częścią aplikacji.
+     Zasada: rygor typograficzny magazynu + szkło robione WYŁĄCZNIE światłem krawędzi
+     (bez cieni, bez rozmyć). Liczby są materiałem ilustracyjnym. Spec: koncept-C.md -->
+<meta charset="utf-8">
+<title>Koncept C — Redakcja szklana</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --f:-apple-system,BlinkMacSystemFont,'SF Pro',system-ui,sans-serif;
+  --bg-base:oklch(98% .01 90);
+  --surface:oklch(100% 0 0/.40);
+  --accent:oklch(45% .08 160); --accent-soft:oklch(90% .04 160);
+  --hero:oklch(15% .01 90); --body:oklch(35% .01 90); --muted:oklch(60% .01 90);
+  --edge-top:oklch(100% 0 0/.80); --edge-bottom:oklch(0% 0 0/.05);
+  --hair:oklch(0% 0 0/.08); --hair-strong:oklch(0% 0 0/.16);
+  --income:oklch(50% .12 150); --expense:oklch(50% .15 25);
+  --wash-a:oklch(95% .05 140/.40); --wash-b:oklch(95% .03 340/.30); --wash-c:oklch(95% .03 240/.22);
+  --pad:24px;
+}
+:root[data-theme="dark"]{
+  --bg-base:oklch(18% .01 260);
+  --surface:oklch(22% .01 260/.60);
+  --accent:oklch(75% .10 160); --accent-soft:oklch(35% .05 160);
+  --hero:oklch(98% 0 0); --body:oklch(85% 0 0); --muted:oklch(65% 0 0);
+  --edge-top:oklch(100% 0 0/.15); --edge-bottom:oklch(0% 0 0/.40);
+  --hair:oklch(100% 0 0/.10); --hair-strong:oklch(100% 0 0/.20);
+  --income:oklch(78% .12 150); --expense:oklch(72% .13 25);
+  --wash-a:oklch(40% .05 140/.26); --wash-b:oklch(38% .04 340/.20); --wash-c:oklch(38% .04 240/.16);
+}
+*{box-sizing:border-box}
+html{background:var(--bg-base)}
+body{margin:0;color:var(--hero);font:400 17px/1.4 var(--f);-webkit-font-smoothing:antialiased;
+  min-height:100vh;background-color:var(--bg-base);
+  background-image:
+    radial-gradient(circle at 20% 0%, var(--wash-a) 0%, transparent 50%),
+    radial-gradient(circle at 80% 18%, var(--wash-b) 0%, transparent 42%),
+    radial-gradient(circle at 50% 100%, var(--wash-c) 0%, transparent 46%)}
+
+.page{width:min(680px,100%);margin-inline:auto;padding:0 var(--pad) 72px}
+.page.wide{width:min(1024px,100%)}
+
+/* ---- główka: tytuł widoku jako nadtytuł redakcyjny, nie nagłówek pudełka ---- */
+.kicker{font:700 11px/1 var(--f);letter-spacing:.18em;text-transform:uppercase;color:var(--muted);
+  padding:38px 0 0}
+.lede{margin:10px 0 30px;font-size:15px;color:var(--body);letter-spacing:-.005em}
+.rule{height:1px;background:var(--hair-strong);margin:0 0 4px}
+
+/* ---- nawigacja: pastylka, aktywny = fizyczne wypełnienie ---- */
+.tabs{display:flex;gap:2px;padding:4px;margin:16px 0 0;border-radius:999px;
+  background:var(--surface);border-top:1px solid var(--edge-top);border-bottom:1px solid var(--edge-bottom);
+  overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:0 0 auto;min-height:44px;padding:0 16px;border:0;background:none;border-radius:999px;
+  color:var(--muted);font:500 15px/1 var(--f);cursor:pointer;white-space:nowrap}
+.tabs button[aria-current]{background:var(--bg-base);color:var(--hero);font-weight:600}
+
+/* ---- powierzchnia: szkło ze światła krawędzi, ZERO cieni ---- */
+.glass{background:var(--surface);border-radius:24px;padding:var(--pad);
+  border-top:1px solid var(--edge-top);border-bottom:1px solid var(--edge-bottom);
+  border-left:1px solid var(--hair);border-right:1px solid var(--hair)}
+
+/* ---- Wpis: kwota jako gigantyczna plansza, pola tylko dolną krawędzią ---- */
+.hero-amount{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
+  padding:8px 0 14px;border-bottom:1px solid var(--hair-strong)}
+.hero-amount input{flex:1;min-width:0;border:0;background:none;color:var(--hero);text-align:right;
+  font:700 clamp(56px,17vw,84px)/.92 var(--f);letter-spacing:-.05em;
+  font-variant-numeric:tabular-nums;outline:none}
+.hero-amount .zl{font:700 20px/1 var(--f);color:var(--muted);letter-spacing:-.02em;padding-bottom:8px}
+.switch{display:flex;gap:22px;padding:4px 0 20px}
+.switch button{border:0;background:none;padding:6px 0;cursor:pointer;color:var(--muted);
+  font:700 12px/1 var(--f);letter-spacing:.14em;text-transform:uppercase}
+.switch button[aria-pressed="true"]{color:var(--hero);border-bottom:2px solid var(--accent);padding-bottom:4px}
+.fline{display:flex;align-items:baseline;justify-content:space-between;gap:16px;min-height:56px;
+  padding:14px 0 10px;border-bottom:1px solid var(--hair)}
+.fline .k{font:700 11px/1 var(--f);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.fline .v{font-size:18px;font-weight:500;text-align:right}
+.fline:focus-within{border-bottom-color:var(--accent)}
+.pill{display:block;width:100%;min-height:54px;margin-top:30px;border:0;border-radius:999px;
+  background:var(--accent);color:oklch(99% .01 160);font:600 17px/1 var(--f);cursor:pointer}
+:root[data-theme="dark"] .pill{color:oklch(18% .02 160)}
+
+/* ---- Historia: ciągły strumień, sticky data, kropka koloru, kwota bohaterem ---- */
+.daybar{position:sticky;top:0;z-index:2;padding:22px 0 8px;background:
+  linear-gradient(var(--bg-base) 55%, transparent);
+  font:700 11px/1 var(--f);letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.entry{display:grid;grid-template-columns:12px 1fr auto;gap:16px;align-items:start;
+  padding:16px 0;border-bottom:1px solid var(--hair);min-height:60px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--cat,transparent);margin-top:6px;
+  box-shadow:inset 0 0 0 .5px oklch(0% 0 0/.14)}
+.entry .t{font-size:1.0625rem;font-weight:500;line-height:1.2;color:var(--hero)}
+.entry .m{margin-top:4px;font-size:.8125rem;color:var(--muted)}
+.entry .a{font:700 1.35rem/1.1 var(--f);letter-spacing:-.03em;font-variant-numeric:tabular-nums;
+  text-align:right;white-space:nowrap}
+.entry[data-k="in"] .a{color:var(--income)}
+.mark{display:inline-block;margin-left:6px;font:700 10px/1 var(--f);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent)}
+
+/* ---- Raporty: liczby bez pudełek, plansza redakcyjna ---- */
+.figures{display:grid;grid-template-columns:1fr;gap:26px;padding:26px 0 34px}
+.fig b{display:block;font:700 clamp(40px,11vw,56px)/.94 var(--f);letter-spacing:-.045em;
+  font-variant-numeric:tabular-nums}
+.fig span{display:block;margin-top:8px;font:700 11px/1 var(--f);letter-spacing:.18em;
+  text-transform:uppercase;color:var(--muted)}
+.fig.small b{font-size:clamp(26px,7vw,34px)}
+@media (min-width:600px){
+  .figures{grid-template-columns:1.3fr 1fr 1fr;align-items:end;gap:20px}
+}
+.sec{font:700 11px/1 var(--f);letter-spacing:.18em;text-transform:uppercase;color:var(--muted);
+  padding:26px 0 12px;border-top:1px solid var(--hair-strong);margin-top:8px}
+.crow{padding:12px 0}
+.crow .l{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+.crow .n{font-size:16px}
+.crow .v{font:700 17px/1 var(--f);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.cbar{height:6px;border-radius:999px;margin-top:10px;background:var(--cat,var(--accent))}
+
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:left;padding:0 0 12px;font:700 11px/1 var(--f);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--hair-strong)}
+td{padding:16px 0;border-bottom:1px solid var(--hair);font-size:16px}
+td:not(:first-child),th:not(:first-child){text-align:right}
+td.big{font:700 17px/1 var(--f);letter-spacing:-.02em}
+.inc{color:var(--income)}
+tr.total td{font-weight:700;border-bottom:0}
+@media (max-width:560px){
+  /* rygor typograficzny zostaje, ale kolumny muszą się zmieścić bez przewijania */
+  table{font-size:14px}
+  th{font-size:10px;letter-spacing:.10em}
+  td{padding:13px 0}
+  td.big{font-size:15px}
+}
+.tag{display:block;margin:10px auto 0;width:max-content;font:700 10px/1 var(--f);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);background:var(--surface);padding:7px 11px;
+  border-top:1px solid var(--edge-top);border-radius:999px}
+[hidden]{display:none!important}
+</style>
+
+<span class="tag">C · Redakcja szklana</span>
+
+<div class="page" id="wrap">
+  <nav class="tabs">
+    <button aria-current="page" data-v="wpis">Wpis</button>
+    <button data-v="historia">Historia</button>
+    <button data-v="raporty">Raporty</button>
+    <button data-v="wpis">Paragon</button>
+    <button data-v="wpis">Import</button>
+  </nav>
+
+  <!-- ========== WPIS ========== -->
+  <section class="view" id="v-wpis">
+    <div class="kicker">Rodzina · 25 lipca 2026</div>
+    <p class="lede">Nowy wydatek. Kwota najpierw — resztę uzupełnisz w dwóch dotknięciach.</p>
+    <div class="switch">
+      <button aria-pressed="true">Wydatek</button>
+      <button aria-pressed="false">Przychód</button>
+      <button aria-pressed="false">Transfer</button>
+    </div>
+    <div class="hero-amount">
+      <span class="zl">zł</span>
+      <input value="51,50" inputmode="decimal" aria-label="Kwota">
+    </div>
+    <div class="fline"><span class="k">Księga</span><span class="v">Rodzina</span></div>
+    <div class="fline"><span class="k">Data</span><span class="v">25.07.2026</span></div>
+    <div class="fline"><span class="k">Kategoria</span><span class="v">Jedzenie › Fastfood</span></div>
+    <div class="fline"><span class="k">Opis</span><span class="v" style="color:var(--muted);font-weight:400">Mcdonalds i śniadanie…</span></div>
+    <button class="pill">Zapisz</button>
+  </section>
+
+  <!-- ========== HISTORIA ========== -->
+  <section class="view" id="v-historia" hidden>
+    <div class="kicker">Rodzina · lipiec 2026</div>
+    <p class="lede">23 wpisy · 4 231,63 zł wydatków</p>
+
+    <div class="daybar">Piątek, 25 lipca</div>
+    <div class="entry" style="--cat:#b08886">
+      <i class="dot"></i>
+      <div><div class="t">Mcdonalds i śniadanie w trasie</div>
+        <div class="m">Jedzenie › Fastfood · Szymon</div></div>
+      <div class="a">−51,50 zł</div>
+    </div>
+
+    <div class="daybar">Czwartek, 24 lipca</div>
+    <div class="entry" data-k="in" style="--cat:#7f9a8a">
+      <i class="dot"></i>
+      <div><div class="t">Najem od Kamila</div>
+        <div class="m">Dom · Szymon <span class="mark">z banku</span></div></div>
+      <div class="a">+3 000,00 zł</div>
+    </div>
+
+    <div class="daybar">Środa, 23 lipca</div>
+    <div class="entry">
+      <i class="dot"></i>
+      <div><div class="t">Rata kredytu</div>
+        <div class="m">⇄ Transfer · Anna</div></div>
+      <div class="a">1 200,00 zł</div>
+    </div>
+
+    <div class="daybar">Wtorek, 22 lipca</div>
+    <div class="entry" style="--cat:#7f9a8a">
+      <i class="dot"></i>
+      <div><div class="t">Prąd — wyrównanie za czerwiec i lipiec, taryfa G12w</div>
+        <div class="m">Dom › Media · Anna</div></div>
+      <div class="a">−246,13 zł</div>
+    </div>
+  </section>
+
+  <!-- ========== RAPORTY ========== -->
+  <section class="view" id="v-raporty" hidden>
+    <div class="kicker">Rodzina · lipiec 2026</div>
+    <p class="lede">Miesiąc zamknął się nadwyżką — trzeci raz z rzędu.</p>
+    <div class="rule"></div>
+    <div class="figures">
+      <div class="fig"><b>1 968,37</b><span>Bilans miesiąca</span></div>
+      <div class="fig small"><b>6 200,00</b><span>Przychody</span></div>
+      <div class="fig small"><b>4 231,63</b><span>Wydatki</span></div>
+    </div>
+
+    <div class="sec">Wydatki wg kategorii</div>
+    <div class="crow" style="--cat:#b08886">
+      <div class="l"><span class="n">Jedzenie</span><span class="v">1 650,00 zł</span></div>
+      <div class="cbar" style="width:100%"></div>
+    </div>
+    <div class="crow" style="--cat:#7f9a8a">
+      <div class="l"><span class="n">Dom › Media</span><span class="v">980,13 zł</span></div>
+      <div class="cbar" style="width:59%"></div>
+    </div>
+    <div class="crow">
+      <div class="l"><span class="n">Transport</span><span class="v">601,50 zł</span></div>
+      <div class="cbar" style="width:36%"></div>
+    </div>
+
+    <div class="sec">Trend 6 miesięcy</div>
+    <table>
+      <thead><tr><th>Miesiąc</th><th>Przychody</th><th>Wydatki</th><th>Bilans</th></tr></thead>
+      <tbody>
+        <tr><td>Maj</td><td class="inc">5 800,00</td><td>3 900,00</td><td class="big">1 900,00</td></tr>
+        <tr><td>Czerwiec</td><td class="inc">6 100,00</td><td>4 460,00</td><td class="big">1 640,00</td></tr>
+        <tr><td>Lipiec</td><td class="inc">6 200,00</td><td>4 231,63</td><td class="big">1 968,37</td></tr>
+        <tr class="total"><td>Razem</td><td class="inc">18 100,00</td><td>12 591,63</td><td class="big">5 508,37</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<script>
+const q = new URLSearchParams(location.search);
+if (q.has('dark')) document.documentElement.dataset.theme = 'dark';
+if (q.has('v')) pokaz(q.get('v'));
+function pokaz(v) {
+  for (const s of document.querySelectorAll('.view')) s.hidden = s.id !== 'v-' + v;
+  document.getElementById('wrap').classList.toggle('wide', v === 'raporty');
+  for (const b of document.querySelectorAll('.tabs button')) {
+    if (b.dataset.v === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  }
+}
+document.querySelector('.tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (b) pokaz(b.dataset.v);
+});
+</script>

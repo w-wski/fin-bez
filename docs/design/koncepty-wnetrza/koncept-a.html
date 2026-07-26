@@ -1,0 +1,289 @@
+<!-- Makieta konceptu A „Arkusz i kamyk" (autor: anthropic/claude-opus-5 przez OpenRouter,
+     2026-07-26). Statyczna, na danych demonstracyjnych — NIE jest częścią aplikacji.
+     Zasada: karta znika, treść porządkują włoskowate linie i powietrze; jedynym
+     szklanym przedmiotem jest kamyk nawigacji. Spec: koncept-A.md -->
+<meta charset="utf-8">
+<title>Koncept A — Arkusz i kamyk</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --paper:oklch(98.1% .006 45); --paper-sunk:oklch(96.3% .008 45);
+  --ink-1:oklch(23% .014 45); --ink-2:oklch(44% .012 45); --ink-3:oklch(53% .010 45);
+  --hair:oklch(23% .014 45/.11); --hair-2:oklch(23% .014 45/.20);
+  --sage:oklch(46% .062 155); --sage-fill:oklch(44% .064 155); --on-sage:oklch(98% .004 155);
+  --num-in:oklch(44% .070 155);
+  --blob-a:oklch(93% .035 155); --blob-b:oklch(94% .030 15); --blob-c:oklch(93% .028 240);
+  --blob-opacity:.75; --grain-opacity:.035; --blob-size:110%;
+  --gutter:20px; --r-group:22px; --r-field:14px; --r-pebble:999px;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s8:56px;
+  --dur:180ms; --ease:cubic-bezier(.32,.72,0,1);
+  --lift:0 1px 1px oklch(23% .02 45/.05), 0 8px 24px -8px oklch(23% .02 45/.20);
+  --glass-rim:inset 0 1px 0 oklch(100% 0 0/.75), inset 0 -1px 0 oklch(23% .02 45/.07);
+  --hair-w:1px;
+  --title:700 34px/1.06 var(--f); --hero:700 clamp(44px,13vw,64px)/1 var(--f);
+  --f:-apple-system,BlinkMacSystemFont,'SF Pro',system-ui,sans-serif;
+}
+@media (min-resolution:2dppx){:root{--hair-w:.5px}}
+:root[data-theme="dark"]{
+  --paper:oklch(16.5% .010 50); --paper-sunk:oklch(20.5% .012 50);
+  --ink-1:oklch(96% .005 60); --ink-2:oklch(76% .008 60); --ink-3:oklch(64% .010 60);
+  --hair:oklch(98% 0 0/.10); --hair-2:oklch(98% 0 0/.18);
+  --sage:oklch(74% .070 155); --sage-fill:oklch(70% .062 155); --on-sage:oklch(16% .020 155);
+  --num-in:oklch(76% .060 155);
+  --blob-a:oklch(30% .040 155); --blob-b:oklch(28% .035 15); --blob-c:oklch(28% .030 240);
+  --blob-opacity:.55; --grain-opacity:.065; --blob-size:150%;
+  --lift:0 0 0 var(--hair-w) oklch(98% 0 0/.14), 0 16px 40px -16px oklch(0% 0 0/.6);
+  --glass-rim:inset 0 1px 0 oklch(100% 0 0/.14);
+  /* ciemny: wagi o stopień niżej — jasny tekst optycznie tłuścieje */
+  --title:600 34px/1.06 var(--f); --hero:600 clamp(44px,13vw,64px)/1 var(--f);
+}
+*{box-sizing:border-box}
+html{background:var(--paper)}
+body{margin:0;color:var(--ink-1);font:400 17px/1.35 var(--f);letter-spacing:-.011em;
+  -webkit-font-smoothing:antialiased;min-height:100vh}
+body::before,body::after{content:"";position:fixed;inset:-10%;pointer-events:none;z-index:-1}
+body::before{opacity:var(--blob-opacity);background:
+  radial-gradient(var(--blob-size) 60% at 12% -6%, var(--blob-a) 0, transparent 62%),
+  radial-gradient(var(--blob-size) 55% at 96% 22%, var(--blob-b) 0, transparent 60%),
+  radial-gradient(var(--blob-size) 70% at 30% 104%, var(--blob-c) 0, transparent 66%)}
+body::after{opacity:var(--grain-opacity);mix-blend-mode:soft-light;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E")}
+
+/* ---- układ: jedna kolumna czytania; desktop = szyna + treść + powietrze ---- */
+.app{display:block}
+.view{width:min(680px,100%);margin-inline:auto;padding:0 var(--gutter) 132px}
+h1{font:var(--title);letter-spacing:-.03em;margin:var(--s8) 0 var(--s2)}
+.sub{color:var(--ink-3);font-size:15px;margin:0 0 var(--s5)}
+.gt{font:600 13px/1 var(--f);letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);
+  margin:var(--s6) 0 var(--s3)}
+.row{position:relative;display:grid;grid-template-columns:1fr auto;align-items:center;
+  gap:var(--s4);min-height:52px;padding:var(--s4) 0}
+.row+.row{box-shadow:inset 0 var(--hair-w) 0 var(--hair)}
+.row .val{color:var(--ink-1);font-weight:500}
+.row .lab{color:var(--ink-2)}
+.chev{color:var(--ink-3);font-size:11px;margin-left:6px}
+.num{font-weight:500;font-variant-numeric:tabular-nums}
+.sunk{background:var(--paper-sunk);border-radius:var(--r-group);padding:var(--s3) var(--s4);
+  margin-inline:calc(var(--s3) * -1);box-shadow:none!important}
+.sunk::before{left:2px}
+
+/* ---- kamyk nawigacji: JEDYNE szkło we wnętrzu ---- */
+.pebble{position:fixed;inset:auto var(--gutter) max(12px,env(safe-area-inset-bottom));
+  height:58px;display:flex;align-items:stretch;border-radius:var(--r-pebble);z-index:5;
+  background:oklch(98% .006 45/.72);backdrop-filter:blur(20px) saturate(1.4);
+  -webkit-backdrop-filter:blur(20px) saturate(1.4);
+  box-shadow:var(--lift),var(--glass-rim)}
+:root[data-theme="dark"] .pebble{background:oklch(26% .012 50/.72)}
+.pebble button{flex:1;min-width:44px;border:0;background:none;font:500 12px/1 var(--f);
+  color:var(--ink-2);cursor:pointer;position:relative;display:grid;place-items:center;
+  padding-top:2px;letter-spacing:-.005em}
+.pebble button[aria-current]{color:var(--ink-1);font-weight:600}
+.pebble button[aria-current]::after{content:"";position:absolute;bottom:9px;width:5px;height:5px;
+  border-radius:50%;background:var(--sage)}
+
+/* ---- pole kwoty: największy obiekt typograficzny ---- */
+.amount{position:relative;display:flex;align-items:baseline;justify-content:flex-end;
+  gap:8px;padding:var(--s6) 0 var(--s5)}
+.amount input{border:0;background:none;text-align:right;width:100%;color:var(--ink-1);
+  font:var(--hero);letter-spacing:-.04em;font-variant-numeric:tabular-nums;caret-color:var(--sage);
+  outline:none}
+.amount .zl{font:500 22px/1 var(--f);color:var(--ink-3)}
+.amount::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.5px;
+  background:var(--sage);transform:scaleX(0);transform-origin:right;transition:transform var(--dur) var(--ease)}
+.amount:focus-within::after{transform:scaleX(1)}
+
+/* ---- typ wpisu: tekstowy przełącznik, nie szare guziki ---- */
+.types{display:flex;gap:var(--s5);padding:var(--s2) 0 0}
+.types button{border:0;background:none;padding:6px 0;font:400 17px/1 var(--f);color:var(--ink-3);
+  cursor:pointer;position:relative}
+.types button[aria-pressed="true"]{color:var(--ink-1);font-weight:600}
+.types button[aria-pressed="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-6px;
+  height:2px;border-radius:1px;background:var(--sage)}
+
+.btn{display:block;width:100%;min-height:52px;margin-top:var(--s6);padding-inline:var(--s6);
+  border:0;border-radius:var(--r-pebble);background:var(--sage-fill);color:var(--on-sage);
+  font:600 17px/1 var(--f);box-shadow:var(--lift);cursor:pointer;
+  transition:transform 120ms var(--ease),opacity 120ms}
+.btn:active{transform:scale(.985);opacity:.92}
+
+/* ---- Historia: sekcje po dacie, wiersz dwuwierszowy, kolor jako kreska ---- */
+.day{font:600 13px/1 var(--f);letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);
+  padding:var(--s5) 0 var(--s3)}
+.h-row{position:relative;display:grid;grid-template-columns:1fr auto;column-gap:var(--s5);
+  align-items:center;min-height:56px;padding:var(--s3) 0}
+.h-row+.h-row{box-shadow:inset 0 var(--hair-w) 0 var(--hair)}
+.h-row::before{content:"";position:absolute;left:-10px;top:50%;width:2px;height:20px;
+  border-radius:1px;background:var(--cat,transparent);transform:translateY(-50%)}
+.h-row .t{font-size:17px}
+.h-row .s{font-size:13px;color:var(--ink-3);margin-top:2px}
+.h-row .a{font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:var(--s2)}
+.h-row[data-k="in"] .a{color:var(--num-in)}
+.bank{font:500 11px/1 var(--f);color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase;
+  margin-left:6px}
+
+/* ---- KPI bez kafli: liczby rozdzielone włosem ---- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--s5) 0;
+  padding-block:var(--s5);box-shadow:inset 0 var(--hair-w) 0 var(--hair)}
+.kpi b{display:block;font:600 32px/1.05 var(--f);letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.kpi span{font:500 11px/1 var(--f);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
+  display:block;margin-top:6px}
+.kpi+.kpi{box-shadow:inset var(--hair-w) 0 0 var(--hair);padding-left:var(--s5)}
+@media (max-width:560px){
+  .kpis{grid-template-columns:1fr 1fr}
+  /* pierwszy w rzędzie nie ma sąsiada po lewej — bez włosa i bez wcięcia */
+  .kpi:nth-child(2n+1){box-shadow:none;padding-left:0}
+}
+
+/* ---- słupek kategorii: 3px szyna pod wierszem ---- */
+.bar{padding-block:var(--s3)}
+.bar .l{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s4)}
+.bar .l b{font-weight:500;font-variant-numeric:tabular-nums}
+.bar__track{height:3px;border-radius:2px;background:var(--hair);margin-top:var(--s2)}
+.bar__fill{height:100%;border-radius:2px;background:var(--cat,var(--sage))}
+
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font:600 11px/1 var(--f);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
+  text-align:left;padding:0 0 var(--s3);box-shadow:inset 0 -1px 0 var(--hair-2)}
+td{padding:var(--s4) 0;box-shadow:inset 0 -1px 0 var(--hair)}
+td:not(:first-child),th:not(:first-child){text-align:right}
+tr.total td{font-weight:600;box-shadow:inset 0 1px 0 var(--hair-2)}
+.inc{color:var(--num-in)}
+.tag{display:block;margin:10px auto 0;width:max-content;font:600 11px/1 var(--f);letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink-3);background:var(--paper-sunk);padding:6px 10px;
+  border-radius:999px}
+[hidden]{display:none!important}
+@media (min-width:1024px){
+  .view{width:min(680px,100%);margin-left:280px;margin-right:auto;padding-bottom:var(--s8)}
+  .pebble{inset:var(--s8) auto auto 40px;height:auto;flex-direction:column;width:196px;
+    border-radius:var(--r-group);background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0}
+  :root[data-theme="dark"] .pebble{background:none}
+  .pebble button{justify-items:start;justify-content:flex-start;min-height:40px;padding:0 var(--s3);
+    font:500 15px/1 var(--f);display:flex;align-items:center;gap:10px}
+  .pebble button[aria-current]{font-weight:600}
+  .pebble button[aria-current]::after{position:static;bottom:auto;order:-1}
+  .h-row{grid-template-columns:96px 1fr 190px 130px;align-items:baseline}
+  .h-row .s{margin:0}
+}
+</style>
+
+<span class="tag">A · Arkusz i kamyk</span>
+
+<div class="app">
+<!-- ========== WPIS ========== -->
+<section class="view" id="v-wpis">
+  <h1>Nowy wpis</h1>
+  <p class="sub">Rodzina · 25 lipca</p>
+
+  <div class="types">
+    <button aria-pressed="true">Wydatek</button>
+    <button aria-pressed="false">Przychód</button>
+    <button aria-pressed="false">Transfer</button>
+  </div>
+
+  <div class="amount">
+    <input value="51,50" inputmode="decimal" aria-label="Kwota">
+    <span class="zl">zł</span>
+  </div>
+
+  <div class="gt">Szczegóły</div>
+  <div class="row"><span class="lab">Księga</span><span class="val">Rodzina<span class="chev">›</span></span></div>
+  <div class="row"><span class="lab">Data</span><span class="val">25.07.2026<span class="chev">›</span></span></div>
+  <div class="row"><span class="lab">Kategoria</span><span class="val">Jedzenie › Fastfood<span class="chev">›</span></span></div>
+  <div class="row"><span class="lab">Opis</span><span class="val" style="color:var(--ink-3);font-weight:400">Mcdonalds…</span></div>
+
+  <button class="btn">Zapisz</button>
+</section>
+
+<!-- ========== HISTORIA ========== -->
+<section class="view" id="v-historia" hidden>
+  <h1>Historia</h1>
+  <p class="sub">Rodzina · lipiec 2026 · 23 wpisy</p>
+
+  <div class="day">25 lipca</div>
+  <div class="h-row" style="--cat:#b08886">
+    <div><div class="t">Mcdonalds i śniadanie w trasie</div>
+      <div class="s">Jedzenie › Fastfood · Szymon</div></div>
+    <div class="a">−51,50 zł</div>
+  </div>
+
+  <div class="day">24 lipca</div>
+  <div class="h-row" data-k="in" style="--cat:#7f9a8a">
+    <div><div class="t">Najem od Kamila</div>
+      <div class="s">Dom · Szymon <span class="bank">z banku</span></div></div>
+    <div class="a">+3 000,00 zł</div>
+  </div>
+
+  <div class="day">23 lipca</div>
+  <div class="h-row">
+    <div><div class="t">Rata kredytu</div>
+      <div class="s">⇄ Transfer · Anna</div></div>
+    <div class="a">1 200,00 zł</div>
+  </div>
+
+  <div class="day">22 lipca</div>
+  <div class="h-row sunk" style="--cat:#7f9a8a">
+    <div><div class="t">Prąd — wyrównanie za czerwiec i lipiec, taryfa G12w</div>
+      <div class="s">Dom › Media · Anna</div></div>
+    <div class="a">−246,13 zł</div>
+  </div>
+</section>
+
+<!-- ========== RAPORTY ========== -->
+<section class="view" id="v-raporty" hidden>
+  <h1>Raporty</h1>
+  <p class="sub">Rodzina · lipiec 2026</p>
+
+  <div class="kpis">
+    <div class="kpi"><b>1 968,37</b><span>Bilans</span></div>
+    <div class="kpi"><b>6 200,00</b><span>Przychody</span></div>
+    <div class="kpi"><b>4 231,63</b><span>Wydatki</span></div>
+  </div>
+
+  <div class="gt">Wydatki wg kategorii</div>
+  <div class="bar" style="--cat:#b08886">
+    <div class="l"><span>Jedzenie</span><b>1 650,00 zł</b></div>
+    <div class="bar__track"><div class="bar__fill" style="width:100%"></div></div>
+  </div>
+  <div class="bar" style="--cat:#7f9a8a">
+    <div class="l"><span>Dom › Media</span><b>980,13 zł</b></div>
+    <div class="bar__track"><div class="bar__fill" style="width:59%"></div></div>
+  </div>
+  <div class="bar">
+    <div class="l"><span>Transport</span><b>601,50 zł</b></div>
+    <div class="bar__track"><div class="bar__fill" style="width:36%"></div></div>
+  </div>
+
+  <div class="gt">Trend 6 miesięcy</div>
+  <table>
+    <thead><tr><th>Miesiąc</th><th>Przychody</th><th>Wydatki</th><th>Bilans</th></tr></thead>
+    <tbody>
+      <tr><td>Maj</td><td class="inc">5 800,00</td><td>3 900,00</td><td>1 900,00</td></tr>
+      <tr><td>Czerwiec</td><td class="inc">6 100,00</td><td>4 460,00</td><td>1 640,00</td></tr>
+      <tr><td>Lipiec</td><td class="inc">6 200,00</td><td>4 231,63</td><td>1 968,37</td></tr>
+      <tr class="total"><td>Razem</td><td class="inc">18 100,00</td><td>12 591,63</td><td>5 508,37</td></tr>
+    </tbody>
+  </table>
+</section>
+</div>
+
+<nav class="pebble">
+  <button aria-current="page" data-v="wpis">Wpis</button>
+  <button data-v="historia">Historia</button>
+  <button data-v="raporty">Raporty</button>
+  <button data-v="wpis">Paragon</button>
+  <button data-v="wpis">Import</button>
+</nav>
+
+<script>
+const q = new URLSearchParams(location.search);
+if (q.has('dark')) document.documentElement.dataset.theme = 'dark';
+if (q.has('v')) pokaz(q.get('v'));
+function pokaz(v) {
+  for (const s of document.querySelectorAll('.view')) s.hidden = s.id !== 'v-' + v;
+  for (const b of document.querySelectorAll('.pebble button')) {
+    if (b.dataset.v === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  }
+}
+document.querySelector('.pebble').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (b) pokaz(b.dataset.v);
+});
+</script>

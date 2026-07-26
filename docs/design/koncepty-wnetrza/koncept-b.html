@@ -1,0 +1,294 @@
+<!-- Makieta konceptu B „Tafla" (autor: openai/gpt-5.5 przez OpenRouter, 2026-07-26).
+     Statyczna, na danych demonstracyjnych — NIE jest częścią aplikacji.
+     Zasada: warstwy materiału — tło, tafla robocza, kamyki akcji; szkło czytane
+     krawędzią, cieniem i kolejnością warstw, bez animowanych rozmyć. Spec: koncept-B.md -->
+<meta charset="utf-8">
+<title>Koncept B — Tafla</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --f:-apple-system,BlinkMacSystemFont,'SF Pro',system-ui,sans-serif;
+  --bg:oklch(97.5% .012 65);
+  --wash-sage:oklch(91% .035 155/.48); --wash-rose:oklch(93% .045 20/.42); --wash-sky:oklch(92% .035 230/.30);
+  --text:oklch(18% .012 60); --muted:oklch(48% .012 60); --soft:oklch(61% .010 60);
+  --sage:oklch(43% .075 160); --income:oklch(44% .105 150);
+  --glass:oklch(99% .006 70/.72); --glass-raised:oklch(100% .004 70/.84);
+  --line:oklch(78% .012 70/.72); --line-hi:oklch(100% 0 0/.92);
+  --shadow:0 22px 60px oklch(38% .018 60/.12), 0 3px 10px oklch(38% .018 60/.08);
+  --shadow-tight:0 10px 26px oklch(38% .018 60/.14), 0 1px 3px oklch(38% .018 60/.10);
+  --field:oklch(99% .004 70/.62); --field-border:oklch(54% .010 70/.58);
+  --focus:oklch(43% .075 160/.34);
+  --r-xl:32px; --r-lg:24px; --r-md:18px; --pill:999px;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;
+  --spec:oklch(100% 0 0/.30);
+}
+:root[data-theme="dark"]{
+  --bg:oklch(15.5% .018 255);
+  --wash-sage:oklch(32% .060 165/.26); --wash-rose:oklch(30% .060 18/.20); --wash-sky:oklch(29% .055 235/.22);
+  --text:oklch(93% .010 80); --muted:oklch(72% .012 80); --soft:oklch(58% .012 80);
+  --sage:oklch(67% .085 160); --income:oklch(72% .115 150);
+  --glass:oklch(23% .018 255/.68); --glass-raised:oklch(28% .020 255/.76);
+  --line:oklch(64% .020 255/.28); --line-hi:oklch(100% 0 0/.16);
+  --shadow:0 26px 70px oklch(0% 0 0/.38), 0 2px 8px oklch(0% 0 0/.26);
+  --shadow-tight:0 12px 34px oklch(0% 0 0/.34), 0 1px 3px oklch(0% 0 0/.35);
+  --field:oklch(19% .016 255/.68); --field-border:oklch(74% .010 255/.30);
+  --focus:oklch(67% .085 160/.36);
+  --spec:oklch(100% 0 0/.10);
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;color:var(--text);font:400 17px/1.4 var(--f);-webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;min-height:100vh;
+  background:
+    radial-gradient(800px 520px at 12% 0%, var(--wash-sage), transparent 62%),
+    radial-gradient(760px 540px at 85% 18%, var(--wash-rose), transparent 64%),
+    radial-gradient(720px 520px at 50% 100%, var(--wash-sky), transparent 66%),
+    var(--bg);
+  background-attachment:scroll}
+
+.shell{width:min(100% - 32px,1180px);margin-inline:auto;padding-block:14px 56px}
+h1{margin:26px 0 6px;font-size:clamp(36px,9vw,52px);line-height:.94;font-weight:750;
+  letter-spacing:-.05em}
+.sub{color:var(--soft);font-size:14px;margin:0 0 var(--s5);letter-spacing:.01em}
+.st{font:700 11px/1 var(--f);letter-spacing:.16em;text-transform:uppercase;color:var(--soft);
+  margin:var(--s6) 0 var(--s4)}
+
+/* ---- nawigacja: szklana rynna, aktywny = szałwiowy kamyk ---- */
+.nav{display:flex;gap:4px;min-height:52px;padding:5px;overflow-x:auto;scrollbar-width:none;
+  background:var(--glass);border:1px solid var(--line);border-top-color:var(--line-hi);
+  border-radius:var(--pill);box-shadow:var(--shadow-tight)}
+.nav::-webkit-scrollbar{display:none}
+.nav button{flex:0 0 auto;min-height:44px;padding:0 18px;border:0;background:none;
+  border-radius:var(--pill);color:var(--muted);font:500 15px/1 var(--f);cursor:pointer;white-space:nowrap}
+.nav button[aria-current]{background:var(--sage);color:oklch(99% .004 160);font-weight:600;
+  box-shadow:inset 0 1px 0 oklch(100% 0 0/.28), 0 8px 18px oklch(43% .075 160/.24)}
+:root[data-theme="dark"] .nav button[aria-current]{color:oklch(16% .02 160)}
+
+/* ---- tafla: krawędź + cień + refleks; jedna na widok ---- */
+.sheet{position:relative;padding:clamp(18px,4vw,32px);border-radius:var(--r-xl);
+  background:var(--glass);border:1px solid var(--line);border-top-color:var(--line-hi);
+  box-shadow:var(--shadow);overflow:hidden}
+.sheet::before{content:"";position:absolute;inset:1px 1px auto;height:42%;pointer-events:none;
+  border-radius:calc(var(--r-xl) - 1px) calc(var(--r-xl) - 1px) 44% 44%;
+  background:linear-gradient(var(--spec),transparent)}
+.sheet>*{position:relative}
+
+/* ---- kamyki: pola, segment typu ---- */
+.seg{display:flex;gap:4px;padding:5px;border-radius:var(--pill);background:var(--field);
+  border:1px solid var(--field-border);border-top-color:var(--line-hi)}
+.seg button{flex:1;min-height:44px;border:0;background:none;border-radius:var(--pill);
+  color:var(--muted);font:500 15px/1 var(--f);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--glass-raised);color:var(--text);font-weight:600;
+  box-shadow:inset 0 1px 0 oklch(100% 0 0/.30), 0 6px 14px oklch(38% .018 60/.10)}
+.field{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
+  min-height:56px;padding:10px 16px;background:var(--field);border:1px solid var(--field-border);
+  border-top-color:var(--line-hi);border-radius:var(--r-md);
+  box-shadow:inset 0 1px 0 oklch(100% 0 0/.34)}
+.field .k{color:var(--soft);font:700 11px/1 var(--f);letter-spacing:.14em;text-transform:uppercase}
+.field .v{font-weight:500}
+.fields{display:grid;gap:var(--s3)}
+@media (min-width:600px){.fields.two{grid-template-columns:1fr 1fr}}
+
+.amount-field{text-align:center;padding:22px 8px 18px}
+.amount-field input{width:100%;border:0;background:transparent;text-align:center;color:var(--text);
+  font-size:clamp(48px,15vw,72px);line-height:.95;font-weight:750;letter-spacing:-.055em;
+  font-variant-numeric:tabular-nums;outline:none}
+.amount-field .zl{display:block;margin-top:6px;font:700 11px/1 var(--f);letter-spacing:.2em;
+  text-transform:uppercase;color:var(--soft)}
+.amount-field::after{content:"";display:block;height:1px;margin:18px auto 0;width:min(340px,84%);
+  background:var(--field-border)}
+
+.btn{display:block;width:100%;min-height:56px;margin-top:var(--s5);border:0;border-radius:var(--pill);
+  background:var(--sage);color:oklch(99% .004 160);font:750 17px/1 var(--f);letter-spacing:-.018em;
+  cursor:pointer;box-shadow:inset 0 1px 0 oklch(100% 0 0/.24), 0 14px 28px oklch(43% .075 160/.28)}
+:root[data-theme="dark"] .btn{color:oklch(16% .02 160)}
+.btn:active{transform:translateY(1px) scale(.992)}
+
+/* ---- Historia: telefon = obiekty z żyłką, desktop = jedna tafla tabeli ---- */
+.hlist{display:grid;gap:var(--s3)}
+.hcard{position:relative;padding:16px 18px 14px 26px;border-radius:var(--r-lg);
+  background:var(--glass-raised);border:1px solid var(--line);border-top-color:var(--line-hi);
+  box-shadow:var(--shadow-tight)}
+.hcard::before{content:"";position:absolute;left:10px;top:16px;bottom:16px;width:4px;
+  border-radius:var(--pill);background:var(--cat,var(--sage))}
+.hcard .top{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3)}
+.hcard .amt{font:750 22px/1 var(--f);letter-spacing:-.035em;white-space:nowrap}
+.hcard[data-k="in"] .amt{color:var(--income)}
+.hcard .cat{font:600 13px/1.2 var(--f);color:var(--muted)}
+.hcard .desc{margin-top:8px;font-size:15px;color:var(--text)}
+.hcard .meta{margin-top:6px;font:400 12px/1 var(--f);color:var(--soft);letter-spacing:.02em}
+.chip{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:var(--pill);
+  font:600 10px/1.6 var(--f);letter-spacing:.08em;text-transform:uppercase;
+  color:color-mix(in oklch, var(--cat,var(--sage)) 74%, var(--text));
+  background:color-mix(in oklch, var(--cat,var(--sage)) 14%, transparent);
+  border:1px solid color-mix(in oklch, var(--cat,var(--sage)) 38%, transparent)}
+
+/* ---- KPI: małe soczewki na tafli ---- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--s3)}
+.kpi{padding:16px;border-radius:var(--r-md);background:var(--glass-raised);
+  border:1px solid var(--line);border-top-color:var(--line-hi)}
+.kpi b{display:block;white-space:nowrap;font-size:clamp(26px,6.4vw,38px);line-height:1;font-weight:750;
+  letter-spacing:-.045em;font-variant-numeric:tabular-nums}
+.kpi span{display:block;margin-top:10px;font:700 11px/1 var(--f);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--soft)}
+
+.crow{display:grid;grid-template-columns:minmax(92px,150px) 1fr max-content;gap:12px;
+  align-items:center;padding:9px 0}
+.cbar{height:6px;border-radius:var(--pill);background:color-mix(in oklch, var(--cat,var(--sage)) 86%, white);
+  box-shadow:inset 0 1px 0 oklch(100% 0 0/.35)}
+.ctrack{height:6px;border-radius:var(--pill);background:var(--field);overflow:hidden}
+.crow .v{font-weight:600;white-space:nowrap}
+
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{height:44px;text-align:left;font:700 11px/1 var(--f);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--soft)}
+td{padding:14px 0;border-top:1px solid var(--line);font-size:15px}
+td:not(:first-child),th:not(:first-child){text-align:right}
+.inc{color:var(--income)}
+tr.total td{font-weight:700}
+.tag{display:block;margin:10px auto 0;width:max-content;font:700 10px/1 var(--f);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--soft);background:var(--glass);padding:7px 11px;
+  border:1px solid var(--line);border-radius:var(--pill)}
+[hidden]{display:none!important}
+@media (max-width:560px){
+  /* jedna kolumna: liczba nie może się łamać w połowie kwoty */
+  .kpis{grid-template-columns:1fr}
+  /* słupek dostaje własną linię pod nazwą i kwotą — na 390 px nitka nic nie mówiła */
+  .crow{grid-template-columns:1fr auto;row-gap:10px}
+  .crow .ctrack{grid-column:1/-1}
+}
+@media (min-width:860px){
+  .hlist{gap:0;background:var(--glass);border:1px solid var(--line);border-top-color:var(--line-hi);
+    border-radius:var(--r-xl);box-shadow:var(--shadow);overflow:hidden;padding:var(--s2) var(--s5)}
+  .hcard{background:none;border:0;box-shadow:none;border-radius:0;padding:16px 0 16px 22px;
+    display:grid;grid-template-columns:1fr 200px;align-items:center;column-gap:var(--s5)}
+  .hcard+.hcard{border-top:1px solid var(--line)}
+  .hcard::before{top:18px;bottom:18px;left:2px}
+  .hcard .top{display:block}
+  .hcard .amt{grid-column:2;text-align:right;font-size:20px}
+  .hcard .desc{margin-top:4px}
+}
+</style>
+
+<span class="tag">B · Tafla</span>
+
+<div class="shell">
+  <nav class="nav">
+    <button aria-current="page" data-v="wpis">Wpis</button>
+    <button data-v="historia">Historia</button>
+    <button data-v="raporty">Raporty</button>
+    <button data-v="wpis">Paragon</button>
+    <button data-v="wpis">Import</button>
+    <button data-v="wpis">Admin</button>
+  </nav>
+
+  <!-- ========== WPIS ========== -->
+  <section class="view" id="v-wpis">
+    <h1>Nowy wpis</h1>
+    <p class="sub">Rodzina · 25 lipca 2026</p>
+    <div class="sheet">
+      <div class="seg">
+        <button aria-pressed="true">Wydatek</button>
+        <button aria-pressed="false">Przychód</button>
+        <button aria-pressed="false">Transfer</button>
+      </div>
+      <div class="amount-field">
+        <input value="51,50" inputmode="decimal" aria-label="Kwota">
+        <span class="zl">złotych</span>
+      </div>
+      <div class="fields">
+        <div class="fields two">
+          <div class="field"><span class="k">Księga</span><span class="v">Rodzina</span></div>
+          <div class="field"><span class="k">Data</span><span class="v">25.07.2026</span></div>
+        </div>
+        <div class="field"><span class="k">Kategoria</span><span class="v">Jedzenie › Fastfood</span></div>
+        <div class="field"><span class="k">Opis</span><span class="v" style="color:var(--soft);font-weight:400">Mcdonalds i śniadanie…</span></div>
+      </div>
+      <button class="btn">Zapisz wpis</button>
+    </div>
+  </section>
+
+  <!-- ========== HISTORIA ========== -->
+  <section class="view" id="v-historia" hidden>
+    <h1>Historia</h1>
+    <p class="sub">Rodzina · lipiec 2026 · 23 wpisy</p>
+    <div class="hlist">
+      <article class="hcard" style="--cat:#b08886">
+        <div class="top"><span class="cat">Jedzenie › Fastfood</span><span class="amt">−51,50 zł</span></div>
+        <div class="desc">Mcdonalds i śniadanie w trasie</div>
+        <div class="meta">25.07 · Szymon</div>
+      </article>
+      <article class="hcard" data-k="in" style="--cat:#7f9a8a">
+        <div class="top"><span class="cat">Dom</span><span class="amt">+3 000,00 zł</span></div>
+        <div class="desc">Najem od Kamila</div>
+        <div class="meta">24.07 · Szymon <span class="chip">z banku</span></div>
+      </article>
+      <article class="hcard">
+        <div class="top"><span class="cat">⇄ Transfer</span><span class="amt">1 200,00 zł</span></div>
+        <div class="desc">Rata kredytu</div>
+        <div class="meta">23.07 · Anna</div>
+      </article>
+      <article class="hcard" style="--cat:#7f9a8a">
+        <div class="top"><span class="cat">Dom › Media</span><span class="amt">−246,13 zł</span></div>
+        <div class="desc">Prąd — wyrównanie za czerwiec i lipiec, taryfa G12w</div>
+        <div class="meta">22.07 · Anna</div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ========== RAPORTY ========== -->
+  <section class="view" id="v-raporty" hidden>
+    <h1>Raporty</h1>
+    <p class="sub">Rodzina · lipiec 2026</p>
+    <div class="sheet">
+      <div class="kpis">
+        <div class="kpi"><b>1 968,37</b><span>Bilans</span></div>
+        <div class="kpi"><b>6 200,00</b><span>Przychody</span></div>
+        <div class="kpi"><b>4 231,63</b><span>Wydatki</span></div>
+      </div>
+
+      <div class="st">Wydatki wg kategorii</div>
+      <div class="crow" style="--cat:#b08886">
+        <span>Jedzenie</span>
+        <span class="ctrack"><span class="cbar" style="width:100%;display:block"></span></span>
+        <span class="v">1 650,00 zł</span>
+      </div>
+      <div class="crow" style="--cat:#7f9a8a">
+        <span>Dom › Media</span>
+        <span class="ctrack"><span class="cbar" style="width:59%;display:block"></span></span>
+        <span class="v">980,13 zł</span>
+      </div>
+      <div class="crow">
+        <span>Transport</span>
+        <span class="ctrack"><span class="cbar" style="width:36%;display:block"></span></span>
+        <span class="v">601,50 zł</span>
+      </div>
+
+      <div class="st">Trend 6 miesięcy</div>
+      <table>
+        <thead><tr><th>Miesiąc</th><th>Przychody</th><th>Wydatki</th><th>Bilans</th></tr></thead>
+        <tbody>
+          <tr><td>Maj</td><td class="inc">5 800,00</td><td>3 900,00</td><td>1 900,00</td></tr>
+          <tr><td>Czerwiec</td><td class="inc">6 100,00</td><td>4 460,00</td><td>1 640,00</td></tr>
+          <tr><td>Lipiec</td><td class="inc">6 200,00</td><td>4 231,63</td><td>1 968,37</td></tr>
+          <tr class="total"><td>Razem</td><td class="inc">18 100,00</td><td>12 591,63</td><td>5 508,37</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+const q = new URLSearchParams(location.search);
+if (q.has('dark')) document.documentElement.dataset.theme = 'dark';
+if (q.has('v')) pokaz(q.get('v'));
+function pokaz(v) {
+  for (const s of document.querySelectorAll('.view')) s.hidden = s.id !== 'v-' + v;
+  for (const b of document.querySelectorAll('.nav button')) {
+    if (b.dataset.v === v) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  }
+}
+document.querySelector('.nav').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (b) pokaz(b.dataset.v);
+});
+</script>
