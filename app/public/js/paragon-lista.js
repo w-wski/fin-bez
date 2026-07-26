@@ -15,7 +15,9 @@ export function initLista(opts) {
   const start = $('#rc-start');
   if (!start) return;
   start.append(el('h3', { class: 'rc-lista-tytul' }, 'Twoje paragony'), box);
-  document.querySelector('nav button[data-view="paragon"]')?.addEventListener('click', odswiezListe);
+  // Zaczep bez prefiksu `nav button`: zakładka Paragonu może mieszkać w pasku u dołu
+  // albo w arkuszu „Więcej" — oba miejsca niosą to samo [data-view].
+  document.querySelector('[data-view="paragon"]')?.addEventListener('click', odswiezListe);
   refreshers.paragon = odswiezListe;
 }
 
