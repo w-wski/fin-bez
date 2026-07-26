@@ -19,10 +19,14 @@ export function okresRaportu(tryb, month, from, to) {
   return { from: f, to: t, qs: `from=${f}&to=${t}` };
 }
 
+// Okres wybiera się pigułkami (#rZakres), nie listą — cztery pozycje mieszczą się
+// w jednym rzędzie i widać wybór bez rozwijania.
+const trybOkresu = () => $('#rZakres')?.querySelector('.active')?.dataset.zakres || 'miesiac';
+
 export async function loadReport() {
   const ledger = $('#rLedger').value || state.me.scope.ledgers[0];
   const month = $('#rMonth').value || new Date().toISOString().slice(0, 7);
-  const tryb = $('#rZakres')?.value || 'miesiac';
+  const tryb = trybOkresu();
   const o = okresRaportu(tryb, month, $('#rFrom')?.value, $('#rTo')?.value);
   if (!o) return;                                  // własny zakres jeszcze niekompletny
   const s = await api(`/api/v1/summary?ledger=${ledger}&${o.qs}`);
@@ -47,14 +51,23 @@ export async function loadReport() {
       for (const k of c.children) if (k.color || c.color) kolory[k.id] = k.color || c.color;
     }
   } catch { /* raport ważniejszy niż barwy */ }
+  // Słupek skalujemy do NAJWIĘKSZEJ pozycji (widać proporcje), a udział liczymy
+  // od sumy okresu (mówi, ile procent wydatków to ta kategoria).
   const max = Math.max(...s.by_category.map((c) => Number(c.total)), 1);
+  const suma = s.by_category.reduce((a, c) => a + Number(c.total), 0) || 1;
   const box = $('#byCat'); box.innerHTML = '';
   for (const c of s.by_category) {
     const r = el('div', { class: 'barrow' });
-    const bar = el('div', { class: 'bar' });
+    const kolor = kolory[c.category_id];
+    if (kolor) r.style.setProperty('--cat-c', kolor);
+    const nazwa = el('span', { class: 'bname' });
+    nazwa.append(el('i', { class: kolor ? 'catdot' : 'catdot pusta', 'aria-hidden': 'true' }), c.category);
+    const tor = el('span', { class: 'btrack' });
+    const bar = el('i', { class: 'bar' });
     bar.style.width = (100 * Number(c.total) / max).toFixed(1) + '%';
-    if (kolory[c.category_id]) bar.style.background = kolory[c.category_id];
-    r.append(el('span', {}, c.category), bar, el('span', { class: 'val' }, zl(c.total)));
+    tor.append(bar);
+    const pct = (100 * Number(c.total) / suma).toFixed(1).replace('.', ',') + ' %';
+    r.append(nazwa, el('span', { class: 'bval' }, zl(c.total)), tor, el('span', { class: 'bpct' }, pct));
     box.append(r);
   }
   const months = [...new Set(s.trend.map((t) => t.month))];
@@ -63,8 +76,10 @@ export async function loadReport() {
     const inc = Number(s.trend.find((t) => t.month === m && t.type === 'PRZYCHÓD')?.total || 0);
     const exp = Number(s.trend.find((t) => t.month === m && t.type === 'WYDATEK')?.total || 0);
     const tr = el('tr');
+    // Ujemny bilans miesiąca dostaje barwę wydatku — znak minus i tak stoi przy liczbie.
     tr.append(el('td', {}, m), el('td', { class: 'num inc' }, zl(inc)),
-      el('td', { class: 'num exp' }, zl(exp)), el('td', { class: 'num' }, zl(inc - exp)));
+      el('td', { class: 'num exp' }, zl(exp)),
+      el('td', { class: 'num' + (inc - exp < 0 ? ' exp' : '') }, zl(inc - exp)));
     tb.append(tr);
   }
   await loadTransfery(s);
@@ -93,7 +108,7 @@ export async function loadReport() {
   else $('#telemetria').innerHTML = '';
 }
 
-// Sekcje raportu dokładane z JS — index.html należy do innego zlecenia, więc go nie ruszamy.
+// Sekcje raportu dokładane z JS (index.html trzyma tylko kotwice).
 // Wstawiane przed #fvp (blok admina), w kolejności wywołań: transfery → Bartuś → najem.
 function sekcja(id) {
   let n = document.getElementById(id);
@@ -101,7 +116,7 @@ function sekcja(id) {
     n = el('div', { id });
     const f = $('#fvp');                       // kotwica; gdyby zniknęła — dokładamy na koniec karty
     if (f && f.parentNode) f.parentNode.insertBefore(n, f);
-    else ($('#view-raporty .card') || document.body).append(n);
+    else ($('#view-raporty .stack') || document.body).append(n);
   }
   n.innerHTML = '';
   return n;
@@ -207,27 +222,35 @@ async function loadTelemetry() {
   } catch { box.innerHTML = ''; }
 }
 
+// „Zakres" podmienia pole miesiąca na parę dat od–do. Puste daty przy wejściu w ten
+// tryb wypełniamy bieżącym miesiącem — inaczej na ekranie zostawał raport poprzedniego
+// trybu pod etykietą, która obiecywała co innego.
+function ustawOkres(tryb) {
+  const wlasny = tryb === 'wlasny';
+  $('#rMonth').hidden = wlasny;
+  $('#rFrom').hidden = $('#rTo').hidden = !wlasny;
+  if (wlasny && (!$('#rFrom').value || !$('#rTo').value)) {
+    const m = $('#rMonth').value || new Date().toISOString().slice(0, 7);
+    const [r, mies] = m.split('-').map(Number);
+    if (!$('#rFrom').value) $('#rFrom').value = m + '-01';
+    if (!$('#rTo').value) $('#rTo').value = `${m}-${String(new Date(r, mies, 0).getDate()).padStart(2, '0')}`;
+  }
+  loadReport();
+}
+
 export function initRaporty() {
   $('#rMonth').value = new Date().toISOString().slice(0, 7);
   $('#rLedger').onchange = loadReport;
   $('#rMonth').onchange = loadReport;
-  // Przełącznik okresu: „Własny zakres" podmienia pole miesiąca na parę dat od–do.
   const zakres = $('#rZakres');
   if (zakres) {
-    zakres.onchange = () => {
-      const wlasny = zakres.value === 'wlasny';
-      $('#rMonth').hidden = wlasny;
-      $('#rFrom').hidden = $('#rTo').hidden = !wlasny;
-      // Puste daty przy wejściu w tryb własny wypełniamy bieżącym miesiącem — inaczej na
-      // ekranie zostawał raport poprzedniego trybu pod etykietą „Własny zakres".
-      if (wlasny && (!$('#rFrom').value || !$('#rTo').value)) {
-        const m = $('#rMonth').value || new Date().toISOString().slice(0, 7);
-        const [r, mies] = m.split('-').map(Number);
-        if (!$('#rFrom').value) $('#rFrom').value = m + '-01';
-        if (!$('#rTo').value) $('#rTo').value = `${m}-${String(new Date(r, mies, 0).getDate()).padStart(2, '0')}`;
-      }
-      loadReport();
-    };
+    zakres.querySelectorAll('button').forEach((b) => {
+      b.onclick = () => {
+        zakres.querySelector('.active')?.classList.remove('active');
+        b.classList.add('active');
+        ustawOkres(b.dataset.zakres);
+      };
+    });
     $('#rFrom').onchange = loadReport;
     $('#rTo').onchange = loadReport;
   }

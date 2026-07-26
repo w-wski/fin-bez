@@ -7,8 +7,9 @@
 #rc-start .rc-lista-tytul { margin: 1rem 0 .3rem; font-size: 1rem; }
 #rc-start .rc-lista-paragonow { display: flex; flex-direction: column; gap: .4rem; }
 #rc-start .rc-wiersz {
-  display: grid; grid-template-columns: auto 1fr auto; gap: .2rem .6rem; align-items: center;
-  min-height: 44px; text-align: left; padding: .5rem .7rem;
+  display: grid; grid-template-columns: auto 1fr auto; gap: .2rem var(--space-3); align-items: center;
+  min-height: 44px; text-align: left; padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-sm);
 }
 #rc-start .rc-w-data { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
 #rc-start .rc-w-sklep { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -19,8 +20,10 @@
 #rcResult .rc-wroc { margin-bottom: .5rem; }
 #rcResult .rc-status { margin-bottom: .5rem; }
 #rcResult .rc-naglowek {
-  display: grid; grid-template-columns: 1fr; gap: .5rem;
-  border: 1px solid var(--line); border-radius: .6rem; padding: .6rem .7rem; margin-bottom: .6rem;
+  display: grid; grid-template-columns: 1fr; gap: var(--space-2);
+  border: 1px solid var(--glass-edge); border-radius: var(--r-md);
+  background: var(--glass-fill); box-shadow: inset 0 1px 0 var(--glass-rim);
+  padding: var(--space-3); margin-bottom: var(--space-3);
 }
 #rcResult .rc-pole { display: flex; flex-direction: column; align-items: stretch; gap: .15rem; font-size: .9rem; }
 #rcResult .rc-pole > span { color: var(--muted); font-size: .78rem; }
@@ -29,11 +32,13 @@
 /* ---------- POZYCJA JAKO KARTA ---------- */
 #rcResult .rc-lista { display: flex; flex-direction: column; gap: .6rem; }
 #rcResult .rc-poz {
-  border: 1px solid var(--line); border-radius: .6rem; padding: .6rem .7rem;
-  display: flex; flex-direction: column; gap: .4rem;
+  border: 1px solid var(--glass-edge); border-radius: var(--r-md);
+  background: var(--glass-fill); box-shadow: inset 0 1px 0 var(--glass-rim);
+  padding: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-2);
 }
 /* K6: pozycja niespójna (ilość × cena ≠ wartość) — widoczna, ale nadal w pełni edytowalna */
-#rcResult .rc-poz.lowconf { border-color: var(--expense); background: color-mix(in srgb, var(--expense) 8%, transparent); }
+#rcResult .rc-poz.lowconf { border-color: var(--danger); background: var(--tint-minus); }
 
 #rcResult .rc-l1 { display: flex; align-items: center; gap: .4rem; }
 #rcResult .rc-nr { color: var(--muted); font-size: .8rem; min-width: 1.4rem; text-align: right; }
@@ -50,7 +55,7 @@
 #rcResult .rc-hint { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; font-size: .82rem; }
 #rcResult .rc-hint:empty { display: none; }
 #rcResult .rc-znak { color: var(--muted); }
-#rcResult .rc-uzyj { background: var(--bar); border-color: var(--bar); }
+#rcResult .rc-uzyj { background: var(--accent-quiet); border-color: var(--accent); color: var(--accent); }
 #rcResult .rc-hint .btn { font-size: .82rem; padding: .3rem .55rem; text-align: left; }
 
 /* ---------- OSTRZEŻENIA (K6/K7): informują, nie blokują ---------- */

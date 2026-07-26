@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Finansowa</title>
 <meta name="description" content="Finansowa — pieniądze rodziny i spółki PERSEVERA w jednym miejscu. Aplikacja prywatna.">
 <meta name="robots" content="noindex, nofollow">
@@ -11,7 +11,9 @@
 <meta name="apple-mobile-web-app-title" content="Finansowa">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="css/logowanie.css">
+<link rel="stylesheet" href="css/wpis.css">
 <link rel="stylesheet" href="css/historia.css">
+<link rel="stylesheet" href="css/raporty.css">
 <link rel="stylesheet" href="css/kategorie.css">
 <link rel="stylesheet" href="css/paragon.css">
 <link rel="stylesheet" href="css/przydzial.css">
@@ -32,34 +34,31 @@
 </script>
 </head>
 <body>
+<!-- CHROME 1/4: nagłówek. Tytuł widoku niesie „gdzie jestem" (iOS large title zjechał
+     do paska, bo nawigacja zeszła pod kciuk). Rozmycie tylko tutaj i w trzech innych
+     powierzchniach — patrz „budżet rozmycia" w styles.css. -->
 <header>
-  <h1>Finansowa</h1>
-  <nav id="nav" hidden>
-    <button data-view="wpis" class="active">Wpis</button>
-    <button data-view="historia">Historia</button>
-    <button data-view="paragon">Paragon</button>
-    <button data-view="import">Import</button>
-    <button data-view="raporty">Raporty</button>
-    <button data-view="przydzial" data-admin hidden>Przydział</button>
-    <button data-view="admin" data-admin hidden>Admin</button>
-  </nav>
+  <div class="head-id">
+    <h1 id="viewTitle">Finansowa</h1>
+    <span id="who"></span>
+  </div>
   <span id="netBadge" class="pill net" hidden></span>
   <div class="theme-switch"></div>
-  <div id="who"></div>
   <button id="logout" class="btn small" hidden title="Zakończ sesję na tym urządzeniu">Wyloguj</button>
 </header>
 
 <main>
-  <!-- LOGOWANIE — scena szkła (docs/design/DESIGN-SPEC-GLASS.md §4) -->
+  <!-- LOGOWANIE — scena szkła (docs/design/DESIGN-SPEC-GLASS.md §4).
+       NIETKNIĘTA przez kierunek „Tafla": własne tokeny, własne tło, własny lens. -->
   <section id="view-login" hidden>
     <div class="login" tabindex="0" role="group" aria-label="Ekran powitalny">
 
       <!-- Faza A + faza D: jeden blok treści, przenikające się warstwy -->
       <div class="login__inner">
-        <p class="login__hero">Spokój w finansach zaczyna się tutaj.</p>
+        <p class="login__hero">Spokój w finansach zaczyna się tutaj.</p>
         <div class="login__mark" aria-hidden="true"></div>
         <h2 class="login__title">Finansowa</h2>
-        <p class="login__sub">Pieniądze rodziny i spółki.</p>
+        <p class="login__sub">Pieniądze rodziny i spółki.</p>
       </div>
 
       <div class="login__bubbles" aria-hidden="true"></div>
@@ -69,10 +68,10 @@
         <div class="lens__scene">
           <div class="lens__world">
             <div class="login__inner">
-              <p class="login__hero">Spokój w finansach zaczyna się tutaj.</p>
+              <p class="login__hero">Spokój w finansach zaczyna się tutaj.</p>
               <div class="login__mark"></div>
               <h2 class="login__title">Finansowa</h2>
-              <p class="login__sub">Pieniądze rodziny i spółki.</p>
+              <p class="login__sub">Pieniądze rodziny i spółki.</p>
             </div>
           </div>
         </div>
@@ -82,7 +81,7 @@
 
       <div class="theme-switch login__switch"></div>
 
-      <p class="login__hint">Przesuń w górę</p>
+      <p class="login__hint">Przesuń w górę</p>
 
       <div class="login__actions">
         <a class="btn-glass" href="/auth/login">
@@ -101,24 +100,45 @@
   <!-- WPIS (rdzeń: transakcja w ≤3 kliknięcia) -->
   <section id="view-wpis" hidden>
     <h1 class="page-title">Nowy wpis</h1>
-    <form id="txForm" class="card">
-      <div class="row seg" id="segType">
-        <button type="button" data-type="WYDATEK" class="active">Wydatek</button>
-        <button type="button" data-type="PRZYCHÓD">Przychód</button>
-        <!-- TRANSFER: rata, wpłata na cel — własne pieniądze, nie konsumpcja (poza raportem wydatków) -->
-        <button type="button" data-type="TRANSFER" title="Przesunięcie własnych pieniędzy: rata kredytu, wpłata na cel. Nie liczy się jako wydatek.">Transfer</button>
+    <form id="txForm" class="stack">
+      <!-- Księga: segment zamiast listy. Jedna księga w zasięgu = segment znika (JS). -->
+      <div class="seg seg-2" id="ledgerSeg" role="group" aria-label="Księga" hidden></div>
+      <input type="hidden" id="ledger">
+
+      <!-- Kwota mieszka na osobnej tafli o mocniejszym kryciu: to jedyna liczba,
+           którą użytkownik naprawdę wpisuje, więc dostaje własną powierzchnię i blask. -->
+      <div class="amount-card field">
+        <label class="fld" for="amount">
+          <span>Kwota</span>
+          <span class="amount-line">
+            <input id="amount" type="text" inputmode="decimal" placeholder="0,00" required autofocus aria-describedby="amountHint">
+            <span class="amount-cur" aria-hidden="true">PLN</span>
+          </span>
+        </label>
+        <span class="amount-hint" id="amountHint">Precyzyjny wpis umożliwia uzgodnienie z wyciągiem banku.</span>
       </div>
-      <input id="amount" type="text" inputmode="decimal" placeholder="Kwota (zł)" required autofocus>
-      <div class="row">
-        <select id="ledger"></select>
-        <input id="txDate" type="date" required>
+
+      <!-- TRANSFER: rata, wpłata na cel — własne pieniądze, nie konsumpcja (poza raportem wydatków) -->
+      <div class="seg seg-3" id="segType" role="group" aria-label="Typ wpisu">
+        <button type="button" data-type="WYDATEK" class="active"><span class="sig" aria-hidden="true">−</span><span>Wydatek</span></button>
+        <button type="button" data-type="PRZYCHÓD"><span class="sig" aria-hidden="true">+</span><span>Przychód</span></button>
+        <button type="button" data-type="TRANSFER" title="Przesunięcie własnych pieniędzy: rata kredytu, wpłata na cel. Nie liczy się jako wydatek."><span class="sig" aria-hidden="true">⇄</span><span>Transfer</span></button>
       </div>
-      <select id="catMain"><option value="">Kategoria…</option></select>
-      <select id="catSub" hidden><option value="">Podkategoria</option></select>
-      <!-- formularz dodawania kategorii pojawia się TU dopiero po wybraniu „DODAJ…" z listy -->
-      <div id="catAddBox"></div>
-      <input id="desc" type="text" placeholder="Opis">
-      <button class="btn primary big" type="submit">Zapisz</button>
+      <p class="note" id="transferNote" hidden>Transfer nie liczy się do wydatków ani przychodów okresu — przesuwa środki między kontami tej samej księgi.</p>
+
+      <div class="card">
+        <label class="fld field"><span>Data</span><input id="txDate" type="date" required></label>
+        <label class="fld field"><span>Kategoria</span><select id="catMain"><option value="">Kategoria…</option></select></label>
+        <label class="fld quiet"><span>Podkategoria (opcjonalna)</span><select id="catSub" hidden><option value="">Podkategoria</option></select></label>
+        <!-- formularz dodawania kategorii pojawia się TU dopiero po wybraniu „DODAJ…" z listy -->
+        <div id="catAddBox"></div>
+        <label class="fld field">
+          <span class="fld-head">Opis<em id="descCount">0/120</em></span>
+          <textarea id="desc" rows="3" maxlength="120" placeholder="Na co poszło?"></textarea>
+        </label>
+      </div>
+
+      <button class="btn primary big" type="submit" id="txSave">Zapisz wpis</button>
       <p id="txMsg" class="msg"></p>
     </form>
   </section>
@@ -126,13 +146,15 @@
   <!-- HISTORIA -->
   <section id="view-historia" hidden>
     <h1 class="page-title">Historia</h1>
-    <div class="card">
-      <div class="row wrap">
-        <select id="fLedger"></select>
-        <input id="fFrom" type="date"><input id="fTo" type="date">
-        <select id="fType"><option value="">Typ: wszystkie</option><option>WYDATEK</option><option>PRZYCHÓD</option><option>TRANSFER</option></select>
-        <span id="histTools"></span>
-        <button class="btn" id="fGo">Filtruj</button>
+    <div class="stack">
+      <div class="card hist-filtry">
+        <div class="row wrap">
+          <select id="fLedger"></select>
+          <input id="fFrom" type="date"><input id="fTo" type="date">
+          <select id="fType"><option value="">Typ: wszystkie</option><option>WYDATEK</option><option>PRZYCHÓD</option><option>TRANSFER</option></select>
+          <span id="histTools"></span>
+          <button class="btn" id="fGo">Filtruj</button>
+        </div>
       </div>
       <div class="overflow"><table id="txTable"><thead>
         <tr><th>Data</th><th>Typ</th><th>Kategoria</th><th class="num">Kwota</th><th>Opis</th><th>Kto</th><th></th></tr>
@@ -144,20 +166,25 @@
   <!-- IMPORT CSV -->
   <section id="view-import" hidden>
     <h1 class="page-title">Import</h1>
-    <div class="card">
-      <h2>Import wyciągu (PKO BP, mBank, ING, Santander, Revolut)</h2>
-      <form id="impForm" class="row wrap">
-        <input type="file" id="impFile" accept=".csv,text/csv" required>
-        <select id="impLedger"></select>
-        <select id="impBank"><option value="">Bank: wykryj automatycznie</option>
-          <option>PKO BP</option><option>mBank</option><option>ING</option><option>Santander</option><option>Revolut</option></select>
+    <div class="stack">
+      <form id="impForm" class="card">
+        <label class="fld imp-plik"><span>Plik wyciągu (CSV)</span><input type="file" id="impFile" accept=".csv,text/csv" required></label>
+        <div class="row wrap">
+          <select id="impLedger"></select>
+          <select id="impBank"><option value="">Bank: wykryj automatycznie</option>
+            <option>PKO BP</option><option>mBank</option><option>ING</option><option>Santander</option><option>Revolut</option></select>
+        </div>
         <button class="btn primary" type="submit">Importuj</button>
+        <p id="impMsg" class="msg"></p>
       </form>
-      <p id="impMsg" class="msg"></p>
-      <h2>Do uzgodnienia <span id="unCount" class="pill"></span></h2>
-      <div id="unmatched"></div>
-      <h2>Historia importów</h2>
-      <div class="overflow"><table id="impTable"><thead><tr><th>Kiedy</th><th>Bank</th><th>Plik</th><th class="num">+</th><th class="num">dup</th><th class="num">błędy</th><th>Kto</th></tr></thead><tbody></tbody></table></div>
+      <div>
+        <div class="sekcja-head"><h2>Do uzgodnienia</h2><span id="unCount" class="pill"></span></div>
+        <div id="unmatched"></div>
+      </div>
+      <div>
+        <h2>Historia importów</h2>
+        <div class="overflow"><table id="impTable"><thead><tr><th>Kiedy</th><th>Bank</th><th>Plik</th><th class="num">+</th><th class="num">dup</th><th class="num">błędy</th><th>Kto</th></tr></thead><tbody></tbody></table></div>
+      </div>
     </div>
   </section>
 
@@ -195,24 +222,28 @@
   <!-- RAPORTY -->
   <section id="view-raporty" hidden>
     <h1 class="page-title">Raporty</h1>
-    <div class="card">
-      <div class="row wrap">
+    <div class="stack">
+      <!-- Okres: miesiąc (domyślnie) / kwartał / rok / własny zakres dat -->
+      <div class="chips" id="rZakres" role="group" aria-label="Okres raportu">
+        <button type="button" data-zakres="miesiac" class="active">Miesiąc</button>
+        <button type="button" data-zakres="kwartal">Kwartał</button>
+        <button type="button" data-zakres="rok">Rok</button>
+        <button type="button" data-zakres="wlasny">Zakres</button>
+      </div>
+      <div class="row wrap rap-okres">
         <select id="rLedger"></select>
-        <!-- Okres: miesiąc (domyślnie) / kwartał / rok / własny zakres dat -->
-        <select id="rZakres" title="Okres raportu">
-          <option value="miesiac">Miesiąc</option>
-          <option value="kwartal">Kwartał</option>
-          <option value="rok">Rok</option>
-          <option value="wlasny">Własny zakres</option>
-        </select>
         <input id="rMonth" type="month">
         <input id="rFrom" type="date" hidden title="Od"><input id="rTo" type="date" hidden title="Do">
       </div>
       <div id="kpi" class="kpi"></div>
-      <h2>Wydatki wg kategorii</h2>
-      <div id="byCat"></div>
-      <h2>Trend 6 miesięcy</h2>
-      <div class="overflow"><table id="trend"><thead><tr><th>Miesiąc</th><th class="num">Przychody</th><th class="num">Wydatki</th><th class="num">Bilans</th></tr></thead><tbody></tbody></table></div>
+      <div>
+        <h2>Wydatki wg kategorii</h2>
+        <div id="byCat" class="bary"></div>
+      </div>
+      <div>
+        <h2>Trend 6 miesięcy</h2>
+        <div class="overflow"><table id="trend"><thead><tr><th>Miesiąc</th><th class="num">Przychody</th><th class="num">Wydatki</th><th class="num">Bilans</th></tr></thead><tbody></tbody></table></div>
+      </div>
       <div id="fvp"></div>
       <div id="telemetria"></div>
     </div>
@@ -221,17 +252,39 @@
   <!-- PRZYDZIAŁ (propozycje reorganizacji kategorii do przyjęcia przez człowieka) -->
   <section id="view-przydzial" hidden>
     <h1 class="page-title">Przydział</h1>
-    <div class="card"><div id="przydzialBox"></div></div>
+    <div id="przydzialBox"></div>
   </section>
 
   <!-- ADMIN (tylko rola admin; treść renderowana z js/admin.js) -->
   <section id="view-admin" hidden>
-    <h1 class="page-title">Admin</h1>
-    <div class="card"><div id="adminBox"></div></div>
+    <h1 class="page-title">Administracja</h1>
+    <div id="adminBox"></div>
   </section>
 </main>
+
+<!-- CHROME 2/4: pasek zakładek pod kciukiem. Pięć slotów — piąty otwiera arkusz. -->
+<nav id="nav" hidden>
+  <button data-view="wpis" class="active"><span class="nav-i" aria-hidden="true">+</span><span>Wpis</span></button>
+  <button data-view="historia"><span class="nav-i" aria-hidden="true">≡</span><span>Historia</span></button>
+  <button data-view="raporty"><span class="nav-i" aria-hidden="true">▤</span><span>Raporty</span></button>
+  <button data-view="paragon"><span class="nav-i" aria-hidden="true">◉</span><span>Paragon</span></button>
+  <button type="button" id="navMore" aria-haspopup="dialog" aria-expanded="false"><span class="nav-i" aria-hidden="true">···</span><span>Więcej</span></button>
+</nav>
+
+<!-- CHROME 3/4: arkusz „Więcej". Reszta widoków + wyjście z sesji — bez modala nad treścią. -->
+<div id="sheet" class="sheet-wrap" hidden>
+  <button class="sheet-scrim" id="sheetClose" aria-label="Zamknij arkusz"></button>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Więcej">
+    <span class="sheet-grip" aria-hidden="true"></span>
+    <button class="sheet-item" data-view="import">Import z banku</button>
+    <button class="sheet-item" data-view="przydzial" data-admin hidden>Przydział</button>
+    <button class="sheet-item" data-view="admin" data-admin hidden>Administracja</button>
+    <div class="sheet-sep" aria-hidden="true"></div>
+    <button class="sheet-item quiet" id="sheetLogout">Wyloguj</button>
+  </div>
+</div>
+
 <!-- Filtr refrakcji soczewki. Mapa przemieszczenia (href) jest generowana raz przez glass.js.
-     Trzy przebiegi o różnej sile + rozdzielenie kanałów = aberracja chromatyczna przy rancie.
      color-interpolation-filters="sRGB" — bez tego linearRGB przekłamuje barwy.
      feImage bez x/y/width/height: podobszar domyślnie równy regionowi filtra (= bbox soczewki). -->
 <svg class="fin-defs" width="0" height="0" aria-hidden="true" focusable="false"

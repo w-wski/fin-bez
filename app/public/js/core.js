@@ -141,6 +141,28 @@ function zerujCzas() {
   if (widoczneOd !== null) widoczneOd = Date.now();
 }
 
+// Tytuł widoku niesie nagłówek (nawigacja zeszła na dół, pod kciuk) — nie ma go
+// już w treści sekcji, więc jedno miejsce prawdy o tym, „gdzie jestem".
+const TYTULY = {
+  login: 'Finansowa', wpis: 'Nowy wpis', historia: 'Historia', raporty: 'Raporty',
+  import: 'Import z banku', paragon: 'Paragon', przydzial: 'Przydział', admin: 'Administracja',
+};
+const W_ARKUSZU = ['import', 'przydzial', 'admin'];    // widoki spod zakładki „Więcej"
+
+export function otworzArkusz() {
+  const a = document.getElementById('sheet');
+  if (!a) return;
+  a.hidden = false;
+  document.getElementById('navMore')?.setAttribute('aria-expanded', 'true');
+  a.querySelector('.sheet-item:not([hidden])')?.focus();
+}
+
+export function zamknijArkusz() {
+  const a = document.getElementById('sheet');
+  if (a) a.hidden = true;
+  document.getElementById('navMore')?.setAttribute('aria-expanded', 'false');
+}
+
 export function show(view) {
   // telemetria czasu na karcie (odpowiednik LOGI ze starej aplikacji, ale poza księgą)
   if (state.me && state.view !== view) {
@@ -151,18 +173,28 @@ export function show(view) {
     zerujCzas();
   }
   state.view = view;
+  // Wnętrze stoi na tafli, logowanie na „papierze" — styles.css rozróżnia je po tym atrybucie.
+  document.body.dataset.view = view;
+  const tytul = document.getElementById('viewTitle');
+  if (tytul) tytul.textContent = TYTULY[view] || 'Finansowa';
   document.querySelectorAll('main > section').forEach((s) => { s.hidden = s.id !== `view-${view}`; });
-  document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  // Zaczepy [data-view] są w dwóch miejscach: pasek zakładek i arkusz „Więcej".
+  document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  document.getElementById('navMore')?.classList.toggle('active', W_ARKUSZU.includes(view));
+  zamknijArkusz();
   $('#nav').hidden = view === 'login';
   // Na ekranie logowania nie ma z czego się wylogowywać — inaczej przycisk zostaje po wygaśnięciu sesji.
   const wyl = document.getElementById('logout');
   if (wyl) wyl.hidden = view === 'login';
 }
 
+export const KSIEGI = { 1: 'RODZINA', 2: 'PERSEVERA' };
+
+// Segment ksiąg we Wpisie buduje js/wpis.js (initKsiegi) — tam mieszka jego zachowanie.
 export function fillLedgerSelects() {
-  const opts = state.me.scope.ledgers.map((id) =>
-    `<option value="${id}">${id === 1 ? 'RODZINA' : 'PERSEVERA'}</option>`).join('');
-  ['#ledger', '#fLedger', '#impLedger', '#rLedger'].forEach((sel) => { const n = $(sel); if (n) n.innerHTML = opts; });
+  const ids = state.me.scope.ledgers;
+  const opts = ids.map((id) => `<option value="${id}">${KSIEGI[id] || 'Księga ' + id}</option>`).join('');
+  ['#fLedger', '#impLedger', '#rLedger'].forEach((sel) => { const n = $(sel); if (n) n.innerHTML = opts; });
 }
 
 export function cacheMe(me) { try { localStorage.setItem(ME_CACHE_KEY, JSON.stringify(me)); } catch { } }

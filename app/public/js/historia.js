@@ -1,10 +1,11 @@
 // Historia: lista wpisów z filtrami, edycja w miejscu, miękkie usuwanie z cofnięciem i Kosz.
-import { $, el, zl, api, track, toast, refreshers } from './core.js';
+import { $, el, zl, api, track, toast, refreshers, KSIEGI } from './core.js';
 import { parseKwota } from './kwota.js';   // jedyne miejsce, gdzie napis staje się kwotą
 
 const TYPY = ['WYDATEK', 'PRZYCHÓD', 'TRANSFER'];
 const ZNAK = { WYDATEK: '−', PRZYCHÓD: '+', TRANSFER: '⇄' };
-const KLASA = { WYDATEK: 'exp', PRZYCHÓD: 'inc' };
+const SLOWO = { WYDATEK: 'Wydatek', PRZYCHÓD: 'Przychód', TRANSFER: 'Transfer' };
+const KLASA = { WYDATEK: 'exp', PRZYCHÓD: 'inc', TRANSFER: 'trf' };
 const ISO_DATA = /^\d{4}-\d{2}-\d{2}$/;
 
 let histOffset = 0;
@@ -54,9 +55,9 @@ function akcje(tr, r) {
     td.append(wroc);
     return td;
   }
-  const ed = el('button', { class: 'btn small', title: 'Edytuj' }, '✎');
+  const ed = el('button', { class: 'btn small', title: 'Edytuj wpis' }, 'Edytuj');
   ed.onclick = () => openEdit(tr, r);
-  const del = el('button', { class: 'btn small', title: 'Usuń' }, '✕');
+  const del = el('button', { class: 'btn small', title: 'Usuń wpis' }, 'Usuń');
   del.onclick = () => removeTx(tr, r);
   td.append(ed, del);
   return td;
@@ -72,19 +73,21 @@ function fillRow(tr, r) {
   // Cały wpis łapie mgiełkę koloru swojej kategorii (nadanego w Admin) + kropkę przy nazwie.
   const kolor = kolorKat(r);
   if (kolor) tr.style.setProperty('--cat-c', kolor); else tr.style.removeProperty('--cat-c');
-  const data = el('td', { 'data-label': 'Data' }, dzien(r.tx_date));
-  // Wpis uzgodniony z wierszem wyciągu — widać to od razu, bo zmiana kwoty/daty rozjedzie uzgodnienie.
-  if (r.bank_tx_id) data.append(el('span', { class: 'pill bank', title: 'Uzgodniony z wyciągiem bankowym' }, 'z banku'));
   const kat = el('td', { 'data-label': 'Kategoria' });
   if (kolor) kat.append(el('i', { class: 'catdot', 'aria-hidden': 'true' }));
   kat.append(r.category || '—');
+  // Wpis uzgodniony z wierszem wyciągu — widać to od razu, bo zmiana kwoty/daty rozjedzie uzgodnienie.
+  if (r.bank_tx_id) kat.append(el('span', { class: 'pill bank', title: 'Uzgodniony z wyciągiem bankowym' }, '✓ uzgodniony'));
+  // Typ niesie ZNAK i SŁOWO — barwa tylko je wzmacnia (§5 briefu: kolor nigdy sam).
+  const typ = el('td', { 'data-label': 'Typ', class: KLASA[r.type] || '' });
+  typ.append(el('span', { class: 'typ' }, `${ZNAK[r.type] || '·'} ${SLOWO[r.type] || r.type}`));
   tr.append(
-    data,
-    el('td', { 'data-label': 'Typ', class: KLASA[r.type] || '' }, ZNAK[r.type] || '·'),
+    el('td', { 'data-label': 'Data' }, dzien(r.tx_date)),
+    typ,
     kat,
-    el('td', { 'data-label': 'Kwota', class: 'num ' + (KLASA[r.type] || '') }, zl(r.amount)),
+    el('td', { 'data-label': 'Kwota', class: 'num ' + (KLASA[r.type] || '') }, `${ZNAK[r.type] || ''} ${zl(r.amount)}`.trim()),
     el('td', { 'data-label': 'Opis', class: 'opis' }, r.description || ''),
-    el('td', { 'data-label': 'Kto' }, r.user_name),
+    el('td', { 'data-label': 'Kto' }, `${r.user_name} · ${KSIEGI[r.ledger_id] || ''}`.replace(/ · $/, '')),
     akcje(tr, r));
   tr.onclick = (e) => { if (!kosz && !e.target.closest('button')) openEdit(tr, r); };
 }
@@ -169,7 +172,9 @@ async function openEdit(tr, r) {
   const anuluj = el('button', { class: 'btn', type: 'button' }, 'Anuluj');
   zapisz.onclick = () => zapiszEdycje(tr, r, { data, typ, kwota, kat, opis });
   anuluj.onclick = () => { delete tr.dataset.edit; fillRow(tr, r); };
-  const td = el('td', { colspan: '7', class: 'edycja' });
+  // Klasa `field` zapala blask edytowanego wiersza (styles.css §6) — animowana jest
+  // wyłącznie opacity warstwy, więc lista pozostaje płynna nawet przy 300 wierszach.
+  const td = el('td', { colspan: '7', class: 'edycja field' });
   td.append(wiersz(data, typ, kwota), wiersz(kat), wiersz(opis), wiersz(zapisz, anuluj));
   tr.innerHTML = '';
   tr.onclick = null;
@@ -230,6 +235,8 @@ async function pobierzHist(reset, widokKosza) {
   await Promise.all([...new Set(rows.map((r) => r.ledger_id))]
     .map((l) => catOptions(l).catch(() => {})));
   kosz = widokKosza;                               // stan widoku zmieniamy dopiero po udanym pobraniu
+  const tytul = document.getElementById('viewTitle');
+  if (tytul) tytul.textContent = kosz ? 'Historia · Kosz' : 'Historia';
   const tb = $('#txTable tbody');
   if (reset) { tb.innerHTML = ''; histOffset = 0; wersjaListy += 1; }
   for (const r of rows) {
@@ -240,6 +247,8 @@ async function pobierzHist(reset, widokKosza) {
   histOffset += rows.length;
   histTotal = total;
   $('#more').hidden = histOffset >= histTotal;
+  // Przycisk mówi, ILE jeszcze zostało — „Pokaż więcej" nie odpowiadało na to pytanie.
+  $('#more').textContent = `Wczytaj następne ${Math.min(50, histTotal - histOffset)} (z ${histTotal})`;
 }
 
 // Wejście na Historię i odświeżenia z UI. Błąd ma trafić do toastu, a nie zostać nieobsłużoną

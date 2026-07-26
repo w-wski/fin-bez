@@ -44,7 +44,8 @@ export async function loadUnmatched() {
   for (const bt of unmatched.slice(0, 30)) {
     const d = el('div', { class: 'un' });
     d.append(el('span', {}, bt.transaction_date.slice(0, 10)),
-      el('b', { class: bt.amount < 0 ? 'exp' : 'inc' }, zl(Math.abs(bt.amount))),
+      // Znak stoi przy kwocie: barwa nie może być jedynym nośnikiem kierunku przepływu (§5).
+      el('b', { class: bt.amount < 0 ? 'exp' : 'inc' }, `${bt.amount < 0 ? '−' : '+'} ${zl(Math.abs(bt.amount))}`),
       el('span', { class: 'grow' }, [bt.counterparty, bt.title].filter(Boolean).join(' — ').slice(0, 90)));
     if (bt.suggestion) d.append(el('span', { class: 'pill', title: `nauczony wzorzec (${bt.suggestion.hits}× potwierdzony)` },
       '→ ' + bt.suggestion.name));

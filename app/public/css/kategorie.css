@@ -1,15 +1,19 @@
-/* Style widoku kategorie — właściciel: zlecenie odpowiedzialne za ten widok.
-   Zakres: formularz „➕ DODAJ…" w karcie Wpis (#catAddBox) oraz drzewo kategorii
-   w karcie Admin (#adminBox). Kolory wyłącznie ze zmiennych z :root (styles.css),
-   żeby oba motywy działały bez osobnych reguł. */
+/* Styl kategorii — kierunek „Tafla".
+   Zakres: formularz „➕ DODAJ…" w Wpisie (#catAddBox) oraz drzewo kategorii
+   w Administracji (#adminBox). Kolory wyłącznie ze zmiennych z :root (styles.css),
+   żeby oba motywy działały bez osobnych reguł.
+
+   Kolory kategorii pochodzą OD UŻYTKOWNIKA (hex, może być null) — projekt musi
+   wyglądać dobrze, gdy kolorów nie ma wcale, gdy ma je część i gdy są brzydkie.
+   Dlatego barwa nigdy nie wypełnia powierzchni: dostaje 13 px kwadracik z rantem
+   `outline: 1px var(--glass-edge)`, który ratuje biel i czerń na gradiencie. */
 
 :root {
-  --cat-dot: 1rem;                 /* średnica kropki koloru kategorii */
-  --cat-wciecie: 1.6rem;           /* wcięcie podkategorii w drzewie admina */
-  --cat-uwaga: #b7791f;            /* obwódka kategorii „do naprawy" (zepsuty rodzic) */
+  --cat-dot: 13px;                 /* bok kwadracika koloru kategorii */
+  --cat-wciecie: 30px;             /* wcięcie podkategorii w drzewie admina */
 }
 
-/* ---------- Wpis: formularz dodawania kategorii (pusty, dopóki nie wybrano „➕ DODAJ…") ---------- */
+/* ---------- Wpis: formularz dodawania kategorii ---------- */
 
 #catAddBox:empty { display: none; }
 
@@ -21,69 +25,91 @@
 #catAddBox .catadd {
   flex-wrap: wrap;
   align-items: center;
-  padding: .6rem;
-  border: 1px dashed var(--primary);
-  border-radius: .5rem;
-  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px dashed var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--accent-quiet);
 }
 #catAddBox .catadd > .catadd-nazwa { flex: 1 1 11rem; min-width: 8rem; }
 #catAddBox .catadd > .btn { flex: 0 0 auto; min-width: 5.5rem; }
 
-/* ---------- Admin: drzewo kategorii ---------- */
+/* ---------- Administracja: drzewo kategorii ---------- */
 
-.admin-tools { align-items: center; margin-bottom: .2rem; }
-.admin-tools > label { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
-.admin-tools > label input { width: auto; flex: 0 0 auto; }
+#adminBox { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.admin-tools { align-items: center; }
+.admin-tools > label { flex: 0 1 auto; min-width: 0; white-space: nowrap; min-height: 44px; }
+.admin-tools > label input { width: auto; flex: 0 0 auto; min-height: 0; }
 .admin-tools > .btn { flex: 0 0 auto; min-width: 0; }
 
-.cat-tree { display: flex; flex-direction: column; gap: .3rem; }
+/* Drzewo to JEDNA tafla, w niej wiersze — dwa poziomy, wcięcie zamiast ramek. */
+.cat-tree {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-md);
+  background: var(--glass-fill);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+  overflow: hidden;
+}
 
 .cat-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: .4rem;
-  padding: .35rem .5rem;
-  border: 1px solid var(--line);
-  border-radius: .5rem;
-  background: var(--card);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
 }
-.cat-row.pod { margin-left: var(--cat-wciecie); font-size: .95rem; }
-.cat-row.arch { opacity: .6; background: color-mix(in srgb, var(--muted) 10%, var(--card)); }
+.cat-row:last-child { border-bottom: 0; }
+.cat-row.pod { padding-left: var(--cat-wciecie); background: var(--glass-fill-sunken); }
+.cat-row.pod .catname { font-weight: 400; }
+.cat-row.arch { opacity: .65; }
 .cat-row.arch .catname { text-decoration: line-through; }
 
 /* Kategoria z zepsutym rodzicem (archiwum / brak / zapętlenie) — serwer oddaje ją jako
    główną z flagą `orphan`, żeby nie zniknęła z księgi. Tu tylko widoczny znak „do naprawy". */
-.cat-row.orphan { border-color: var(--cat-uwaga); border-style: dashed; }
-.cat-row .catwarn { flex: 0 0 auto; cursor: help; font-size: .95rem; }
+.cat-row.orphan { box-shadow: inset 3px 0 0 var(--warn); }
+.cat-row .catwarn { flex: 0 0 auto; cursor: help; color: var(--warn); }
 
-.catdot {
+.cat-row .catdot {
   flex: 0 0 auto;
   width: var(--cat-dot); height: var(--cat-dot);
-  border-radius: 50%;
-  border: 1px solid var(--line);
+  border-radius: 4px;
+  outline: 1px solid var(--glass-edge);
   background: transparent;
 }
-.catdot.pusta { border-style: dashed; border-color: var(--muted); }
+.cat-row .catdot.pusta { outline: 0; border: 1.5px dashed var(--line-strong); }
 
 .cat-row .catcolor {
   flex: 0 0 auto;
-  width: 2.4rem; height: 2rem;
-  padding: .1rem; cursor: pointer;
+  width: 2.2rem; height: 2rem;
+  min-height: 0;
+  padding: .1rem;
+  cursor: pointer;
 }
-.cat-row .catname { flex: 1 1 9rem; min-width: 6rem; }
-.cat-row .catparent { flex: 0 1 11rem; min-width: 7rem; font-size: .9rem; }
+.cat-row .catname { flex: 1 1 9rem; min-width: 6rem; font-weight: 600; }
+.cat-row .catparent { flex: 1 1 8rem; min-width: 6rem; max-width: 14rem; font-size: var(--fs-cap); }
 .cat-row .catparent:disabled { opacity: .5; cursor: not-allowed; }
-.cat-row .btn.small { flex: 0 0 auto; }
+.cat-row .btn.small { flex: 0 0 auto; min-width: 0; }
 
+/* Telefon: nazwa dostaje własną linię (jest najważniejsza i bywa długa), a kolor,
+   rodzic i archiwizacja mieszczą się pod nią w JEDNYM rzędzie — wiersz ma dwie linie,
+   nie trzy, więc drzewo 41 pozycji da się przewinąć bez zmęczenia. */
 @media (max-width: 560px) {
-  .cat-row .catname { flex: 1 1 100%; order: -1; }   /* nazwa w osobnej linii, nad sterowaniem */
-  .cat-row.pod { margin-left: .8rem; }
+  .cat-row { row-gap: var(--space-1); }
+  .cat-row .catname { flex: 1 1 100%; order: -1; }
+  .cat-row.pod { padding-left: var(--space-5); }
+  .cat-row .catparent { flex: 1 1 6rem; }
+  .cat-row .btn.small { padding: 0 var(--space-2); }
 }
 
-@media (prefers-color-scheme: dark) {
-  /* kropka na ciemnym tle potrzebuje jaśniejszej obwódki, żeby nie zlewała się z kartą */
-  :root { --cat-uwaga: #e0b050; }
-  .catdot { border-color: color-mix(in srgb, var(--fg) 35%, transparent); }
-  #catAddBox .catadd { background: color-mix(in srgb, var(--primary) 12%, var(--card)); }
+/* Wyjaśnienie pod drzewem — jak w Przydziale: tekst na wpuszczonej tafli, nie na gradiencie. */
+#adminBox > p.msg {
+  max-width: none;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--glass-fill-sunken);
 }

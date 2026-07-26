@@ -1,9 +1,10 @@
 // Finansowa — punkt startowy frontendu (bez build stepu; ES modules).
 // Ten plik TYLKO spina moduły widoków. Logika widoku należy do js/<widok>.js.
 import { $, api, show, track, state, cacheMe, cachedMe, fillLedgerSelects,
-         updateNetBadge, syncQueue, flushTelemetry, refreshers, wyloguj } from './js/core.js';
+         updateNetBadge, syncQueue, flushTelemetry, refreshers, wyloguj,
+         otworzArkusz, zamknijArkusz } from './js/core.js';
 import { loadCats, onCatMain } from './js/kategorie.js';
-import { initWpis } from './js/wpis.js';
+import { initWpis, initKsiegi } from './js/wpis.js';
 import { initHistoria, loadHist } from './js/historia.js';
 import { initImport, loadImports, loadUnmatched } from './js/import.js';
 import { initRaporty, loadReport } from './js/raporty.js';
@@ -21,10 +22,21 @@ const OPEN = {
   // Wpis tutaj powodowałby drugie, identyczne pobranie listy przy każdym wejściu.
 };
 
-async function init() {
-  document.querySelectorAll('nav button').forEach((b) => {
+// Zakładki są w dwóch miejscach: pasek u dołu (cztery pierwsze) i arkusz „Więcej"
+// (Paragon, Przydział, Administracja). Oba niosą data-view, więc wiążemy je jednym
+// zapytaniem — arkusz zamyka się sam w show().
+function podepnijNawigacje() {
+  document.querySelectorAll('[data-view]').forEach((b) => {
     b.onclick = () => { show(b.dataset.view); OPEN[b.dataset.view]?.(); };
   });
+  $('#navMore').onclick = otworzArkusz;
+  $('#sheetClose').onclick = zamknijArkusz;
+  $('#sheetLogout').onclick = () => wyloguj();
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') zamknijArkusz(); });
+}
+
+async function init() {
+  podepnijNawigacje();
   $('#logout').onclick = () => wyloguj();
   initWpis();
   initHistoria();
@@ -42,10 +54,11 @@ async function init() {
   try {
     state.me = await api('/api/v1/me');
     cacheMe(state.me);
-    $('#who').textContent = `${state.me.name} (${state.me.role})`;
+    $('#who').textContent = `${state.me.name} · ${state.me.role}`;
     $('#logout').hidden = false;
-    document.querySelectorAll('nav button[data-admin]').forEach((b) => { b.hidden = state.me.role !== 'admin'; });
+    document.querySelectorAll('[data-view][data-admin]').forEach((b) => { b.hidden = state.me.role !== 'admin'; });
     fillLedgerSelects();
+    initKsiegi(state.me.scope.ledgers);
     await loadCats();
     show('wpis');
     track('Start aplikacji', 'wpis', { detail: 'online' });
@@ -56,9 +69,10 @@ async function init() {
     if (!navigator.onLine || err instanceof TypeError) {
       state.me = cachedMe();
       if (state.me) {
-        $('#who').textContent = `${state.me.name} (offline)`;
+        $('#who').textContent = `${state.me.name} · offline`;
         $('#logout').hidden = false;
         fillLedgerSelects();
+        initKsiegi(state.me.scope.ledgers);
         await loadCats(); // spadnie na cache kategorii
         show('wpis');
         track('Start aplikacji', 'wpis', { detail: 'offline-cache', offline: true });

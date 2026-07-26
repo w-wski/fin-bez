@@ -1,94 +1,184 @@
-/* Style widoku historia — właściciel: zlecenie odpowiedzialne za ten widok. */
+/* Styl widoku „Historia" — kierunek „Tafla".
+
+   Tabela 7 kolumn na 390 px nie istnieje: na telefonie i tablecie każdy wpis to
+   WIERSZ jednej wspólnej tafli (nie osobna karta — lista ma być jedną szybą, tak jak
+   w projekcie), ułożony siatką w cztery linie:
+
+     data · typ                                  kwota
+     ● kategoria                       ✓ uzgodniony
+     opis (zawija się, nigdy nie ucinamy treści)
+     kto · księga                        [Edytuj] [Usuń]
+
+   Od 901 px wraca prawdziwa tabela — tam siedem kolumn ma gdzie oddychać.
+   Etykiety data-label (historia.js) niosą nagłówki dla trybu tabeli; w trybie
+   wiersza-tafli chowamy je, bo układ mówi to samo bez słów. */
 
 /* Pasek narzędzi: kontrolka „Kosz" dorenderowana z JS do #histTools. */
-#histTools { display: flex; align-items: center; }
-#histTools .kosz-filtr { gap: .4rem; white-space: nowrap; cursor: pointer; }
-#histTools .kosz-filtr input { width: auto; flex: 0 0 auto; }
+#histTools { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; }
+#histTools .kosz-filtr { gap: .4rem; white-space: nowrap; cursor: pointer; min-height: 44px; }
+#histTools .kosz-filtr input { width: auto; flex: 0 0 auto; min-height: 0; }
 
-/* Wiersz jest klikalny — otwiera edycję w miejscu. */
+.hist-filtry { padding: var(--space-3); }
+.hist-filtry .row > * { min-width: 7rem; }
+
+/* Wiersz jest klikalny — otwiera edycję w miejscu (bez modala). */
 #txTable tbody tr { cursor: pointer; }
 
-/* Kolor kategorii (nadany w Admin) wyróżnia CAŁY wpis: delikatna mgiełka barwy na
-   wierszu/karcie + kropka przy nazwie. --cat-c ustawia historia.js per wiersz;
-   wpis bez koloru zostaje neutralny (var z fallbackiem transparent). Warstwa jako
-   background-image: na telefonie kładzie się NAD tłem karty, na desktopie nad
-   przezroczystym wierszem — jedna reguła dla obu układów. */
+/* Kolor kategorii (nadany w Admin) wyróżnia CAŁY wpis: ledwo widoczna mgiełka barwy
+   na wierszu + kropka przy nazwie. --cat-c ustawia historia.js per wiersz; wpis bez
+   koloru zostaje neutralny (var z fallbackiem transparent). */
 #txTable tbody tr {
   background-image: linear-gradient(
-    color-mix(in srgb, var(--cat-c, transparent) 10%, transparent),
-    color-mix(in srgb, var(--cat-c, transparent) 10%, transparent));
+    color-mix(in srgb, var(--cat-c, transparent) 8%, transparent),
+    color-mix(in srgb, var(--cat-c, transparent) 8%, transparent));
 }
-.catdot {
+/* Rant na kropce ratuje biel i czerń użytkownika — na tafli obie by zniknęły.
+   Reguła zawężona do tabeli: `.catdot` żyje też w Raportach i w Adminie, w innych rozmiarach. */
+#txTable .catdot {
   display: inline-block;
-  width: .55em; height: .55em;
-  border-radius: 50%;
+  width: 9px; height: 9px;
+  flex: none;
+  border-radius: 3px;
   background: var(--cat-c, transparent);
+  outline: 1px solid var(--glass-edge);
   margin-right: .45em;
-  box-shadow: inset 0 0 0 .5px oklch(0% 0 0 / .12);
 }
 #txTable tr.del { cursor: default; }                /* wpis z Kosza: bez edycji w miejscu */
-#txTable tr.del td { opacity: .7; }
-#txTable td.opis { overflow-wrap: anywhere; }       /* długi opis zawija się, nie rozpycha tabeli */
+#txTable tr.del td { opacity: .75; }
+#txTable td.opis { overflow-wrap: anywhere; color: var(--ink-muted); }
 #txTable td.akcje { cursor: default; white-space: nowrap; }
-#txTable td.akcje button + button { margin-left: .3rem; }
 
-/* „z banku": wpis uzgodniony z wierszem wyciągu — zmiana kwoty/daty rozjeżdża uzgodnienie. */
-#txTable .pill.bank { margin-left: .4rem; font-size: .75rem; white-space: nowrap; }
+/* Typ: znak ORAZ słowo w pigułce — kolor tylko wzmacnia, nigdy nie niesie sam (§5 briefu). */
+#txTable .typ {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--glass-rim);
+  border-radius: var(--r-pill);
+  font: 600 var(--fs-micro)/1 var(--font);
+  white-space: nowrap;
+  color: var(--ink-muted);
+  background: var(--glass-fill-sunken);
+}
+#txTable td.exp .typ { color: var(--minus); background: var(--tint-minus); }
+#txTable td.inc .typ { color: var(--plus);  background: var(--tint-plus); }
+#txTable td.trf .typ { color: var(--flow);  background: var(--glass-fill-sunken); }
 
-/* Formularz edycji zajmuje cały wiersz. */
-#txTable td.edycja { cursor: default; padding: .6rem .5rem; }
-#txTable td.edycja .row { margin-bottom: .4rem; }
+/* „uzgodniony": wpis połączony z wierszem wyciągu — zmiana kwoty/daty go rozjedzie. */
+#txTable .pill.bank { margin-left: .4rem; }
+
+/* Formularz edycji w miejscu zajmuje cały wiersz i ŚWIECI (klasa .field z styles.css). */
+#txTable td.edycja {
+  cursor: default;
+  padding: var(--space-3);
+  background: var(--glass-fill-strong);
+  border-top: 1px solid var(--glow-rim);
+  border-bottom: 1px solid var(--glow-rim);
+}
+#txTable td.edycja .row { margin-bottom: var(--space-2); }
 #txTable td.edycja .row:last-child { margin-bottom: 0; }
 
-/* >900 px: tabela ma się mieścić w karcie, nie rozpychać jej w poziomie.
-   Globalne `.overflow table { min-width: max-content }` każe tabeli NIGDY nie zawijać
-   treści — długi opis wypychał Historię poza ekran nawet na komputerze. Tu nadpisujemy
-   sam min-width i pozwalamy zawijać opis/kategorię: auto layout rozdziela wtedy
-   szerokości po zawartości. ŻADNEGO table-layout: fixed — sztywne kolumny potrafiły
-   zdusić Opis do zera na średnich szerokościach (opis pionowo, litera pod literą). */
+/* „Wczytaj następne 50" — domknięcie listy, nie akcja pierwszoplanowa. */
+#more {
+  width: 100%;
+  min-height: 50px;
+  border-radius: var(--r-md);
+  background: var(--glass-fill-sunken);
+  border-color: var(--line);
+  color: var(--accent);
+  font-size: var(--fs-body);
+}
+
+/* ---------- ≥901 px: prawdziwa tabela ---------- */
 @media (min-width: 901px) {
   #txTable { min-width: 100%; }
   #txTable th:nth-child(5) { width: 38%; }        /* Opis: wskazówka, nie sztywna szerokość */
   #txTable td[data-label="Data"], #txTable td[data-label="Kwota"],
   #txTable td[data-label="Kto"] { white-space: nowrap; }  /* data łamałaby się na myślnikach */
+  #txTable td[data-label="Data"] { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   #txTable td[data-label="Kategoria"] { overflow-wrap: anywhere; }
-  /* pill jako block: przy nowrap na komórce schodzi POD datę, zamiast ją rozszerzać */
-  #txTable .pill.bank { display: block; width: max-content; margin: .2rem 0 0; }
+  #txTable td.akcje button + button { margin-left: .3rem; }
 }
 
-/* ≤900 px: każdy wpis to karta — bez poziomego przewijania i bez ucinania treści.
-   Telefon i tablet (mobile-first, tablet-second): iPad też dostaje karty, bo tabela
-   robi się użyteczna dopiero na szerokim ekranie. Nagłówki tabeli zastępuje etykieta
-   z data-label (dokładana w historia.js). */
+/* ---------- ≤900 px: wiersz-tafla (telefon i tablet) ---------- */
 @media (max-width: 900px) {
   /* min-width: 0 nadpisuje globalne `.overflow table { min-width: max-content }`:
-     w trybie kart tabela jest blokiem, a max-content liczy szerokość NAJDŁUŻSZEGO
-     niezawiniętego opisu — karty wyjeżdżały poza ekran telefonu (nagranie 07-26). */
-  #txTable { font-size: 1rem; min-width: 0; }
-  #txTable, #txTable tbody, #txTable tr { display: block; width: 100%; }
+     max-content liczy szerokość NAJDŁUŻSZEGO niezawiniętego opisu, więc wiersze
+     wyjeżdżały poza ekran telefonu. */
+  #txTable { min-width: 0; font-size: var(--fs-cap); }
+  #txTable, #txTable tbody { display: block; width: 100%; }
   #txTable thead { display: none; }
-  #txTable tr { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
-    padding: var(--space-3) var(--space-4); margin: var(--space-3) 0;
-    box-shadow: inset 0 1px 0 var(--glass-rim-a), 0 1px 2px -1px var(--glass-drop); }
-  #txTable td { display: flex; gap: .8rem; justify-content: space-between; align-items: baseline;
-    width: 100%; border: 0; padding: .15rem 0; }
-  #txTable td::before { content: attr(data-label); flex: 0 0 5.5rem;
-    color: var(--muted); font-size: var(--text-xs);
-    text-transform: uppercase; letter-spacing: .08em; }
-  #txTable td[data-label="Kwota"] { font-size: var(--text-md); font-weight: 600; font-variant-numeric: tabular-nums; }
-  #txTable td[data-label="Opis"] { display: block; }
-  #txTable td[data-label="Opis"]::before { display: block; }
-  /* Pusta komórka znika razem z etykietą (wpis bez opisu nie dostaje pustej linii „Opis").
-     Reguła MUSI stać PO regułach td[data-label=...]: ma tę samą specyficzność, więc decyduje
-     kolejność — wcześniej przegrywała i etykieta zostawała. */
+
+  #txTable tr {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 2px var(--space-2);
+    align-items: baseline;
+    padding: 13px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  #txTable tbody tr:last-child { border-bottom: 0; }
+  #txTable td { display: block; width: auto; border: 0; padding: 0; }
+  #txTable td::before { display: none; }          /* układ mówi to, co etykieta */
   #txTable td:empty { display: none; }
-  /* Akcje: zwarte przyciski przy prawej krawędzi karty (cel dotyku ≥ 44 px) —
-     NIE rozciągnięte na całą szerokość (uwaga Szymona 07-26: „po co takie szerokie"). */
-  #txTable td.akcje { gap: .5rem; margin-top: .5rem; justify-content: flex-end; }
-  #txTable td.akcje::before { display: none; }
-  #txTable td.akcje button { flex: 0 0 auto; min-height: 44px; min-width: 64px;
-    padding: .6rem 1rem; font-size: 1rem; margin-left: 0; }
-  #txTable td.edycja { display: block; padding: .2rem 0; }
-  #txTable td.edycja::before { display: none; }
+
+  #txTable td[data-label="Data"] {
+    grid-column: 1; grid-row: 1;
+    font: 500 var(--fs-cap)/1.2 var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-muted);
+    white-space: nowrap;
+  }
+  #txTable td[data-label="Typ"] { grid-column: 2; grid-row: 1; }
+  #txTable td[data-label="Kwota"] {
+    grid-column: 3; grid-row: 1;
+    text-align: right;
+    font: 600 var(--num-md)/1.15 var(--mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  #txTable td[data-label="Kategoria"] {
+    grid-column: 1 / -1; grid-row: 2;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+    padding-top: 5px;
+    font: 500 var(--fs-cap)/1.35 var(--font);
+    overflow-wrap: anywhere;
+  }
+  #txTable td[data-label="Opis"] {
+    grid-column: 1 / -1; grid-row: 3;
+    padding-top: 5px;
+    line-height: 1.45;
+  }
+  /* „kto" i akcje dzielą ostatnią linię: meta po lewej, przyciski przy krawędzi.
+     Meta zawija się, gdy zabraknie miejsca — nigdy nie wjedzie pod przyciski. */
+  #txTable td[data-label="Kto"] {
+    grid-column: 1 / 3; grid-row: 4;
+    align-self: center;
+    min-width: 0;
+    padding-top: 6px;
+    font: 400 var(--fs-micro)/1.3 var(--font);
+    color: var(--ink-faint);
+    overflow-wrap: anywhere;
+  }
+  /* Zwarte przyciski przy prawej krawędzi (cel dotyku ≥ 44 px), bez rozciągania. */
+  #txTable td.akcje {
+    grid-column: 3; grid-row: 4;
+    justify-self: end;
+    align-self: center;
+    display: flex; gap: 2px;
+  }
+  #txTable td.akcje .btn {
+    min-width: 44px; min-height: 44px;
+    padding: 0 var(--space-2);
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--accent);
+    font-size: var(--fs-cap);
+  }
+  #txTable td.akcje .btn:hover { background: var(--accent-quiet); }
+
+  #txTable td.edycja { grid-column: 1 / -1; grid-row: auto; margin: -13px -14px; }
   #txTable td.edycja input, #txTable td.edycja select, #txTable td.edycja .btn { min-height: 44px; }
 }

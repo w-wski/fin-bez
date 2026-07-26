@@ -1,0 +1,72 @@
+/* Styl widoku „Wpis" — rdzeń aplikacji: transakcja w ≤3 kliknięcia.
+   Kierunek „Tafla": kwota mieszka na osobnej, mocniej kryjącej tafli i jako jedyne
+   pole formularza dostaje BLASK (warstwa ::before z --glow, animowana wyłącznie
+   opacity — §4.1 briefu). Kolory wyłącznie z tokenów w styles.css. */
+
+/* ---------- Księga: segment zamiast listy ---------- */
+#ledgerSeg[hidden] { display: none; }        /* jedna księga w zasięgu — segment nic nie wnosi */
+#ledgerSeg button { font-size: var(--fs-cap); letter-spacing: .04em; }
+
+/* ---------- Tafla kwoty ---------- */
+.amount-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-lg);
+  background: var(--glass-fill-strong);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+}
+/* Halo kwoty jest odrobinę szersze niż przy zwykłym polu — to największa tafla formularza. */
+.amount-card.field::before { inset: -10px; }
+/* Rant tafli jaśnieje razem z blaskiem: informacja „tu jest kursor" nie zależy od
+   samego halo (wyłączone rozmycie ani forced-colors jej nie odbierają). */
+.amount-card.field:has(:focus-visible) { border-color: var(--glow-rim); }
+
+.amount-card > .fld { gap: var(--space-2); }
+.amount-line { display: flex; align-items: baseline; gap: var(--space-2); }
+
+/* Wysokość 48 px (min-height + padding): każdy cel dotykowy w formularzu ≥ 44 px. */
+input#amount {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  font: 600 var(--num-xl)/1.05 var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  caret-color: var(--accent);
+}
+input#amount:hover { border: 0; }
+input#amount:focus-visible { outline: none; }   /* blask + jaśniejszy rant tafli niosą stan */
+/* Podpowiedź nie może udawać wpisanej kwoty — wartość jest wielka, podpowiedź cicha. */
+input#amount::placeholder { color: var(--ink-faint); font-weight: 400; font-size: var(--fs-body-lg); }
+
+.amount-cur { flex: none; font: 500 var(--fs-h3)/1 var(--mono); color: var(--ink-faint); }
+.amount-hint { font: 400 var(--fs-micro)/1.35 var(--font); color: var(--ink-faint); }
+
+/* ---------- Opis ---------- */
+#desc { min-height: 92px; }
+/* Licznik znaków siedzi w linii etykiety (styles.css: .fld-head em) — bez własnego wiersza. */
+
+/* ---------- Zapis ---------- */
+/* Offline przycisk mówi prawdę: wpis pójdzie do kolejki, a nie „zapisze się". */
+#txSave.offline {
+  background: var(--tint-warn);
+  border-color: var(--warn);
+  color: var(--warn);
+  box-shadow: inset 0 1px 0 var(--glass-rim);
+}
+
+@media (min-width: 641px) {
+  /* Data i kategoria obok siebie — na szerokim ekranie formularz nie musi być kolumną. */
+  #view-wpis .card { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  #view-wpis .card > #catAddBox,
+  #view-wpis .card > .fld:last-child { grid-column: 1 / -1; }
+}

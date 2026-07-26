@@ -1,0 +1,138 @@
+/* Styl widoku „Raporty" — kierunek „Tafla".
+   Zakres: kafle KPI (#kpi, także sekcja „Konto Bartusia"), wydatki wg kategorii ze
+   słupkami (#byCat), trend 6 miesięcy, sekcje admina (#fvp, #telemetria).
+   Kolory wyłącznie z tokenów w styles.css — oba motywy bez osobnych reguł. */
+
+/* Okres: pigułki (styles.css: .chips) + pola daty pod nimi. */
+.rap-okres > * { flex: 1 1 9rem; min-width: 8rem; }
+
+/* ---------- Kafle KPI ----------
+   `column-reverse` odwraca kolejność w malowaniu (etykieta na górze, liczba pod nią)
+   bez ruszania kolejności w DOM — czytnik ekranu nadal czyta „wartość, etykieta". */
+.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); }
+.kpi .tile {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-md);
+  background: var(--glass-fill);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+}
+.kpi .tile b {
+  font: 600 var(--num-lg)/1.1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
+}
+.kpi .tile span { color: var(--ink-muted); font: 500 var(--fs-micro)/1.25 var(--font); overflow-wrap: break-word; }
+
+/* ---------- Wydatki wg kategorii ----------
+   Jedna tafla, w niej wiersze. Nazwa i kwota w pierwszej linii, słupek i udział
+   w drugiej — na 390 px nic się nie ucina i liczby zostają w kolumnie. */
+.bary {
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-md);
+  background: var(--glass-fill);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+  overflow: hidden;
+}
+.bary .barrow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px var(--space-3);
+  align-items: baseline;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.bary .barrow:last-child { border-bottom: 0; }
+.barrow .bname {
+  display: flex; align-items: center; gap: 7px;
+  min-width: 0;
+  font: 500 var(--fs-cap)/1.3 var(--font);
+  overflow-wrap: anywhere;
+}
+.barrow .bval {
+  font: 600 var(--num-md)/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.barrow .btrack {
+  grid-column: 1;
+  display: block;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--glass-fill-sunken);
+  box-shadow: inset 0 1px 1px oklch(0.3 0.03 265 / .10);
+  overflow: hidden;
+}
+/* Słupek: barwa kategorii zmieszana z wypełnieniem tafli, żeby brzydki hex użytkownika
+   nie krzyczał; bez koloru — spokojny akcent. Szerokość ustawia raporty.js inline
+   (wartość zmienia się po danych, nie w animacji — §4.3 briefu). */
+.barrow .bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--cat-c, var(--accent)) 72%, var(--glass-fill));
+}
+.barrow .bpct {
+  font: 500 var(--fs-micro)/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+  min-width: 46px;
+  text-align: right;
+  white-space: nowrap;
+}
+/* Kropka koloru kategorii — rant ratuje biel i czerń użytkownika na tafli. */
+.barrow .catdot {
+  width: 9px; height: 9px;
+  flex: none;
+  border-radius: 3px;
+  background: var(--cat-c, transparent);
+  outline: 1px solid var(--glass-edge);
+}
+.barrow .catdot.pusta { background: none; border: 1.5px solid var(--line-strong); outline: 0; }
+
+/* ---------- Trend i tabele sekcji (transfery, Bartuś, najem, admin) ----------
+   Tekst nigdy nie leży na samym gradiencie: każda tabela dokładana z JS dostaje
+   własną taflę, tak samo jak tabela w .overflow. Kontrast liczony dla najgorszego
+   punktu tafli, stąd krycie --glass-fill, nie 30 %. */
+#view-raporty table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-md);
+  background: var(--glass-fill);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+  overflow: hidden;
+}
+/* W .overflow taflą jest kontener (przewija się w poziomie) — tabela w środku jest naga. */
+#view-raporty .overflow table { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+
+#trend td, #fvp td, #telemetria td, #transfery td, #bartus td, #najem td {
+  font: 500 var(--fs-cap)/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+#trend td:first-child, #fvp td:first-child, #telemetria td:first-child { color: var(--ink-muted); }
+#trend td.inc { color: var(--plus); } #trend td.exp { color: var(--minus); }
+
+#fvp, #telemetria, #transfery, #bartus, #najem { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* Puste bloki mówią „—", nie milczą (checklista stanów: dane / brak danych / …). */
+#kpi:empty::before, #byCat:empty::before {
+  content: "— brak danych w\00a0tym zakresie";
+  display: block;
+  padding: var(--space-5) var(--space-4);
+  color: var(--ink-muted);
+  font-size: var(--fs-cap);
+}
+#byCat:empty { border-style: dashed; }
+
+@media (max-width: 390px) {
+  .kpi { grid-template-columns: 1fr 1fr; }        /* dwa kafle w rzędzie także na 320 px */
+  .kpi .tile b { font-size: var(--num-md); }
+}

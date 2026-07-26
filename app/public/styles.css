@@ -1,8 +1,24 @@
 /* ============================================================================
-   finansowa — tokeny systemu „Szkło" + komponenty WSPÓLNE (wiele widoków).
-   Styl pojedynczego widoku mieszka w css/<widok>.css (scena logowania:
-   css/logowanie.css). Źródło prawdy designu: repo finansowe,
-   docs/design/DESIGN-SPEC-GLASS.md. Komponenty nie znają wartości — tokeny.
+   finansowa — kierunek wizualny „TAFLA": tokeny + komponenty WSPÓLNE.
+
+   Jedna kolorowa tafla światła pod spodem, wszystko nad nią z mlecznego szkła.
+   Hierarchię buduje STOPIEŃ KRYCIA, nie kolor: tło jest gradientem, powierzchnie
+   są półprzezroczyste, a element, który właśnie edytujesz, ŚWIECI (halo + jaśniejsza
+   krawędź). Cztery warstwy szkła:
+     1. Tafla   — cztery statyczne radial-gradient na --bg-1…4 (body::before, 0 KB).
+     2. Wypełnienie — --glass-fill (60/55 %) na kartach i polach, --glass-fill-strong
+        (82/80 %) tam, gdzie tekst leży nad przewijaną treścią (chrome).
+     3. Rant    — 1 px --glass-edge na zewnątrz + inset 0 1px 0 --glass-rim u góry.
+        Ten drugi daje wrażenie grubości tafli i jest darmowy (cień, nie filtr).
+     4. Blask edycji — warstwa ::before z radialnym --glow; animowana WYŁĄCZNIE
+        opacity (160 ms), więc §4 briefu zostaje spełnione.
+
+   BUDŻET ROZMYCIA (§4.2 briefu): backdrop-filter tylko na 4 małych powierzchniach
+   chrome — header, nav, .toast, .sheet. Karty, wiersze i pola NIE MAJĄ filtra;
+   wrażenie szkła robi krycie + rant. Lista 300 wierszy to zero filtrów.
+
+   Styl pojedynczego widoku mieszka w css/<widok>.css. Scena logowania
+   (css/logowanie.css) została NIETKNIĘTA — jej tokeny odtwarzamy w §4 niżej.
    ========================================================================== */
 /* Typografia: JEDEN krój — SF Pro wszędzie. Sprzęt Apple bierze systemowy SF
    (-apple-system stoi PIERWSZY w stacku, więc webfont się tam nawet nie pobiera);
@@ -10,8 +26,7 @@
    ~55 KB każda). Pliki woff2 leżą WYŁĄCZNIE na serwerze produkcyjnym, poza gitem —
    kroje są własnością Apple i nie podlegają redystrybucji w repo; wgrywa je Szymon
    (RUNBOOK). Brak plików niczego nie psuje: font-display swap + fallback w stacku.
-   Wagi: 400/500/600 = SF Pro Text, 700 = SF Pro Display Bold (tytuły).
-   Instrument Serif wycofany z użycia. */
+   Wagi: 400/500/600 = SF Pro Text, 700 = SF Pro Display Bold (tytuły). */
 @font-face { font-family: 'SF Pro'; src: url('fonts/sf-pro-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'SF Pro'; src: url('fonts/sf-pro-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
 @font-face { font-family: 'SF Pro'; src: url('fonts/sf-pro-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
@@ -22,36 +37,44 @@
   --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
 
-  --r-sm: 8px; --r-md: 12px; --r-lg: 20px; --r-pill: 999px;
+  /* Promienie tafli: 10/16/24/32 zamiast 6/10/16 z wersji papierowej. */
+  --r-sm: 10px; --r-md: 16px; --r-lg: 24px; --r-xl: 32px; --r-pill: 999px;
 
-  --font: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif; /* SF Pro z serwera NA KAŻDEJ platformie (Szymon 07-25) */
-  /* Display = ten sam krój, inna waga i tracking (tokeny niżej) — Apple-like, nie para krojów. */
+  --font: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
+  /* Display = ten sam krój, inna waga i tracking — Apple-like, nie para krojów. */
   --font-display: var(--font);
+  /* Liczby, daty i znaki typu (− + ⇄) też idą SF Pro — na serwerze leżą subsety
+     WYŁĄCZNIE SF Pro (sf-pro-400…700.woff2), SF Mono nie ma i nie będzie. Kolumnę
+     kwot trzyma `font-variant-numeric: tabular-nums` (§8 briefu: wszystkie liczby
+     w cyfrach tabelarycznych), a nie drugi krój — „jeden krój wszędzie" zostaje.
+     Token zostaje pod nazwą --mono, bo tak nazywa go projekt i widoki go czytają. */
+  --mono: var(--font);
   --track-display: -0.022em;
 
-  /* Skala 1,25 (tercja wielka) od 16 px — max 5 rozmiarów na ekran. */
+  /* Skala typograficzna kierunku (px — układ telefonu jest ciasny i przewidywalny). */
+  --fs-micro: 11.5px;   /* meta, etykiety wersalikowe */
+  --fs-cap: 13px;       /* podpisy, opisy wierszy */
+  --fs-body: 15px;      /* tekst wewnątrz kart */
+  --fs-body-lg: 17px;   /* tytuły widoku, pola formularza */
+  --fs-h3: 20px;
+  --fs-h2: 24px;
+  --num-md: 17px;       /* kwota w wierszu */
+  --num-lg: 22px;       /* kwota wiodąca, KPI */
+  --num-xl: 36px;       /* pole kwoty we Wpisie */
+
+  /* Nazwy historyczne — używa ich css/logowanie.css. NIE USUWAĆ. */
   --text-xs: .72rem;
   --text-sm: .875rem;
   --text-base: 1rem;
   --text-md: 1.25rem;
   --text-display: clamp(2rem, 5vw + 1rem, 2.6rem);
 
-  /* Stos szkła: dwa przeciwstawne rozświetlenia (bevel) + ostry rant + cień pod spodem.
-     Odpowiednik warstw z przepisu Apo, ale jako jeden box-shadow — bez mnożenia elementów. */
-  --glass-stack:
-    inset 2px -1px 5px -1px var(--glass-rim-a),
-    inset -4px 4px 12px -3px var(--glass-rim-b),
-    inset 0 0 0 .5px var(--glass-hairline),
-    0 4px 22px -10px var(--glass-drop),
-    0 1px 2px -1px var(--glass-drop);
-  --glass-blur: blur(16px) saturate(1.8);
+  /* Rozmycie: towar deficytowy. Budżet = 4 powierzchnie chrome na ekran. */
+  --blur-chrome: blur(24px) saturate(150%);
+  --blur-field: blur(14px) saturate(130%);
 
-  /* Ziarno: ledwo wyczuwalna faktura papieru — jedyna tekstura tła. Kraciasty splot
-     (repeating-linear-gradient 45°/-45°) WYCOFANY: na ekranie czytał się jak tkanina
-     obrusu, nie jak powierzchnia. Soczewka ma co załamywać: ziarno + plamy barwne. */
+  /* Ziarno + „papier" — scena LOGOWANIA (css/logowanie.css). Wnętrze ma taflę. */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-  /* Tło sceny: trzy wielkie, miękkie plamy pastelu (szałwia / róż / niebo) na ciepłej
-     bieli + ziarno. Barwy z referencji kitu szkła; natężenie per motyw (tokeny --wash-*). */
   --paper:
     radial-gradient(58rem 42rem at 10% -8%,  var(--wash-a), transparent 62%),
     radial-gradient(52rem 38rem at 108% 14%, var(--wash-b), transparent 60%),
@@ -61,89 +84,131 @@
   --ease-glass: cubic-bezier(.22, 1, .36, 1);
   --ease-soft: cubic-bezier(.4, 0, .2, 1);
   --t-fast: 150ms; --t-base: 240ms; --t-slow: 380ms;
-
+  --t-glow: 160ms;                     /* blask pola — jedyna animowana opacity */
 }
 
-/* ---------- 2. Motyw jasny (kotwica z referencji: ciepła pudrowa biel) ---------- */
+/* ---------- 2. Motyw jasny — „tafla dzienna" ---------- */
 :root, :root[data-theme="light"] {
-  --bg:        oklch(97.5% 0.008 40);
-  --bg-sunk:   oklch(95.5% 0.010 40);
-  --surface:   oklch(99.2% 0.004 40);
-  --fg:        oklch(24% 0.012 40);
-  --muted:     oklch(52% 0.010 40);
-  --line:        oklch(89% 0.008 40);   /* włoskowate linie dekoracyjne */
-  --line-strong: oklch(62% 0.014 40);   /* granice kontrolek — 3.4:1 na --bg */
-  --line-soft:   oklch(93% 0.007 40);
+  --bg:        oklch(0.975 0.008 250);
+  --bg-1:      oklch(0.90 0.070 255 / 0.85);   /* błękit — plama górna lewa */
+  --bg-2:      oklch(0.92 0.060 330 / 0.75);   /* róż — plama górna prawa */
+  --bg-3:      oklch(0.93 0.055 175 / 0.70);   /* mięta — plama dolna */
+  --bg-4:      oklch(0.97 0.030 60 / 0.55);    /* ciepły refleks */
 
-  /* Akcent: głęboka szałwia z referencji (aktywny segment kitu szkła) — nie niebieski. */
-  --accent:    oklch(50% 0.055 165);
-  --accent-fg: oklch(99% 0 0);
-  --accent-soft: oklch(50% 0.055 165 / .14);   /* podświetlenie zaznaczenia/fokusu */
+  --glass-fill:        oklch(1 0 0 / 0.60);
+  --glass-fill-strong: oklch(1 0 0 / 0.82);
+  --glass-fill-sunken: oklch(0.93 0.012 250 / 0.42);
+  --glass-rim:         oklch(1 0 0 / 0.80);
+  --glass-edge:        oklch(0.50 0.030 260 / 0.22);
+  --glass-edge-strong: oklch(0.42 0.035 260 / 0.34);
+  --glass-shadow: 0 1px 2px oklch(0.35 0.04 265 / 0.10), 0 10px 28px oklch(0.35 0.05 265 / 0.10);
 
-  /* Plamy tła (jasny: pastele czytelne, ale spokojne) */
-  --wash-a: oklch(93% 0.030 165 / .55);   /* szałwia */
-  --wash-b: oklch(94% 0.026 25 / .50);    /* róż pudrowy */
-  --wash-c: oklch(93% 0.024 250 / .34);   /* niebo */
+  --glow:     oklch(0.70 0.170 255 / 0.50);
+  --glow-rim: oklch(0.62 0.150 255 / 0.85);
+  --overlay:  oklch(0.30 0.03 265 / 0.30);
 
-  --glass-bg:     oklch(99% 0.004 40 / .62);
-  --glass-tint:   oklch(99% 0.004 40 / .10);
-  --glass-rim:    oklch(100% 0 0 / .9);
-  --glass-edge:   oklch(24% 0.012 40 / .10);
-  --glass-shadow: oklch(24% 0.012 40 / .16);
-  --glass-hi:     oklch(100% 0 0 / .30);
+  --ink:           oklch(0.255 0.022 265);
+  --ink-muted:     oklch(0.455 0.022 265);
+  --ink-faint:     oklch(0.575 0.020 265);
+  --ink-on-accent: oklch(0.99 0.004 250);
+
+  --line:        oklch(0.50 0.03 260 / 0.16);
+  --line-strong: oklch(0.44 0.035 260 / 0.36);
+
+  --focus:         oklch(0.520 0.170 255);
+  --accent:        oklch(0.480 0.135 255);
+  --accent-strong: oklch(0.395 0.145 255);
+  --accent-quiet:  oklch(0.55 0.15 255 / 0.14);
+
+  --minus:  oklch(0.470 0.150 27);
+  --plus:   oklch(0.425 0.110 155);
+  --flow:   oklch(0.450 0.050 265);
+  --warn:   oklch(0.480 0.125 70);
+  --danger: oklch(0.465 0.170 22);
+  --tint-minus: oklch(0.60 0.16 27 / 0.12);
+  --tint-plus:  oklch(0.58 0.13 155 / 0.14);
+  --tint-warn:  oklch(0.68 0.14 70 / 0.18);
+
+  /* Tokeny sceny logowania — barwy „papieru" i soczewki (css/logowanie.css). */
+  --wash-a: oklch(93% 0.030 165 / .55);
+  --wash-b: oklch(94% 0.026 25 / .50);
+  --wash-c: oklch(93% 0.024 250 / .34);
+  --glass-tint:    oklch(99% 0.004 40 / .10);
+  --glass-hi:      oklch(100% 0 0 / .30);
   --glass-horizon: oklch(30% 0.05 280 / .30);
-  --glass-fill:    oklch(100% 0 0 / .10);
   --glass-rim-a:   oklch(100% 0 0 / .55);
   --glass-rim-b:   oklch(100% 0 0 / .85);
   --glass-hairline: oklch(100% 0 0 / .70);
   --glass-drop:    oklch(24% 0.012 40 / .28);
-  --iris:          0;                      /* tęczowy rant WYCOFANY — Apple-like = wstrzemięźliwość */
+  --iris:          0;
   --caustic:      oklch(48% 0.27 268);
   --caustic-hot:  oklch(66% 0.21 243);
   --caustic-far:  oklch(52% 0.22 275 / .35);
 
-  --income:  oklch(46% 0.11 155);
-  --expense: oklch(48% 0.15 25);
-  --transfer: oklch(46% 0.09 250);   /* przesunięcie własnych pieniędzy — neutralne, nie ± */
-
   /* Aliasy zgodności: css/<widok>.css używa historycznych nazw. */
-  --card: var(--surface);
+  --fg: var(--ink);
+  --muted: var(--ink-muted);
+  --surface: var(--glass-fill-strong);
+  --bg-sunk: var(--glass-fill-sunken);
+  --line-soft: var(--line);
+  --card: var(--glass-fill);
   --primary: var(--accent);
-  --primary-fg: var(--accent-fg);
-  --bar:     oklch(72% 0.090 220);
-  --danger:  oklch(48% 0.15 25);
+  --primary-fg: var(--ink-on-accent);
+  --income: var(--plus);
+  --expense: var(--minus);
+  --transfer: var(--flow);
+  --bar: var(--accent);
   color-scheme: light;
 }
 
-/* ---------- 3. Motyw ciemny (osobna scena, nie przyciemniony jasny) ---------- */
+/* ---------- 3. Motyw ciemny — „tafla nocna" (osobna scena, nie inwersja) ---------- */
 :root[data-theme="dark"] {
-  --bg:        oklch(17% 0.010 265);
-  --bg-sunk:   oklch(14% 0.010 265);
-  --surface:   oklch(21% 0.012 265);
-  --fg:        oklch(94% 0.006 265);
-  --muted:     oklch(69% 0.012 265);
-  --line:        oklch(30% 0.012 265);
-  --line-strong: oklch(56% 0.014 265);  /* granice kontrolek — 3.4:1 na --bg */
-  --line-soft:   oklch(25% 0.012 265);
+  --bg:        oklch(0.155 0.020 275);
+  --bg-1:      oklch(0.36 0.120 275 / 0.80);
+  --bg-2:      oklch(0.32 0.100 330 / 0.62);
+  --bg-3:      oklch(0.30 0.090 200 / 0.58);
+  --bg-4:      oklch(0.28 0.060 60 / 0.40);
 
-  --accent:    oklch(76% 0.075 165);
-  --accent-fg: oklch(16% 0.02 265);
-  --accent-soft: oklch(76% 0.075 165 / .16);
+  --glass-fill:        oklch(0.32 0.022 275 / 0.55);
+  --glass-fill-strong: oklch(0.28 0.020 275 / 0.80);
+  --glass-fill-sunken: oklch(0.18 0.018 275 / 0.55);
+  --glass-rim:         oklch(1 0 0 / 0.18);
+  --glass-edge:        oklch(0.80 0.030 275 / 0.20);
+  --glass-edge-strong: oklch(0.86 0.035 275 / 0.34);
+  --glass-shadow: 0 1px 2px oklch(0.08 0.01 275 / 0.55), 0 14px 34px oklch(0.06 0.01 275 / 0.55);
 
-  /* Plamy tła (ciemny: te same barwy, śladowe natężenie — scena, nie dyskoteka) */
+  --glow:     oklch(0.82 0.150 255 / 0.42);
+  --glow-rim: oklch(0.86 0.130 255 / 0.90);
+  --overlay:  oklch(0.08 0.01 275 / 0.55);
+
+  --ink:           oklch(0.960 0.008 250);
+  --ink-muted:     oklch(0.790 0.012 265);
+  --ink-faint:     oklch(0.665 0.014 265);
+  --ink-on-accent: oklch(0.16 0.02 275);
+
+  --line:        oklch(0.85 0.03 275 / 0.14);
+  --line-strong: oklch(0.88 0.03 275 / 0.34);
+
+  --focus:         oklch(0.840 0.130 255);
+  --accent:        oklch(0.800 0.120 255);
+  --accent-strong: oklch(0.880 0.100 255);
+  --accent-quiet:  oklch(0.80 0.12 255 / 0.20);
+
+  --minus:  oklch(0.775 0.140 32);
+  --plus:   oklch(0.805 0.130 158);
+  --flow:   oklch(0.775 0.030 275);
+  --warn:   oklch(0.830 0.130 78);
+  --danger: oklch(0.765 0.150 25);
+  --tint-minus: oklch(0.70 0.15 27 / 0.20);
+  --tint-plus:  oklch(0.72 0.13 155 / 0.20);
+  --tint-warn:  oklch(0.78 0.14 70 / 0.22);
+
   --wash-a: oklch(40% 0.045 165 / .20);
   --wash-b: oklch(38% 0.040 25 / .16);
   --wash-c: oklch(40% 0.045 250 / .14);
-
-  /* Szkło na ciemnym: korpus ciemnieje, rant jaśnieje, cień ustępuje poświacie. */
-  --glass-bg:     oklch(70% 0.02 265 / .14);
-  --glass-tint:   oklch(80% 0.02 265 / .07);
-  --glass-rim:    oklch(100% 0 0 / .44);
-  --glass-edge:   oklch(100% 0 0 / .10);
-  --glass-shadow: oklch(0% 0 0 / .48);
-  --glass-hi:     oklch(100% 0 0 / .19);
+  --glass-tint:    oklch(80% 0.02 265 / .07);
+  --glass-hi:      oklch(100% 0 0 / .19);
   --glass-horizon: oklch(72% 0.05 250 / .26);
-  --glass-fill:    oklch(100% 0 0 / .05);
   --glass-rim-a:   oklch(100% 0 0 / .22);
   --glass-rim-b:   oklch(100% 0 0 / .18);
   --glass-hairline: oklch(100% 0 0 / .26);
@@ -152,40 +217,108 @@
   --caustic:      oklch(62% 0.24 258);
   --caustic-hot:  oklch(80% 0.18 232);
   --caustic-far:  oklch(60% 0.20 268 / .35);
-
-  --income:  oklch(76% 0.13 155);
-  --expense: oklch(72% 0.15 25);
-  --transfer: oklch(74% 0.09 250);
-  --bar:     oklch(58% 0.100 220);
-  --danger:  oklch(72% 0.15 25);
   color-scheme: dark;
 }
 
-/* ---------- 4. Podstawy ---------- */
+/* ---------- 4. Scena logowania zostaje NIETKNIĘTA ----------
+   „Okno logowania jest zrobione dobrze" (Szymon, 07-26) — nowy system szkła nie ma
+   go dotykać. css/logowanie.css nie zmienił się ani o znak; tutaj przywracamy mu
+   dokładnie te wartości tokenów, które miał przed wprowadzeniem tafli. Zakres
+   ograniczony do ekranu logowania, więc wnętrze aplikacji ich nie widzi. */
+body[data-view="login"], #view-login {
+  --bg:        oklch(97.5% 0.008 40);
+  --bg-sunk:   oklch(95.5% 0.010 40);
+  --surface:   oklch(99.2% 0.004 40);
+  --fg:        oklch(24% 0.012 40);
+  --muted:     oklch(52% 0.010 40);
+  --line:        oklch(89% 0.008 40);
+  --line-strong: oklch(62% 0.014 40);
+  --line-soft:   oklch(93% 0.007 40);
+  --glass-rim:    oklch(100% 0 0 / .9);
+  --glass-edge:   oklch(24% 0.012 40 / .10);
+  --glass-shadow: oklch(24% 0.012 40 / .16);
+}
+:root[data-theme="dark"] body[data-view="login"],
+:root[data-theme="dark"] #view-login {
+  --bg:        oklch(17% 0.010 265);
+  --bg-sunk:   oklch(14% 0.010 265);
+  --surface:   oklch(21% 0.012 265);
+  --fg:        oklch(94% 0.006 265);
+  --muted:     oklch(69% 0.012 265);
+  --line:        oklch(30% 0.012 265);
+  --line-strong: oklch(56% 0.014 265);
+  --line-soft:   oklch(25% 0.012 265);
+  --glass-rim:    oklch(100% 0 0 / .44);
+  --glass-edge:   oklch(100% 0 0 / .10);
+  --glass-shadow: oklch(0% 0 0 / .48);
+}
+
+/* ---------- 5. Podstawy i TAFLA ---------- */
 * { box-sizing: border-box; }
 
 html, body { min-height: 100%; }
 
 body {
   margin: 0;
-  font: 400 16px/1.5 var(--font);
+  font: 400 var(--fs-body-lg)/1.5 var(--font);
   background-color: var(--bg);
-  background-image: var(--paper);
-  background-attachment: fixed;
-  color: var(--fg);
+  color: var(--ink);
   -webkit-font-smoothing: antialiased;
-  transition: background-color var(--t-base) var(--ease-soft), color var(--t-base) var(--ease-soft);
   overflow-x: hidden;
 }
+
+/* Tafla: cztery statyczne radial-gradient, jedno malowanie, zero obrazów, 0 KB.
+   Warstwa jest `position: fixed` — NIE `background-attachment: fixed` (§4.4 briefu:
+   osobna, wolna ścieżka rysowania na iOS). Nic jej nie animuje. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(90% 60% at 12% 0%,   var(--bg-1) 0%, transparent 62%),
+    radial-gradient(80% 55% at 92% 6%,   var(--bg-2) 0%, transparent 60%),
+    radial-gradient(100% 60% at 50% 100%, var(--bg-3) 0%, transparent 58%),
+    radial-gradient(70% 40% at 80% 62%,  var(--bg-4) 0%, transparent 60%);
+  background-repeat: no-repeat;
+}
+/* Na ekranie logowania tafli nie ma — tam scena maluje własny „papier". */
+body[data-view="login"]::before { background: var(--paper); }
 
 :where(h1, h2, h3) { font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
 p { text-wrap: pretty; max-width: 65ch; }
 
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Blask NIE JEST jedynym sygnałem: pole w edycji ma halo ORAZ pierścień fokusu. */
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-::selection { background: color-mix(in oklch, var(--accent) 28%, transparent); }
+::selection { background: var(--accent-quiet); }
 
-/* ---------- 5. Nagłówek i nawigacja (jedna z nielicznych warstw ze szkłem) ---------- */
+/* ---------- 6. Blask pola w edycji (warstwa 4 tafli) ----------
+   Animujemy WYŁĄCZNIE opacity osobnej warstwy — nigdy box-shadow ani filter (§4.1).
+   `will-change` celowo NIE występuje: brief pozwala na nie tylko na czas animacji,
+   a 160 ms przejścia opacity nie potrzebuje promocji warstwy. */
+.field { position: relative; isolation: isolate; }
+.field::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(70% 130% at 50% 0%, var(--glow) 0%, transparent 72%);
+  opacity: 0;
+  transition: opacity var(--t-glow) ease-out;
+}
+.field:has(:focus-visible)::before,
+.field.is-glowing::before { opacity: 1; }
+.field:has(:focus-visible) > input,
+.field:has(:focus-visible) > select,
+.field:has(:focus-visible) > textarea,
+.field:has(:focus-visible) .fld-input { border-color: var(--glow-rim); }
+@media (prefers-reduced-motion: reduce) { .field::before { transition: none; } }
+
+/* ---------- 7. Chrome 1/4: nagłówek ---------- */
 header {
   position: sticky;
   top: 0;
@@ -193,136 +326,172 @@ header {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  flex-wrap: wrap;
-  padding: var(--space-3) var(--space-5);
-  background: var(--glass-fill);
-  border-bottom: 1px solid var(--line-soft);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 -1px 0 var(--glass-hairline), 0 6px 24px -18px var(--glass-drop);
+  padding: calc(var(--space-2) + env(safe-area-inset-top, 0px)) var(--space-5) var(--space-3);
+  background: var(--glass-fill-strong);
+  border-bottom: 1px solid var(--glass-edge);
+  backdrop-filter: var(--blur-chrome);
+  -webkit-backdrop-filter: var(--blur-chrome);
+}
+/* Awaryjne wyłączenie rozmycia (stary WebKit, tryb oszczędzania): układ i kontrast
+   trzymają się bez niego — dokładamy tyle krycia, ile filtr dawał „na oko". */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  header, nav, .toast, .sheet { background: color-mix(in oklab, var(--glass-fill-strong) 100%, var(--bg) 18%); }
 }
 
-header h1 {
-  font-family: var(--font-display);
-  font-size: var(--text-md);
-  font-weight: 700;
+.head-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+#viewTitle {
   margin: 0;
-  letter-spacing: var(--track-display);
+  font: 600 var(--fs-body-lg)/1.2 var(--font-display);
+  letter-spacing: -0.015em;
+  overflow-wrap: break-word;
 }
+#who { font: 400 var(--fs-micro)/1.2 var(--font); color: var(--ink-faint); }
+/* Tytuł widoku niesie „gdzie jestem" z nagłówka — sekcje nie powtarzają go w treści. */
+.page-title { display: none; }
 
-#who { color: var(--muted); font-size: var(--text-xs); }
-
-/* Nawigacja = szklana pigułka jak segment kitu z referencji (nie luźne guziki):
-   jedna tafla, w niej zakładki, aktywna wypełniona szałwią. */
+/* ---------- 8. Chrome 2/4: nawigacja (pasek zakładek u dołu) ----------
+   Telefon to urządzenie pierwsze (§1 briefu): nawigacja siedzi pod kciukiem, nie pod
+   powiekami. Na szerokim ekranie ten sam pasek zwęża się do pływającej pigułki. */
 nav {
-  display: flex;
-  gap: 2px;
-  flex-wrap: wrap;
-  padding: 3px;
-  background: var(--glass-fill);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-pill);
-  box-shadow: inset 0 0 0 .5px var(--glass-hairline), inset 0 1px 2px var(--glass-drop);
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  background: var(--glass-fill-strong);
+  border-top: 1px solid var(--glass-edge);
+  backdrop-filter: var(--blur-chrome);
+  -webkit-backdrop-filter: var(--blur-chrome);
 }
+nav[hidden] { display: none; }
 
 nav button {
-  position: relative;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 var(--space-1);
   border: 1px solid transparent;
+  border-radius: var(--r-md);
   background: transparent;
-  color: var(--muted);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--r-pill);
+  color: var(--ink-muted);
+  font: 600 var(--fs-micro)/1 var(--font);
   cursor: pointer;
-  font: inherit;
-  font-size: var(--text-sm);
-  min-height: 36px;
+  -webkit-tap-highlight-color: transparent;
   transition: color var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
 }
-nav button:hover { color: var(--fg); background: var(--accent-soft); }
-/* Aktywna karta: wypełniona głęboką szałwią jak segment z referencji —
-   „gdzie jestem" widać od razu, przyjemnie, bez ramek i cieni. */
+nav button .nav-i { font: 600 var(--fs-body-lg)/1 var(--mono); }
+nav button:hover { color: var(--ink); }
+/* Aktywna zakładka: mleczna tafla o mocniejszym kryciu + rant. Kolor NIE jest
+   jedynym nośnikiem — wypełnienie i rant niosą stan tak samo. */
 nav button.active {
-  color: var(--accent-fg);
-  background: var(--accent);
-  font-weight: 600;
-  box-shadow: 0 2px 10px -6px var(--glass-drop);
+  color: var(--accent);
+  background: var(--glass-fill-strong);
+  border-color: var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-rim);
 }
 
+/* ---------- 9. Chrome 3/4: arkusz „Więcej" ---------- */
+.sheet-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: var(--overlay);
+}
+.sheet-wrap[hidden] { display: none; }
+.sheet-scrim { flex: 1; border: 0; background: transparent; cursor: pointer; }
+.sheet {
+  padding: var(--space-3) var(--space-3) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background: var(--glass-fill-strong);
+  border-top: 1px solid var(--glass-edge-strong);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+  backdrop-filter: var(--blur-chrome);
+  -webkit-backdrop-filter: var(--blur-chrome);
+  animation: sheet-in var(--t-base) var(--ease-glass);
+}
+@keyframes sheet-in { from { transform: translateY(12px); opacity: 0; } }
+.sheet-grip { width: 44px; height: 4px; border-radius: var(--r-pill); background: var(--line-strong); margin: 0 auto var(--space-2); }
+.sheet-item {
+  min-height: 52px;
+  text-align: left;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font: 500 var(--fs-body-lg)/1 var(--font);
+  cursor: pointer;
+}
+.sheet-item:hover { background: var(--accent-quiet); }
+.sheet-item.quiet { color: var(--ink-muted); font-size: var(--fs-body); }
+.sheet-item[hidden] { display: none; }
+.sheet-sep { height: 1px; background: var(--line); margin: var(--space-1) 0; }
+
+/* ---------- 10. Scena ---------- */
 main {
   max-width: 660px;
-  margin: var(--space-6) auto var(--space-8);
-  padding: 0 var(--space-5);
+  /* Dolny margines robi miejsce paskowi zakładek — treść nigdy nie chowa się pod szkłem. */
+  margin: var(--space-5) auto calc(112px + env(safe-area-inset-bottom, 0px));
+  padding: 0 var(--space-4);
 }
-
-/* Wielki tytuł widoku (iOS large title): mocny, ciasny, na scenie — nie w karcie.
-   To on niesie „gdzie jestem"; nagłówki h2 w kartach zostają cichymi etykietami. */
-.page-title {
-  font-family: var(--font-display);
-  font-size: clamp(1.75rem, 2.6vw + .8rem, 2.15rem);
-  font-weight: 700;
-  letter-spacing: var(--track-display);
-  line-height: 1.15;
-  text-wrap: balance;
-  margin: 0 0 var(--space-4);
-}
-/* Widoki danych są tabelaryczne — na szerokim ekranie dostają szerszą scenę niż
-   formularz Wpisu (660 px dusiło 7 kolumn Historii niezależnie od stylów tabeli). */
+/* Widoki danych są tabelaryczne — na szerokim ekranie dostają szerszą scenę. */
 body:has(#view-historia:not([hidden])) main,
 body:has(#view-import:not([hidden])) main,
 body:has(#view-raporty:not([hidden])) main,
 body:has(#view-przydzial:not([hidden])) main,
 body:has(#view-admin:not([hidden])) main { max-width: 1080px; }
+body[data-view="login"] main { margin: 0; padding: 0; max-width: none; }
 
-/* `both` zostawiłoby sekcję na zawsze w stanie animowanej opacity — a element
-   z animowaną opacity jest korzeniem tła, więc backdrop-filter w środku nie ma
-   czego próbkować. `backwards` zwalnia element zaraz po wejściu. */
 main > section { animation: view-in var(--t-base) var(--ease-glass) backwards; }
 @keyframes view-in { from { opacity: 0; transform: translateY(8px); } }
 
-/* ---------- 6. Przełącznik motywu — jedna kropka ----------
-   To nie jest funkcja do eksponowania: żadnych stałych napisów. Kropka pokazuje stan
-   samym wypełnieniem (pusta = jasny, pełna = ciemny, pół na pół = auto), a nazwa trybu
-   pojawia się na chwilę dopiero po kliknięciu. */
-.theme-switch {
-  display: inline-flex;
-  flex-direction: row-reverse;   /* ulotna etykieta wychodzi w lewo, nie poza ekran */
-  align-items: center;
-  gap: var(--space-2);
-}
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* ---------- 11. Przełącznik motywu — jedna kropka ----------
+   To nie jest funkcja do eksponowania: kropka pokazuje stan wypełnieniem
+   (pusta = jasny, pełna = ciemny, pół na pół = auto), nazwa trybu miga po kliknięciu. */
+.theme-switch { display: inline-flex; flex-direction: row-reverse; align-items: center; gap: var(--space-2); }
 .theme-dot {
-  width: 44px; height: 44px;     /* cel dotykowy, choć sama kropka jest mała */
+  width: 44px; height: 44px;
   flex: none;
   display: grid;
   place-items: center;
   padding: 0;
-  border: 0;
-  background: none;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-fill);
   border-radius: 50%;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 var(--glass-rim);
   -webkit-tap-highlight-color: transparent;
 }
 .theme-dot__i {
-  width: 17px; height: 17px;
+  width: 15px; height: 15px;
   border-radius: 50%;
-  border: 1.5px solid var(--line-strong);
+  border: 1.5px solid var(--ink-muted);
   background: transparent;
-  transition: background-color var(--t-base) var(--ease-soft),
-              border-color var(--t-base) var(--ease-soft);
+  transition: background-color var(--t-base) var(--ease-soft), border-color var(--t-base) var(--ease-soft);
 }
-.theme-dot:hover .theme-dot__i { border-color: var(--fg); }
+.theme-dot:hover .theme-dot__i { border-color: var(--ink); }
 .theme-dot:active .theme-dot__i { transform: scale(.92); }
-
-:root[data-theme-mode="dark"] .theme-dot__i { background: var(--fg); border-color: var(--fg); }
+:root[data-theme-mode="dark"] .theme-dot__i { background: var(--ink); border-color: var(--ink); }
 :root[data-theme-mode="auto"] .theme-dot__i {
-  border-color: var(--fg);
-  background: linear-gradient(90deg, transparent 0 50%, var(--fg) 50% 100%);
+  border-color: var(--ink);
+  background: linear-gradient(90deg, transparent 0 50%, var(--ink) 50% 100%);
 }
-
-/* Etykieta zostaje w drzewie dostępności (aria-live ją czyta), a widoczna jest
-   tylko przez chwilę po kliknięciu. */
 .theme-switch__now {
-  font-size: var(--text-xs);
-  color: var(--muted);
+  font-size: var(--fs-micro);
+  color: var(--ink-muted);
   white-space: nowrap;
   opacity: 0;
   transform: translateX(4px);
@@ -331,94 +500,78 @@ main > section { animation: view-in var(--t-base) var(--ease-glass) backwards; }
 }
 .theme-switch.is-showing .theme-switch__now { opacity: 1; transform: none; }
 
-header .theme-switch { margin-left: auto; }
-header .theme-switch + #who { margin-left: 0; }
-
-/* ---------- 7. Karty, pola, przyciski ---------- */
-/* Karta = mleczna tafla z referencji: półprzezroczysta, rozmywa plamy tła pod sobą,
-   biały rant u góry, miękki cień. Treść leży NA szkle, nie na płaskim kartonie. */
+/* ---------- 12. Karty, pola, przyciski ----------
+   Szkło BEZ filtra — używane setki razy, więc kosztuje tylko krycie i dwa cienie. */
 .card {
   position: relative;
-  background: var(--glass-bg);
-  border: 1px solid transparent;
-  border-radius: var(--r-lg);
-  padding: var(--space-6);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-md);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow:
-    inset 0 1px 0 var(--glass-rim-a),
-    inset 0 0 0 .5px var(--glass-hairline),
-    0 1px 2px -1px var(--glass-drop),
-    0 18px 44px -30px var(--glass-drop);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
 }
 .card.center { align-items: center; text-align: center; padding: var(--space-7) var(--space-4); }
+/* Tor „wpuszczony" w taflę: segmenty, słupki, bloki kodu. */
+.sunken { background: var(--glass-fill-sunken); border: 1px solid var(--line); border-radius: var(--r-md); }
 
 .row { display: flex; gap: var(--space-3); }
 .row.wrap { flex-wrap: wrap; }
 .row > * { flex: 1; min-width: 8rem; }
 
-input, select {
-  padding: var(--space-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  color: var(--fg);
-  font: inherit;
+input, select, textarea {
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid var(--glass-edge-strong);
+  border-radius: var(--r-sm);
+  background: var(--glass-fill);
+  color: var(--ink);
+  font: 400 var(--fs-body-lg)/1.2 var(--font);
   width: 100%;
-  min-height: 44px;
-  box-shadow: inset 0 1px 2px var(--glass-rim-a), inset 0 0 0 .5px var(--glass-hairline);
-  transition: border-color var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
+  box-shadow: inset 0 1px 0 var(--glass-rim);
+  transition: border-color var(--t-fast) var(--ease-soft);
 }
-/* Select bez natywnego chromu + własny chevron (dwa gradienty = strzałka w barwie
-   tokenu, działa w obu motywach bez osobnych ikon). */
+textarea { padding: 11px 13px; font-size: var(--fs-body); line-height: 1.45; resize: none; overflow-wrap: break-word; }
+input[type="date"], input[type="month"] { font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+/* Select bez natywnego chromu + własny chevron (dwa gradienty = strzałka w barwie tokenu). */
 select {
   appearance: none;
   -webkit-appearance: none;
   background-image:
-    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
+    linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
   background-position: calc(100% - 19px) calc(50% - 1px), calc(100% - 14px) calc(50% - 1px);
   background-size: 5px 6px, 5px 6px;
   background-repeat: no-repeat;
   padding-right: var(--space-6);
 }
-input:hover, select:hover { border-color: var(--muted); }
-/* Fokus = przyjemna poświata, nie sama zmiana ramki: widać, GDZIE się wpisuje. */
-input:focus-visible, select:focus-visible {
-  border-color: var(--accent);
-  outline: none;
-  box-shadow: 0 0 0 4px var(--accent-soft), inset 0 1px 2px var(--glass-rim-a);
+input:hover, select:hover, textarea:hover { border-color: var(--line-strong); }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  border-color: var(--glow-rim);
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
-input::placeholder { color: var(--muted); }
-input:disabled, select:disabled, .btn:disabled { opacity: .5; cursor: not-allowed; }
+input::placeholder, textarea::placeholder { color: var(--ink-faint); }
+input:disabled, select:disabled, textarea:disabled, .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-input#amount {
-  font-family: var(--font-display);
-  font-size: clamp(2.4rem, 8vw, 3rem);
-  font-weight: 600;
-  text-align: center;
-  letter-spacing: var(--track-display);
+/* Pole opisane etykietą — podstawowy klocek formularzy. `align-items: stretch`
+   nadpisuje globalne `label { align-items: center }`: bez tego etykieta i licznik
+   znaków kurczą się do treści i lądują na środku kolumny. */
+.fld { display: flex; flex-direction: column; align-items: stretch; gap: 6px; font-size: inherit; color: inherit; }
+/* Podkategoria bywa schowana (kategoria bez dzieci) — etykieta znika razem z polem,
+   inaczej w karcie zostaje samotny napis bez kontrolki. */
+.fld:has(> select[hidden]) { display: none; }
+.fld > span { font: 600 var(--fs-cap)/1 var(--font); color: var(--ink-muted); }
+.fld.quiet > span { font: 400 var(--fs-micro)/1 var(--font); color: var(--ink-faint); }
+.fld.quiet select, .fld.quiet input { background: var(--glass-fill-sunken); font-size: var(--fs-body); }
+.fld-head { display: flex; justify-content: space-between; align-items: baseline; }
+.fld-head em {
+  font: 400 var(--fs-micro)/1 var(--mono);
   font-variant-numeric: tabular-nums;
-  min-height: 64px;
-  padding-top: var(--space-3);
-  border: 0;
-  background: transparent;
-  box-shadow: inset 0 -1.5px 0 var(--line-strong);
-  border-radius: 0;
-  caret-color: var(--accent);
-}
-input#amount:hover { border: 0; box-shadow: inset 0 -1.5px 0 var(--muted); }
-input#amount:focus-visible { outline: none; box-shadow: inset 0 -2px 0 var(--accent); }
-/* Podpowiedź nie może udawać wpisanej kwoty — wartość jest wielka, podpowiedź cicha. */
-input#amount::placeholder {
-  font-family: var(--font);
-  font-weight: 400;
-  font-size: var(--text-md);
-  color: var(--muted);
-  letter-spacing: 0;
+  font-style: normal;
+  color: var(--ink-faint);
 }
 
 .btn {
@@ -428,174 +581,329 @@ input#amount::placeholder {
   justify-content: center;
   gap: var(--space-2);
   text-align: center;
-  padding: var(--space-3) var(--space-5);
-  border-radius: var(--r-pill);
-  border: 1px solid var(--line-strong);
+  min-height: 46px;
+  padding: 0 var(--space-4);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--glass-edge-strong);
   background: var(--glass-fill);
-  color: var(--fg);
+  color: var(--ink);
   cursor: pointer;
   text-decoration: none;
-  font: inherit;
-  min-height: 44px;
-  box-shadow: var(--glass-stack);
+  font: 600 var(--fs-cap)/1 var(--font);
+  box-shadow: inset 0 1px 0 var(--glass-rim);
   transition: transform var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft),
               border-color var(--t-fast) var(--ease-soft);
 }
-.btn:hover { border-color: var(--muted); }
+.btn:hover { border-color: var(--line-strong); }
 .btn:active { transform: scale(.985); }
-/* Główna akcja: pełna szałwia — jednoznaczne „to jest TEN przycisk". */
-.btn.primary { background: var(--accent); color: var(--accent-fg);
-  border-color: transparent; font-weight: 600;
-  box-shadow: 0 1px 2px -1px var(--glass-drop), 0 10px 24px -16px var(--accent); }
-.btn.primary:hover { background: color-mix(in oklch, var(--accent) 88%, var(--fg)); }
-.btn.big { padding: var(--space-4) var(--space-5); font-size: var(--text-base); min-height: 52px; }
+.btn.primary {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  border-color: var(--accent);
+  box-shadow: inset 0 1px 0 var(--glass-rim), 0 6px 20px oklch(0.50 0.14 255 / .28);
+}
+.btn.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+.btn.big {
+  min-height: 54px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-body-lg);
+  font-weight: 600;
+}
+.btn.small { min-height: 44px; padding: 0 var(--space-3); font-size: var(--fs-micro); }
+/* Cichy wariant — „Pomiń", „Anuluj" i inne trzecioplanowe wyjścia. */
+.btn.quiet { background: var(--glass-fill-sunken); border-color: var(--line); color: var(--ink-muted); }
 
-.seg { gap: 0; padding: 3px; background: var(--glass-fill); border: 1px solid var(--line-strong);
-  border-radius: var(--r-pill);
-  box-shadow: inset 0 1px 3px var(--glass-drop), inset 0 0 0 .5px var(--glass-hairline); }
+/* Segment: jeden tor „wpuszczony" w taflę, w nim przyciski. Aktywny wypływa na wierzch. */
+.seg {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--glass-fill-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.seg.seg-2 { grid-template-columns: 1fr 1fr; }
+.seg.seg-3 { grid-template-columns: repeat(3, 1fr); }
 .seg button {
-  position: relative;
-  flex: 1;
-  padding: var(--space-2);
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--text-sm);
   min-height: 44px;
-  border-radius: var(--r-pill);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  font: 600 var(--fs-cap)/1.15 var(--font);
+  cursor: pointer;
+  text-align: center;
+  overflow-wrap: break-word;
   transition: color var(--t-fast) var(--ease-soft), background-color var(--t-fast) var(--ease-soft);
 }
-.seg button:first-child, .seg button:last-child { border-radius: var(--r-pill); }
-/* Trzy przyciski (Wydatek/Przychód/Transfer) muszą zmieścić się na 320 px:
-   dziedziczone z .row > * min-width 8rem rozsadzało wiersz. */
-.seg > button { min-width: 0; flex: 1 1 0; padding-inline: var(--space-2); }
-.seg button:hover { color: var(--fg); }
-/* Wybrany typ: pastelowe wypełnienie w barwie znaczenia + mocny tekst — od razu widać,
-   co jest zaznaczone (jak aktywny segment w referencji), bez szklanych cieni. */
-.seg button.active { font-weight: 600; box-shadow: 0 1px 4px -2px var(--glass-drop); }
-.seg button.active[data-type="WYDATEK"] { background: color-mix(in oklch, var(--expense) 16%, var(--surface)); color: var(--expense); }
-.seg button.active[data-type="PRZYCHÓD"] { background: color-mix(in oklch, var(--income) 16%, var(--surface)); color: var(--income); }
-.seg button.active[data-type="TRANSFER"] { background: color-mix(in oklch, var(--transfer) 16%, var(--surface)); color: var(--transfer); }
-
-.msg { min-height: 1.2em; margin: 0; font-size: var(--text-sm); color: var(--muted); }
-.msg.ok { color: var(--income); }
-.msg.err { color: var(--danger); }
-
-/* Tęczowy rant („iris") WYCOFANY 2026-07-25: na produkcji czytał się jako artefakt
-   renderowania, nie detal. Token --iris zostaje na 0 — gdyby kiedyś wracał, wraca
-   świadomą decyzją, nie kopiuj-wklej. */
-
-/* ---------- 8. Dane: tabele, KPI, słupki ---------- */
-h2 { font-size: var(--text-xs); margin: var(--space-6) 0 var(--space-2); color: var(--muted);
-     text-transform: uppercase; letter-spacing: .11em; font-weight: 600; }
-
-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
-th, td { text-align: left; padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--line-soft); }
-th { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
-tbody tr:last-child td { border-bottom: 0; }
-/* Wiersz pod kursorem delikatnie łapie światło — czytanie szerokich tabel po linii. */
-tbody tr:hover td { background: color-mix(in oklch, var(--accent) 5%, transparent); }
-th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
-td.exp { color: var(--expense); } td.inc { color: var(--income); } td.trf { color: var(--transfer); }
-/* Szerokie tabele przewijają się WEWNĄTRZ karty — strona nigdy nie jedzie w bok. */
-.overflow { overflow-x: auto; max-width: 100%; overscroll-behavior-x: contain; }
-.overflow table { min-width: max-content; }
-
-.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); }
-/* Kafel KPI = mała mleczna tafla (jak karta, ciszej): bez twardej ramki,
-   włoskowaty rant + rozświetlenie u góry, liczba na pierwszym planie. */
-.kpi .tile { position: relative; border: 0; border-radius: var(--r-md); padding: var(--space-4);
-  background: var(--surface);
-  box-shadow:
-    inset 0 1px 0 var(--glass-rim-a),
-    inset 0 0 0 .5px var(--glass-hairline),
-    0 1px 2px -1px var(--glass-drop),
-    0 10px 26px -22px var(--glass-drop); }
-.kpi .tile b {
-  display: block;
-  font-family: var(--font-display);
-  font-size: clamp(1.6rem, 4vw, 2rem);
-  font-weight: 600;
-  letter-spacing: var(--track-display);
-  font-variant-numeric: tabular-nums;
-  margin-bottom: var(--space-1);
+.seg button .sig { font: 600 var(--fs-body)/1 var(--mono); }
+#segType button { text-transform: uppercase; letter-spacing: .04em; }
+.seg button:hover { color: var(--ink); }
+.seg button.active {
+  color: var(--ink);
+  background: var(--glass-fill-strong);
+  border-color: var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-rim), 0 2px 8px oklch(0.4 0.05 265 / .12);
 }
-.kpi .tile span { color: var(--muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
+/* Znaczenie typu niesie ZNAK (− + ⇄) i słowo; barwa tylko je wzmacnia. */
+.seg button.active[data-type="WYDATEK"] { color: var(--minus); }
+.seg button.active[data-type="PRZYCHÓD"] { color: var(--plus); }
+.seg button.active[data-type="TRANSFER"] { color: var(--flow); }
 
-.barrow { display: grid; grid-template-columns: minmax(7rem, 14rem) 1fr auto; gap: var(--space-3);
-  align-items: center; font-size: var(--text-sm); padding: var(--space-1) 0; }
-.barrow .bar { height: 8px; background: var(--accent); border-radius: var(--r-pill); min-width: 2px;
-  box-shadow: inset 0 1px 0 var(--glass-rim-a); }
-.barrow .val { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Pigułki okresu w Raportach i podobne przełączniki jednowierszowe. */
+.chips {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: var(--space-1);
+  background: var(--glass-fill-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+}
+.chips::-webkit-scrollbar { display: none; }
+.chips button {
+  flex: none;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-muted);
+  font: 600 var(--fs-cap)/1 var(--font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chips button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--ink-on-accent);
+  box-shadow: inset 0 1px 0 var(--glass-rim);
+}
 
-.pill { background: var(--glass-fill); border: 1px solid var(--line); border-radius: var(--r-pill);
-  padding: 2px var(--space-3); font-size: var(--text-xs); color: var(--muted);
-  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: var(--glass-stack); }
-.pill.bank {
-  background: color-mix(in oklch, var(--accent) 12%, transparent);
-  border-color: color-mix(in oklch, var(--accent) 36%, transparent);
-  color: var(--accent);
+/* Komunikat pod formularzem. Kolor nie jest jedynym nośnikiem — jest też rant i tło. */
+.msg { margin: 0; font: 400 var(--fs-cap)/1.45 var(--font); color: var(--ink-muted); }
+.msg.ok, .msg.err {
+  padding: 11px 13px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--plus);
+  background: var(--tint-plus);
+  color: var(--ink);
   font-weight: 500;
 }
-.pill.net { margin-left: auto; }
-.pill.net.off { background: var(--expense); border-color: var(--expense); color: var(--bg); }
-.pill.net + #who { margin-left: var(--space-3); }
-
-.un { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--space-3) var(--space-4);
-  margin: var(--space-2) 0; display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; font-size: var(--text-sm); }
-.un .grow { flex: 1; min-width: 12rem; }
-
-/* Puste stany — checklista wymaga `—`, nie milczącej pustki. */
-.overflow:has(tbody:empty)::after,
-#kpi:empty::before,
-#byCat:empty::before {
-  content: "— brak danych w\00a0tym zakresie";
-  display: block;
-  padding: var(--space-5) var(--space-2);
-  color: var(--muted);
-  font-size: var(--text-sm);
+.msg.err { border-color: var(--danger); background: var(--tint-minus); }
+.note {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: var(--r-sm);
+  background: var(--glass-fill-sunken);
+  border: 1px solid var(--line);
+  font: 400 var(--fs-cap)/1.45 var(--font);
+  color: var(--ink-muted);
 }
 
-a.small, button.small { font-size: var(--text-xs); padding: var(--space-1) var(--space-3); min-height: 32px; }
+/* ---------- 13. Dane: tabele, KPI, słupki, pigułki ---------- */
+h2 {
+  font: 600 var(--fs-body-lg)/1.2 var(--font);
+  color: var(--ink);
+  margin: var(--space-5) 0 var(--space-2);
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+table { width: 100%; border-collapse: collapse; font-size: var(--fs-cap); }
+th, td { text-align: left; padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--line); }
+th {
+  font: 600 var(--fs-micro)/1 var(--font);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--ink-muted);
+  background: var(--glass-fill-sunken);
+}
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--accent-quiet); }
+th.num, td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td.exp { color: var(--minus); } td.inc { color: var(--plus); } td.trf { color: var(--flow); }
+/* Szerokie tabele przewijają się WEWNĄTRZ tafli — strona nigdy nie jedzie w bok. */
+.overflow {
+  overflow-x: auto;
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-md);
+  background: var(--glass-fill);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+}
+.overflow table { min-width: max-content; }
+
+/* Nagłówek sekcji z licznikiem obok („Do uzgodnienia · 3"). */
+.sekcja-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+.sekcja-head h2 { margin-bottom: var(--space-2); }
+
+/* Pigułka: krótka etykieta stanu. Bez filtra — to nie jest chrome. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-fill);
+  color: var(--ink-muted);
+  font: 600 var(--fs-micro)/1.6 var(--font);
+  white-space: nowrap;
+}
+.pill.bank {
+  border-color: var(--glass-rim);
+  background: var(--tint-plus);
+  color: var(--plus);
+}
+.pill[hidden] { display: none; }
+.pill.net { flex: none; }
+.pill.net.off { border-color: var(--glass-rim); background: var(--tint-warn); color: var(--warn); }
+
+/* ---------- 14. Chrome 4/4: toast (core.js) — komunikat z „Cofnij", okno 12 s ---------- */
+.toast {
+  position: fixed;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  margin: 0 auto;
+  max-width: 34rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-3) 15px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--glass-edge-strong);
+  background: var(--glass-fill-strong);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+  backdrop-filter: var(--blur-chrome);
+  -webkit-backdrop-filter: var(--blur-chrome);
+  font: 500 var(--fs-cap)/1.35 var(--font);
+  animation: toast-in var(--t-base) var(--ease-glass);
+}
+.toast[hidden] { display: none; }
+.toast span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 44px;
+  border-radius: var(--r-pill);
+  border-color: var(--accent);
+  background: var(--accent-quiet);
+  color: var(--accent);
+}
+@keyframes toast-in { from { opacity: 0; transform: translate3d(0, 16px, 0) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* ---------- 15. Import: wiersz „do uzgodnienia" i wybór pliku ----------
+   Wiersz wymagający decyzji człowieka dostaje ostrzegawczy rant z lewej: widać go
+   na liście bez czytania, a barwa nie jest jedynym nośnikiem (jest też pozycja i tekst). */
+.un {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin: var(--space-2) 0;
+  padding: 13px 14px;
+  border: 1px solid var(--glass-edge);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--r-md);
+  background: var(--glass-fill);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
+  font-size: var(--fs-cap);
+}
+.un > span:first-child { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-muted); flex: none; }
+.un > b { font: 600 var(--num-md)/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+.un > b.exp { color: var(--minus); } .un > b.inc { color: var(--plus); }
+.un .grow { flex: 1 1 100%; min-width: 12rem; overflow-wrap: anywhere; line-height: 1.4; }
+.un .btn { flex: 0 1 auto; }
+
+/* Wybór pliku: strefa zrzutu zamiast nagiego „Browse…". */
+.imp-plik input[type="file"] {
+  min-height: 60px;
+  padding: var(--space-3);
+  border: 1px dashed var(--line-strong);
+  background: var(--glass-fill-sunken);
+  color: var(--ink-muted);
+  font-size: var(--fs-cap);
+}
+input[type="file"]::file-selector-button {
+  margin-right: var(--space-3);
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  font: 600 var(--fs-cap)/1 var(--font);
+  cursor: pointer;
+}
+
+/* ---------- 16. Puste stany — checklista wymaga „—", nie milczącej pustki ---------- */
+.overflow:has(tbody:empty)::after {
+  content: "— brak danych w\00a0tym zakresie";
+  display: block;
+  padding: var(--space-5) var(--space-4);
+  color: var(--ink-muted);
+  font-size: var(--fs-cap);
+}
 
 /* Puste elementy nie rezerwują miejsca — rytm karty kończy się tam, gdzie treść. */
 .msg:empty, #fvp:empty, #telemetria:empty { display: none; }
-.rcv { width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--r-md); touch-action: none; }
-tr.lowconf td { background: color-mix(in oklch, var(--expense) 12%, transparent); }
-label { font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-2); color: var(--muted); }
+.rcv { width: 100%; height: auto; border: 1px solid var(--glass-edge); border-radius: var(--r-md); touch-action: none; }
+tr.lowconf td { background: var(--tint-minus); }
+label { font-size: var(--fs-cap); display: flex; align-items: center; gap: var(--space-2); color: var(--ink-muted); }
 
-/* ---------- 10. Responsywność ---------- */
+/* Kosz: wpis usunięty — wyciszony, kwota przekreślona, „Przywróć" pełnosprawne. */
+tr.del td { color: var(--ink-muted); }
+tr.del td[data-label="Kwota"], tr.del td.num { text-decoration: line-through; text-decoration-color: var(--line-strong); }
+
+/* Wyloguj — wyjście awaryjne („to nie mój telefon"), nie jedna z głównych akcji.
+   Na telefonie mieszka w arkuszu „Więcej", więc z nagłówka znika (patrz §17). */
+#logout { flex: none; color: var(--ink-muted); }
+#logout:hover, #logout:focus-visible { color: var(--ink); }
+
+/* ---------- 17. Responsywność ---------- */
 @media (max-width: 640px) {
-  header { gap: var(--space-2); row-gap: var(--space-2); padding: var(--space-2) var(--space-3); }
-  header h1 { font-size: var(--text-base); }
-
-  header .theme-switch { margin-left: auto; }
-
-
+  header { gap: var(--space-2); padding-left: var(--space-4); padding-right: var(--space-4); }
+  main { padding: 0 var(--space-4); margin-top: var(--space-4); }
+  .card { padding: var(--space-4); }
+}
+@media (max-width: 900px) {
+  /* Wyloguj jest w arkuszu „Więcej" — w nagłówku byłby drugim, mylącym wyjściem. */
+  #logout { display: none; }
+}
+/* Szeroki ekran: pasek zakładek zwęża się do pływającej pigułki, ale zostaje na dole —
+   jeden układ nawigacji na wszystkich urządzeniach, jedna ścieżka do „Więcej". */
+@media (min-width: 901px) {
   nav {
-    order: 10;
-    flex-basis: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    margin: 0 calc(-1 * var(--space-3));
-    padding: 0 var(--space-3);
+    left: 50%;
+    right: auto;
+    bottom: var(--space-5);
+    transform: translateX(-50%);
+    width: max-content;
+    grid-template-columns: repeat(5, minmax(92px, 1fr));
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--r-xl);
+    box-shadow: var(--glass-shadow);
   }
-  nav::-webkit-scrollbar { display: none; }
-  nav button { white-space: nowrap; flex: none; min-height: 44px; }
-
-  #who { display: none; }
-  /* Wyloguj zostaje także na telefonie — tam jest najpotrzebniejszy. Bez `margin-left: auto`:
-     przełącznik motywu już odpycha grupę w prawo, dwa auto dzieliłyby wolne miejsce po połowie. */
-  #logout { min-height: 44px; }
-  main { padding: 0 var(--space-4); margin-top: var(--space-5); }
-  .card { padding: var(--space-5); border-radius: var(--r-md); gap: var(--space-3); }
+  main { margin-bottom: calc(var(--space-8) + 72px); }
+  .toast { bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+  .sheet { max-width: 520px; width: 100%; margin: 0 auto; border-radius: var(--r-xl) var(--r-xl) 0 0; }
 }
 
-/* ---------- 11. Ruch ograniczony ---------- */
+/* ---------- 18. Ruch ograniczony ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .001ms !important;
@@ -603,41 +911,3 @@ label { font-size: var(--text-sm); display: flex; align-items: center; gap: var(
     transition-duration: .001ms !important;
   }
 }
-
-
-/* ---------- Toast (core.js) — komunikat z akcją „Cofnij", okno 12 s ---------- */
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  max-width: min(34rem, calc(100vw - var(--space-5) * 2));
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--r-pill);
-  background: var(--glass-fill);
-  color: var(--fg);
-  border: 1px solid var(--line-strong);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: var(--glass-stack);
-  font-size: var(--text-sm);
-  animation: toast-in var(--t-base) var(--ease-glass);
-}
-.toast[hidden] { display: none; }
-.toast span { overflow-wrap: anywhere; }
-.toast .btn { flex: 0 0 auto; white-space: nowrap; color: var(--accent); border-color: var(--line-strong); font-weight: 600; }
-@keyframes toast-in { from { opacity: 0; transform: translateX(-50%) translateY(10px); } }
-@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
-
-/* Kosz: wpis usunięty — wyciszony, kwota przekreślona, „Przywróć" zostaje pełnosprawne */
-tr.del td { color: var(--muted); }
-tr.del td[data-label="Kwota"], tr.del td.num { text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--muted) 60%, transparent); }
-
-/* Wyloguj — na końcu nagłówka, za informacją o zalogowanej osobie. Wyciszony:
-   to wyjście awaryjne („to nie mój telefon"), nie jedna z głównych akcji. */
-#logout { flex: none; margin-left: var(--space-3); color: var(--muted); }
-#logout:hover, #logout:focus-visible { color: var(--fg); border-color: var(--line-strong); }

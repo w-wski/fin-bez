@@ -1,35 +1,63 @@
-/* Style widoku „Przydział" — właściciel: zlecenie Z5.
-   Zakres: lista grup propozycji w #przydzialBox (karta „Przydział", tylko admin).
-   Kolory wyłącznie ze zmiennych z :root (styles.css), żeby oba motywy działały bez
-   osobnych reguł. `.row > *` z styles.css rozciąga dzieci na równo — tu prawie wszystko
-   ma być szerokości treści, dlatego jawne `flex: 0 1 auto`. */
+/* Styl widoku „Przydział" — kierunek „Tafla".
+   Zakres: lista grup propozycji w #przydzialBox (tylko admin). Kolory wyłącznie ze
+   zmiennych z :root (styles.css), żeby oba motywy działały bez osobnych reguł.
+   `.row > *` z styles.css rozciąga dzieci na równo — tu prawie wszystko ma być
+   szerokości treści, dlatego jawne `flex: 0 1 auto`. */
 
-.prz-tools { align-items: center; margin-bottom: .4rem; }
+#przydzialBox { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.prz-tools { align-items: center; }
 .prz-tools > select { flex: 0 1 12rem; }
-.prz-licznik { flex: 0 1 auto; white-space: nowrap; }
+.prz-licznik { flex: 0 1 auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.prz-lista { display: flex; flex-direction: column; gap: .5rem; }
+.prz-lista { display: flex; flex-direction: column; gap: var(--space-2); }
 
-/* Jedna grupa = jedna decyzja jednym kliknięciem. Grupy przychodzą z serwera posortowane
-   po liczbie wpisów malejąco, więc na górze jest to, co zamyka najwięcej pracy. */
+/* Jedna grupa = jedna decyzja jednym kliknięciem. Grupy przychodzą z serwera
+   posortowane po liczbie wpisów malejąco, więc na górze jest to, co zamyka
+   najwięcej pracy. Każda leży na własnej tafli — decyzja dotyczy pieniędzy,
+   więc nie może ginąć w liście. */
 .prz-grupa {
-  border: 1px solid var(--bar);
-  border-radius: .5rem;
-  padding: .5rem .6rem;
-  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-md);
+  background: var(--glass-fill);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--glass-shadow);
 }
-.prz-head { align-items: center; }
+.prz-head { align-items: center; gap: var(--space-2); }
 .prz-head > * { flex: 0 1 auto; min-width: 0; }
-.prz-para { text-align: left; font-weight: 600; }
-.prz-meta { color: var(--muted); font-size: .9rem; white-space: nowrap; }
-.prz-przyklady { margin: .2rem 0 .3rem; overflow-wrap: anywhere; }
-.prz-akcje > .btn { flex: 0 1 auto; }
+.prz-para {
+  text-align: left;
+  font: 600 var(--fs-body)/1.25 var(--font);
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  color: var(--ink);
+}
+.prz-para:hover { color: var(--accent); border: 0; }
+/* .btn centruje etykietę — para „skąd → dokąd" ma zaczynać się przy lewej krawędzi karty. */
+.prz-para { justify-content: flex-start; }
+.prz-meta {
+  color: var(--ink-muted);
+  font: 500 var(--fs-cap)/1.3 var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.prz-przyklady { margin: 0; overflow-wrap: anywhere; }
+.prz-akcje { gap: var(--space-2); }
+.prz-akcje > .btn { flex: 0 1 auto; min-width: 6rem; }
+
+/* Wybór innego celu: pole otwarte w obrębie grupy, bez modala. */
 .prz-cel {
   align-items: center;
-  margin-top: .4rem;
-  padding: .4rem;
-  border: 1px dashed var(--primary);
-  border-radius: .5rem;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px dashed var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--glass-fill-sunken);
 }
 .prz-cel > select { flex: 1 1 12rem; }
 .prz-cel > .btn { flex: 0 0 auto; }
@@ -39,16 +67,35 @@
 .prz-wpisy {
   display: flex;
   flex-direction: column;
-  gap: .3rem;
-  margin-top: .4rem;
-  border-top: 1px solid var(--bar);
-  padding-top: .4rem;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
 }
-/* „Pokazano 500 z 700" — obcięcie listy musi być widoczne nad wpisami, bo decyzja grupowa
-   obejmuje także te wpisy, których na liście nie ma. */
-.prz-obciete { margin: 0 0 .3rem; font-weight: 600; }
+/* „Pokazano 500 z 700" — obcięcie listy musi być widoczne nad wpisami, bo decyzja
+   grupowa obejmuje także te wpisy, których na liście nie ma. */
+.prz-obciete { margin: 0 0 var(--space-2); font-weight: 600; }
 
-.prz-wpis { align-items: center; font-size: .9rem; }
+.prz-wpis {
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-sm);
+  background: var(--glass-fill-sunken);
+  font-size: var(--fs-cap);
+}
 .prz-wpis > * { flex: 0 1 auto; min-width: 0; }
+.prz-wpis > strong { font-variant-numeric: tabular-nums; }
 .prz-wpis > .prz-opis { flex: 1 1 10rem; overflow-wrap: anywhere; }
-.prz-data { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prz-wpis > .btn { flex: 0 0 auto; }
+.prz-data { color: var(--ink-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Wyjaśnienie pod listą to długi tekst — kładziemy je na wpuszczonej tafli, żeby nie
+   leżało bezpośrednio na gradiencie (kontrast nie może zależeć od tego, co pod spodem). */
+#przydzialBox > p.msg {
+  max-width: none;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--glass-fill-sunken);
+}
