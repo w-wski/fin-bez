@@ -107,15 +107,16 @@ export const KEYFRAMES = [
   { p: 0.56, s: 1.36, hero: 0.28, dest: 0, dsl: 1.30, cta: 0 },
   { p: 0.70, s: 1.22, hero: 0, dest: 0, dsl: 1.30, cta: 0 },
   { p: 0.86, s: 1.02, hero: 0, dest: 0, dsl: 1.30, cta: 0 },
-  { p: 0.94, s: 0.78, hero: 0, dest: 0, dsl: 1.30, cta: 0 },
+  { p: 0.92, s: 0.86, hero: 0, dest: 0, dsl: 1.30, cta: 0 },
   // Tytuł wychodzi DOPIERO tutaj — i nie „pojawia się", a wysuwa spod kamyka
   // (zasłona, patrz applyFx). Kamyk jest wtedy jeszcze 2–3× większy od docelowego,
-  // rozmiar docelowy bierze na ostatnich pikselach drogi.
-  { p: 0.955, s: 0.68, hero: 0, dest: 1, dsl: 1.29, cta: 0 },
-  { p: 0.975, s: 0.55, hero: 0, dest: 1, dsl: 1.28, cta: 0 },
-  { p: 0.985, s: 0.44, hero: 0, dest: 1, dsl: 1.22, cta: 0 },
-  { p: 0.992, s: 0.36, hero: 0, dest: 1, dsl: 1.14, cta: 0 },
-  { p: 0.997, s: 0.29, hero: 0, dest: 1, dsl: 1.06, cta: 0.4 },
+  // rozmiar docelowy bierze na ostatnich pikselach drogi. Okno cofnięte o ~0,2 s
+  // względem pierwszej wersji (Szymon 07-26: „lekko wcześniej niech się pojawia").
+  { p: 0.94, s: 0.74, hero: 0, dest: 1, dsl: 1.28, cta: 0 },
+  { p: 0.96, s: 0.60, hero: 0, dest: 1, dsl: 1.22, cta: 0 },
+  { p: 0.972, s: 0.48, hero: 0, dest: 1, dsl: 1.14, cta: 0 },
+  { p: 0.985, s: 0.36, hero: 0, dest: 1, dsl: 1.06, cta: 0 },
+  { p: 0.993, s: 0.30, hero: 0, dest: 1, dsl: 1.01, cta: 0.35 },
   { p: 1.00, s: 0.25, hero: 0, dest: 1, dsl: 1.00, cta: 1 },
 ];
 

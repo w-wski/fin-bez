@@ -32,6 +32,25 @@
 @font-face { font-family: 'SF Pro'; src: url('fonts/sf-pro-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
 @font-face { font-family: 'SF Pro'; src: url('fonts/sf-pro-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 
+/* Kroje skóry „Sygnał" (WNĘTRZE aplikacji; scena logowania zostaje na SF Pro —
+   decyzja Szymona 07-26). W ODRÓŻNIENIU od SF Pro te dwa wolno trzymać w repo:
+   oba są na OFL, licencje leżą obok plików (fonts/OFL-Archivo.txt, OFL-IBM-Plex.txt).
+   Archivo jest ZMIENNY — oś wagi 100–900 ORAZ oś szerokości 62–125%. Osi szerokości
+   nie da się pominąć: projekt oprawia nią wielkie tytuły (font-stretch: 110%).
+   Zawężone do znaków, których używamy (łacina + polskie + symbole): 54 KB zamiast
+   172 KB. Znaku ⇄ Archivo nie zawiera — w projekcie stoi on w mono, i tam jest. */
+@font-face {
+  font-family: 'Archivo';
+  src: url('fonts/archivo-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face { font-family: 'Plex Mono'; src: url('fonts/plex-mono-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Plex Mono'; src: url('fonts/plex-mono-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Plex Mono'; src: url('fonts/plex-mono-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+
 /* ---------- 1. Tokeny wspólne (motyw-niezależne) ---------- */
 :root {
   --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
