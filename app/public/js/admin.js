@@ -185,7 +185,10 @@ function blokWygladu() {
   for (const [id, nazwa] of [['sygnal', 'Sygnał'], ['tafla', 'Tafla']]) {
     opcje.append(el('button', { class: 'skora__opcja', type: 'button', 'data-skin-set': id }, nazwa));
   }
-  grupa.append(el('span', { class: 'skora__label' }, 'Wygląd'), opcje);
+  // Bez `.skora__label`: nad blokiem stoi już `h2 „Wygląd"`, a to samo słowo dwa razy pod
+  // sobą czytało się jak błąd. Nazwę dla czytnika ekranu nosi `aria-label` grupy. Wariant
+  // w arkuszu „Więcej" etykietę ZACHOWUJE — tam nie ma nagłówka, który by ją zastąpił.
+  grupa.append(opcje);
   return grupa;
 }
 

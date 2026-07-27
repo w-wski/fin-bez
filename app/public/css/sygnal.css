@@ -9,10 +9,18 @@
    Arkusz jest BEZCZYNNY bez `data-skin="sygnal"` na <html>, więc wisi w index.html
    na stałe: przełączenie skóry nie dogrywa plików i nie mruga. Druga skóra („Tafla",
    szkło) siedzi w styles.css i css/<widok>.css — tu tylko ją przykrywamy.
-   Scena logowania jest POZA tym wyborem: jest celowo inna niż wnętrze.
+
+   SCENA LOGOWANIA JEST POZA TYM WYBOREM — celowo, i to jest powód, dla którego KAŻDY
+   selektor w tym pliku ma przedrostek `:root[data-skin="sygnal"]:has(#view-login[hidden])`.
+   Wcześniej tokeny siedziały na samym `:root`, więc scena logowania dziedziczyła po
+   Sygnale krój (Archivo zamiast SF Pro) i traciła cztery radialne plamy tła, mimo że
+   reguły wyglądu miały wyjątek `:not(#view-login)`. Wyjątek per reguła nie działa na
+   WŁASNOŚCI WŁASNE: te dziedziczą się z `:root` w dół, do wnętrza wyjątku włącznie.
+   Bramka `:has()` załatwia to raz: dopóki `#view-login` nie jest `hidden`, cała skóra
+   milczy i strona jest czystą „Taflą". Nowe reguły dopisuj Z TYM przedrostkiem.
    ========================================================================== */
 
-:root[data-skin="sygnal"] {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) {
   --font: 'Archivo', system-ui, sans-serif;
   --font-display: 'Archivo', system-ui, sans-serif;
   --mono: 'Plex Mono', ui-monospace, Menlo, monospace;
@@ -45,17 +53,34 @@
   --t-micro: 11.5px; --t-cap: 13px; --t-body: 15px; --t-body-lg: 17px;
   --num-md: 17px; --num-lg: 22px; --num-xl: 42px;
 
-  /* Tokeny „Tafli", których Sygnał nie używa — gasimy je, żeby nie przeciekały. */
+  /* Tokeny „Tafli", których Sygnał nie używa — gasimy je, żeby nie przeciekały.
+     Szkło to nie tylko `background-image`: to kilkanaście tokenów `--glass-*` z bieli
+     o niskim kryciu. Dopóki ich tu nie było, każda powierzchnia, dla której nie
+     napisałem reguły wprost — karty importu, grupy przydziału, `.note` — świeciła
+     łososiowo na pomarańczu (biel 80 % na farbie). */
   --paper: none;
-  --glass-drop: transparent;
   --surface: transparent;
   --line-soft: var(--line);
   --muted: var(--ink-muted);
   --fg: var(--ink);
+  --glass-fill: transparent;
+  --glass-fill-strong: transparent;
+  --glass-fill-sunken: transparent;
+  --glass-tint: transparent;
+  --glass-hi: transparent;
+  --glass-horizon: transparent;
+  --glass-rim: transparent;
+  --glass-rim-a: transparent;
+  --glass-rim-b: transparent;
+  --glass-shadow: transparent;
+  --glass-drop: transparent;
+  --glass-edge: var(--line);
+  --glass-edge-strong: var(--line-strong);
+  --glass-hairline: var(--line);
 }
 
 /* Noc = zamiana ról: farba przechodzi z tła na akcent. */
-:root[data-skin="sygnal"][data-theme="dark"] {
+:root[data-skin="sygnal"][data-theme="dark"]:has(#view-login[hidden]) {
   --bg: oklch(0.185 0.012 45);
   --panel: oklch(0.230 0.016 45);
   --panel-deep: oklch(0.155 0.010 45);
@@ -85,16 +110,17 @@
 /* Najpierw GASIMY szkło „Tafli": cztery radialne plamy tła (body::before), blask
    edytowanego pola (::before z --glow), wypełnienia i ranty. Bez tego przez duotone
    przeciekają różowe poświaty — Sygnał ma zero gradientów i zero cieni.
-   Scena logowania jest WYŁĄCZONA z tej kosiarki: ma własny język i zostaje szklana. */
-:root[data-skin="sygnal"] body::before,
-:root[data-skin="sygnal"] main > section:not(#view-login) *::before,
-:root[data-skin="sygnal"] body > header::before,
-:root[data-skin="sygnal"] #nav::before,
-:root[data-skin="sygnal"] .sheet::before { background: none; opacity: 0; content: none; }
-:root[data-skin="sygnal"] main > section:not(#view-login) *,
-:root[data-skin="sygnal"] body > header *,
-:root[data-skin="sygnal"] #nav *,
-:root[data-skin="sygnal"] .sheet * {
+   O scenę logowania dba bramka `:has()` w przedrostku (nagłówek pliku); `:not(#view-login)`
+   zostaje jako drugi bezpiecznik na wypadek, gdyby przedrostek kiedyś zniknął. */
+:root[data-skin="sygnal"]:has(#view-login[hidden]) body::before,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) main > section:not(#view-login) *::before,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) body > header::before,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #nav::before,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .sheet::before { background: none; opacity: 0; content: none; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) main > section:not(#view-login) *,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) body > header *,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #nav *,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .sheet * {
   background-image: none;
   box-shadow: none;
   text-shadow: none;
@@ -102,53 +128,56 @@
   -webkit-backdrop-filter: none;
 }
 
-:root[data-skin="sygnal"] body {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) body {
   background: var(--bg);
   background-image: none;          /* ziarno i plamy „Tafli" nie istnieją w duotone */
   color: var(--ink);
   font-family: var(--font);
 }
 /* Płasko znaczy płasko: żadnego rozmycia i cienia w całym wnętrzu. */
-:root[data-skin="sygnal"] body > header,
-:root[data-skin="sygnal"] #nav,
-:root[data-skin="sygnal"] .sheet,
-:root[data-skin="sygnal"] .card,
-:root[data-skin="sygnal"] .amount-card,
-:root[data-skin="sygnal"] .kpi,
-:root[data-skin="sygnal"] .overflow {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) body > header,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #nav,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .sheet,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .card,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .amount-card,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .overflow {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: none;
   background-image: none;
 }
 
-:root[data-skin="sygnal"] body > header {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) body > header {
   background: var(--bg);
   border-bottom: 2px solid var(--line-strong);
   border-radius: 0;
   align-items: flex-end;
   gap: 10px;
 }
-:root[data-skin="sygnal"] #viewTitle {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #viewTitle {
   font-family: var(--font-display);
   font-weight: 900;
   font-stretch: 110%;               /* oś szerokości Archivo — sedno tej typografii */
-  font-size: 26px;
+  /* „ADMINISTRACJA" to jedno słowo na 13 znaków — przy sztywnych 26 px pękało w środku
+     wyrazu („ADMINISTRACJ / A"). Wielkość skaluje się z szerokością ekranu, więc
+     najdłuższy tytuł mieści się w jednej linii także na 320 px. */
+  font-size: clamp(19px, 6vw, 26px);
   line-height: 1;
   letter-spacing: -0.01em;
   text-transform: uppercase;
   color: var(--ink);
 }
-:root[data-skin="sygnal"] #who,
-:root[data-skin="sygnal"] .amount-hint,
-:root[data-skin="sygnal"] .note {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #who,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .amount-hint,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .note {
   font-family: var(--mono);
   font-size: var(--t-micro);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--ink-muted);
 }
-:root[data-skin="sygnal"] .note {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .note {
   letter-spacing: normal;
   text-transform: none;
   font-family: var(--font);
@@ -159,7 +188,7 @@
   border-radius: var(--r-sm);
   background: transparent;
 }
-:root[data-skin="sygnal"] .page-title {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .page-title {
   font-family: var(--font-display);
   font-weight: 900;
   font-stretch: 110%;
@@ -169,13 +198,13 @@
 }
 
 /* ---------- 2. Nawigacja: obrys-pigułka, nie wypełnienie ---------- */
-:root[data-skin="sygnal"] #nav {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #nav {
   background: var(--bg);
   border-top: 2px solid var(--line-strong);
   border-radius: 0;
   gap: 4px;
 }
-:root[data-skin="sygnal"] #nav button {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #nav button {
   min-height: 52px;
   border: 2px solid transparent;
   border-radius: var(--r-pill);
@@ -185,26 +214,26 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-:root[data-skin="sygnal"] #nav button.active {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #nav button.active {
   border-color: var(--ink);
   color: var(--ink);
   background: transparent;
 }
-:root[data-skin="sygnal"] #nav .nav-i { font-size: 15px; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #nav .nav-i { font-size: 15px; }
 
 /* ---------- 3. Panele: obrys, zero wypełnienia ---------- */
-:root[data-skin="sygnal"] .card,
-:root[data-skin="sygnal"] .overflow,
-:root[data-skin="sygnal"] .kpi,
-:root[data-skin="sygnal"] .sheet {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .card,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .overflow,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .sheet {
   border: 1.5px solid var(--line-strong);
   border-radius: var(--r-md);
   background: transparent;
 }
-:root[data-skin="sygnal"] .sheet { background: var(--bg); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .sheet { background: var(--bg); }
 
 /* ---------- 4. Kwota: największa rzecz na ekranie ---------- */
-:root[data-skin="sygnal"] .amount-card {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .amount-card {
   padding: 18px;
   border: 1.5px solid var(--line-strong);
   border-radius: var(--r-lg);
@@ -212,16 +241,16 @@
   transition: background .16s ease-out, color .16s ease-out;
 }
 /* Pole w edycji = INWERSJA całej karty. To jedyny „blask" w tej skórze. */
-:root[data-skin="sygnal"] .amount-card:has(#amount:focus) {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .amount-card:has(#amount:focus) {
   border-color: var(--card);
   background: var(--card);
   color: var(--card-ink);
 }
-:root[data-skin="sygnal"] .amount-card:has(#amount:focus) .fld > span,
-:root[data-skin="sygnal"] .amount-card:has(#amount:focus) .amount-hint { color: var(--card-muted); }
-:root[data-skin="sygnal"] .amount-card:has(#amount:focus) #amount,
-:root[data-skin="sygnal"] .amount-card:has(#amount:focus) .amount-cur { color: var(--card-ink); }
-:root[data-skin="sygnal"] #amount {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .amount-card:has(#amount:focus) .fld > span,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .amount-card:has(#amount:focus) .amount-hint { color: var(--card-muted); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .amount-card:has(#amount:focus) #amount,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .amount-card:has(#amount:focus) .amount-cur { color: var(--card-ink); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #amount {
   min-height: 48px;
   border: 0;
   background: transparent;
@@ -231,27 +260,30 @@
   text-align: right;
   padding: 2px 0;
 }
-:root[data-skin="sygnal"] #amount:focus { outline: none; box-shadow: none; }
-:root[data-skin="sygnal"] .amount-cur {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #amount:focus { outline: none; box-shadow: none; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .amount-cur {
   font: 600 20px/1 var(--mono);
   color: var(--ink-muted);
 }
 
 /* ---------- 5. Etykiety i pola ---------- */
-:root[data-skin="sygnal"] .fld > span:first-child {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .fld > span:first-child {
   font: 500 var(--t-micro)/1 var(--mono);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-muted);
 }
-:root[data-skin="sygnal"] .fld.quiet > span:first-child {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .fld.quiet > span:first-child {
   font-weight: 400;
   letter-spacing: 0.14em;
   color: var(--ink-faint);
 }
-:root[data-skin="sygnal"] input:not([type="file"]),
-:root[data-skin="sygnal"] select,
-:root[data-skin="sygnal"] textarea {
+/* Pola TEKSTOWE. Wyłączone są te, które przeglądarka rysuje sama i którym wysokość
+   ani wyściółka nie służą: plik, pole koloru (13 px wyściółki zamieniało próbkę
+   w pionową kreskę), przełącznik, suwak. */
+:root[data-skin="sygnal"]:has(#view-login[hidden]) input:not([type="file"], [type="color"], [type="checkbox"], [type="radio"], [type="range"]),
+:root[data-skin="sygnal"]:has(#view-login[hidden]) select,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) textarea {
   min-height: 46px;
   padding: 0 13px;
   border: 1.5px solid var(--line-strong);
@@ -262,10 +294,10 @@
   font: 400 var(--t-body-lg)/1.2 var(--font);
   box-shadow: none;
 }
-:root[data-skin="sygnal"] textarea { padding: 12px 13px; line-height: 1.4; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) textarea { padding: 12px 13px; line-height: 1.4; }
 /* Chevron selecta jest rysowany dwoma gradientami — kosiarka wyżej go zdjęła,
    więc przywracamy go tutaj, w barwie atramentu skóry. */
-:root[data-skin="sygnal"] select {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) select {
   appearance: none;
   -webkit-appearance: none;
   padding-right: 40px;
@@ -276,16 +308,26 @@
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
 }
-:root[data-skin="sygnal"] input:focus,
-:root[data-skin="sygnal"] select:focus,
-:root[data-skin="sygnal"] textarea:focus {
+/* Pole koloru zostaje próbką: obrys skóry, w środku sam kolor bez wyściółki. */
+:root[data-skin="sygnal"]:has(#view-login[hidden]) input[type="color"] {
+  padding: 2px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+}
+:root[data-skin="sygnal"]:has(#view-login[hidden]) input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 9px; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+
+:root[data-skin="sygnal"]:has(#view-login[hidden]) input:focus,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) select:focus,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) textarea:focus {
   outline: none;
   border: 2px solid var(--focus);
   box-shadow: 0 0 0 3px var(--focus-halo);
 }
 
 /* ---------- 6. Segmenty: tor z obrysem, aktywny w pigułce ---------- */
-:root[data-skin="sygnal"] .seg {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .seg {
   display: grid;
   gap: 4px;
   padding: 4px;
@@ -293,9 +335,9 @@
   border-radius: var(--r-pill);
   background: transparent;
 }
-:root[data-skin="sygnal"] .seg-2 { grid-template-columns: 1fr 1fr; }
-:root[data-skin="sygnal"] .seg-3 { grid-template-columns: repeat(3, 1fr); }
-:root[data-skin="sygnal"] .seg button {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .seg-2 { grid-template-columns: 1fr 1fr; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .seg-3 { grid-template-columns: repeat(3, 1fr); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .seg button {
   min-height: 46px;
   display: flex;
   flex-direction: column;
@@ -310,15 +352,15 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-:root[data-skin="sygnal"] .seg button.active { border-color: var(--ink); color: var(--ink); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .seg button.active { border-color: var(--ink); color: var(--ink); }
 /* Semantyka +/− zostaje, ale ŚCISZONA do dwóch ciemnych odcieni w gamie farby. */
-:root[data-skin="sygnal"] #segType button[data-type="WYDATEK"].active { border-color: var(--minus); color: var(--minus); }
-:root[data-skin="sygnal"] #segType button[data-type="PRZYCHÓD"].active { border-color: var(--plus); color: var(--plus); }
-:root[data-skin="sygnal"] #segType button[data-type="TRANSFER"].active { border-color: var(--flow); color: var(--flow); }
-:root[data-skin="sygnal"] .seg .sig { font: 600 var(--t-body)/1 var(--mono); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #segType button[data-type="WYDATEK"].active { border-color: var(--minus); color: var(--minus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #segType button[data-type="PRZYCHÓD"].active { border-color: var(--plus); color: var(--plus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #segType button[data-type="TRANSFER"].active { border-color: var(--flow); color: var(--flow); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .seg .sig { font: 600 var(--t-body)/1 var(--mono); }
 
 /* ---------- 7. Przyciski ---------- */
-:root[data-skin="sygnal"] .btn {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .btn {
   min-height: 46px;
   padding: 0 18px;
   border: 1.5px solid var(--line-strong);
@@ -331,22 +373,22 @@
   text-transform: uppercase;
   box-shadow: none;
 }
-:root[data-skin="sygnal"] .btn.primary {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .btn.primary {
   border-color: var(--ink);
   background: var(--ink);
   color: var(--bg);
   font-weight: 800;
   letter-spacing: 0.1em;
 }
-:root[data-skin="sygnal"] .btn.small { min-height: 36px; padding: 0 12px; font-size: 11px; }
-:root[data-skin="sygnal"] .btn:focus-visible {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .btn.small { min-height: 36px; padding: 0 12px; font-size: 11px; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .btn:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
 /* ---------- 8. Historia: lista bez kart wokół wpisu ---------- */
-:root[data-skin="sygnal"] #txTable { border-collapse: collapse; font-family: var(--font); }
-:root[data-skin="sygnal"] #txTable th {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable { border-collapse: collapse; font-family: var(--font); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable th {
   font: 500 var(--t-micro)/1 var(--mono);
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -354,12 +396,12 @@
   background: transparent;
   border-bottom: 2px solid var(--line-strong);
 }
-:root[data-skin="sygnal"] #txTable tbody tr {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable tbody tr {
   border-bottom: 1.5px solid var(--line);
   background-image: none;            /* mgiełka kategorii z „Tafli" — w Sygnale to KRESKA */
 }
-:root[data-skin="sygnal"] #txTable td { border: 0; color: var(--ink); font-size: var(--t-body); }
-:root[data-skin="sygnal"] #txTable .num {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td { border: 0; color: var(--ink); font-size: var(--t-body); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable .num {
   font: 600 var(--num-md)/1.15 var(--mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -369,17 +411,17 @@
    pod nim (DECYZJE #89 zostaje w mocy — kolor nadal wyróżnia całą transakcję, tylko
    ciszej). Inset zamiast border-left, bo w trybie kart wiersz jest gridem i dodatkowa
    krawędź przesunęłaby kolumny. */
-:root[data-skin="sygnal"] #txTable tbody tr {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable tbody tr {
   box-shadow: inset 3px 0 0 0 var(--cat-c, transparent);
 }
-:root[data-skin="sygnal"] .catdot { display: none; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .catdot { display: none; }
 /* Znacznik typu: OBRYS w barwie znaczenia, nigdy wypełnienie. Selektory muszą
    zawierać #txTable, bo „Tafla" maluje te plakietki regułą z ID (`#txTable td.exp
    .typ`) i bez tego wygrywałaby specyficznością. */
-:root[data-skin="sygnal"] #txTable .typ,
-:root[data-skin="sygnal"] #txTable td.exp .typ,
-:root[data-skin="sygnal"] #txTable td.inc .typ,
-:root[data-skin="sygnal"] #txTable td.trf .typ {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable .typ,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td.exp .typ,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td.inc .typ,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td.trf .typ {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -392,15 +434,15 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
-:root[data-skin="sygnal"] #txTable td.exp .typ { color: var(--minus); }
-:root[data-skin="sygnal"] #txTable td.inc .typ { color: var(--plus); }
-:root[data-skin="sygnal"] #txTable td.trf .typ { color: var(--flow); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td.exp .typ { color: var(--minus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td.inc .typ { color: var(--plus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td.trf .typ { color: var(--flow); }
 /* Kwoty w kolumnie liczbowej też chodzą przez #txTable w „Tafli". */
-:root[data-skin="sygnal"] #txTable td.exp.num { color: var(--minus); }
-:root[data-skin="sygnal"] #txTable td.inc.num { color: var(--plus); }
-:root[data-skin="sygnal"] #txTable td.trf.num { color: var(--flow); }
-:root[data-skin="sygnal"] .pill,
-:root[data-skin="sygnal"] #txTable .pill.bank {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td.exp.num { color: var(--minus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td.inc.num { color: var(--plus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable td.trf.num { color: var(--flow); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .pill,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #txTable .pill.bank {
   border: 1.5px solid var(--line);
   border-radius: var(--r-pill);
   background: transparent;
@@ -410,7 +452,7 @@
   text-transform: uppercase;
 }
 
-:root[data-skin="sygnal"] .theme-dot {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .theme-dot {
   width: 44px;
   height: 44px;
   border: 1.5px solid var(--line-strong);
@@ -418,14 +460,14 @@
   background: transparent;
   color: var(--ink);
 }
-:root[data-skin="sygnal"] .theme-dot__i {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .theme-dot__i {
   width: 14px;
   height: 14px;
   border: 1.5px solid currentColor;
   border-radius: 50%;
   background-image: linear-gradient(90deg, currentColor 50%, transparent 50%);
 }
-:root[data-skin="sygnal"] .theme-switch__now {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .theme-switch__now {
   font: 600 var(--t-micro)/1 var(--mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -439,14 +481,14 @@
    Tu kończy się „jedna karta na widok": kontener `.kpi` przestaje być panelem, a
    panelem staje się KAŻDY kafel. Bez tego obrys pudełka i obrysy kafli tworzyłyby
    dwie ramki w odległości 2 px od siebie. */
-:root[data-skin="sygnal"] .kpi {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi {
   border: 0;
   border-radius: 0;
   background: transparent;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-:root[data-skin="sygnal"] .kpi .tile {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile {
   flex-direction: column;          /* nie `column-reverse` — kolejność robi `order` */
   justify-content: flex-start;     /* „Tafla" dociska do dołu; tu kafle równają się GÓRĄ */
   gap: 6px;
@@ -456,27 +498,27 @@
   background: transparent;
 }
 /* DOM to „wartość, etykieta, drugi wiersz"; na ekranie ma być etykieta u góry. */
-:root[data-skin="sygnal"] .kpi .tile span { order: 1; }
-:root[data-skin="sygnal"] .kpi .tile b { order: 2; }
-:root[data-skin="sygnal"] .kpi .tile small { order: 3; }
-:root[data-skin="sygnal"] .kpi .tile span {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile span { order: 1; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile b { order: 2; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile small { order: 3; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile span {
   font: 500 var(--t-micro)/1.3 var(--mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-muted);
   overflow-wrap: break-word;
 }
-:root[data-skin="sygnal"] .kpi .tile b {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile b {
   font: 600 var(--num-lg)/1.1 var(--mono);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 /* Ton kafla musi być powtórzony w skórze: selektor „Tafli" (`.kpi .tile--minus b`)
    przegrywa specyficznością z regułą wyżej, która ustawia `color: var(--ink)`. */
-:root[data-skin="sygnal"] .kpi .tile--minus b { color: var(--minus); }
-:root[data-skin="sygnal"] .kpi .tile--plus b { color: var(--plus); }
-:root[data-skin="sygnal"] .kpi .tile--warn b { color: var(--warn); }
-:root[data-skin="sygnal"] .kpi .tile small {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile--minus b { color: var(--minus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile--plus b { color: var(--plus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile--warn b { color: var(--warn); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile small {
   font: 400 var(--t-micro)/1 var(--mono);
   font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
@@ -487,14 +529,14 @@
 
 /* Pigułki okresu: aktywna jest tu WYPEŁNIONA, nie obrysowana — inaczej trzy obrysy
    (tor, aktywna pigułka, kafel pod nią) zlewają się w kratkę. */
-:root[data-skin="sygnal"] .chips {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .chips {
   padding: 4px;
   border: 1.5px solid var(--line-strong);
   border-radius: var(--r-pill);
   background: transparent;
   gap: 6px;
 }
-:root[data-skin="sygnal"] .chips button {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .chips button {
   min-height: 44px;
   padding: 0 16px;
   border: 0;
@@ -505,7 +547,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-:root[data-skin="sygnal"] .chips button.active {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .chips button.active {
   background: var(--ink);
   color: var(--bg);
   font-weight: 800;
@@ -514,34 +556,34 @@
 /* Słupki kategorii: tor to sam obrys, wypełnienie to barwa kategorii BEZ mieszania
    z tłem („Tafla" mieszała, żeby brzydki hex nie krzyczał — tu krzyk jest na miejscu,
    bo to jedyny kolor poza duotone). Bez koloru: pełny atrament. */
-:root[data-skin="sygnal"] .bary {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .bary {
   border: 1.5px solid var(--line-strong);
   border-radius: var(--r-md);
   background: transparent;
 }
-:root[data-skin="sygnal"] .bary .barrow { border-bottom: 1.5px solid var(--line); padding: 12px 14px; }
-:root[data-skin="sygnal"] .barrow .bname { font: 600 var(--t-cap)/1.3 var(--font); }
-:root[data-skin="sygnal"] .barrow .bval { font: 600 var(--num-md)/1.2 var(--mono); color: var(--ink); }
-:root[data-skin="sygnal"] .barrow .btrack {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .bary .barrow { border-bottom: 1.5px solid var(--line); padding: 12px 14px; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .barrow .bname { font: 600 var(--t-cap)/1.3 var(--font); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .barrow .bval { font: 600 var(--num-md)/1.2 var(--mono); color: var(--ink); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .barrow .btrack {
   height: 8px;
   border: 1.5px solid var(--line);
   background: transparent;
 }
-:root[data-skin="sygnal"] .barrow .bar { background: var(--cat-c, var(--ink)); }
-:root[data-skin="sygnal"] .barrow .bpct { font: 500 var(--t-micro)/1 var(--mono); color: var(--ink-muted); }
-:root[data-skin="sygnal"] .barrow .catdot {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .barrow .bar { background: var(--cat-c, var(--ink)); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .barrow .bpct { font: 500 var(--t-micro)/1 var(--mono); color: var(--ink-muted); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .barrow .catdot {
   width: 10px; height: 10px;
   border-radius: 50%;
   outline: 1.5px solid var(--line-strong);
 }
-:root[data-skin="sygnal"] .barrow .catdot.pusta { border: 1.5px solid var(--line-strong); outline: 0; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .barrow .catdot.pusta { border: 1.5px solid var(--line-strong); outline: 0; }
 
 /* Nagłówki sekcji dokładanych z JS — Archivo 900, wersaliki, bez tła. */
-:root[data-skin="sygnal"] #view-raporty h2,
-:root[data-skin="sygnal"] #view-import h2,
-:root[data-skin="sygnal"] #view-paragon h2,
-:root[data-skin="sygnal"] #view-przydzial h2,
-:root[data-skin="sygnal"] #view-admin h2 {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-raporty h2,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-import h2,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-paragon h2,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-przydzial h2,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-admin h2 {
   margin: 0;
   font: 900 var(--t-body-lg)/1.2 var(--font);
   font-stretch: 108%;
@@ -552,21 +594,21 @@
 }
 
 /* Tabele: obrys zewnętrzny + linie wierszy. Nagłówek mono, rozstrzelony, wersaliki. */
-:root[data-skin="sygnal"] #view-raporty table,
-:root[data-skin="sygnal"] #view-admin table,
-:root[data-skin="sygnal"] #view-import table,
-:root[data-skin="sygnal"] #view-przydzial table {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-raporty table,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-admin table,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-import table,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-przydzial table {
   border: 1.5px solid var(--line-strong);
   border-radius: var(--r-md);
   background: transparent;
 }
 /* W `.overflow` panelem jest KONTENER (to on się przewija) — tabela w środku jest naga,
    inaczej dwie ramki jadą obok siebie i przy przewijaniu jedna wjeżdża pod drugą. */
-:root[data-skin="sygnal"] .overflow table { border: 0; border-radius: 0; background: transparent; }
-:root[data-skin="sygnal"] #view-raporty th,
-:root[data-skin="sygnal"] #view-admin th,
-:root[data-skin="sygnal"] #view-import th,
-:root[data-skin="sygnal"] #view-przydzial th {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .overflow table { border: 0; border-radius: 0; background: transparent; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-raporty th,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-admin th,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-import th,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-przydzial th {
   border-bottom: 1.5px solid var(--line-strong);
   background: transparent;
   color: var(--ink-muted);
@@ -574,10 +616,10 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-:root[data-skin="sygnal"] #view-raporty td,
-:root[data-skin="sygnal"] #view-admin td,
-:root[data-skin="sygnal"] #view-import td,
-:root[data-skin="sygnal"] #view-przydzial td {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-raporty td,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-admin td,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-import td,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-przydzial td {
   border-top: 1.5px solid var(--line);
   font: 500 var(--t-cap)/1.2 var(--mono);
   font-variant-numeric: tabular-nums;
@@ -585,11 +627,11 @@
 }
 /* Liczba nigdy nie łamie się w środku („121,50" + „zł" w dwóch liniach) — kolumna
    ma prawo wyjechać za kadr, bo kontener `.overflow` się przewija. */
-:root[data-skin="sygnal"] #view-raporty td.num,
-:root[data-skin="sygnal"] #view-raporty th.num { white-space: nowrap; }
-:root[data-skin="sygnal"] #trend td.inc { color: var(--plus); }
-:root[data-skin="sygnal"] #trend td.exp { color: var(--minus); }
-:root[data-skin="sygnal"] #view-raporty .msg {
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-raporty td.num,
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-raporty th.num { white-space: nowrap; }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #trend td.inc { color: var(--plus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #trend td.exp { color: var(--minus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #view-raporty .msg {
   padding: 0;
   border: 0;
   background: transparent;
@@ -598,7 +640,7 @@
 }
 
 @media (max-width: 390px) {
-  :root[data-skin="sygnal"] .kpi .tile b { font-size: var(--num-md); }
+  :root[data-skin="sygnal"]:has(#view-login[hidden]) .kpi .tile b { font-size: var(--num-md); }
 }
 
 /* ---------- 10. Wybór skóry (arkusz „Więcej" i Administracja) ---------- */
@@ -626,5 +668,5 @@
 
 /* ---------- 11. Ruch: tyle, ile potrzeba ---------- */
 @media (prefers-reduced-motion: reduce) {
-  :root[data-skin="sygnal"] * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+  :root[data-skin="sygnal"]:has(#view-login[hidden]) * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
 }
