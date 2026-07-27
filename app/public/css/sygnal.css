@@ -221,6 +221,29 @@
 }
 :root[data-skin="sygnal"]:has(#view-login[hidden]) #nav .nav-i { font-size: 15px; }
 
+/* Szeroki ekran: „Tafla" zwęża pasek do PŁYWAJĄCEJ pigułki na środku (styles.css,
+   @media min-width 901px). W duotone to nie działa — Szymon 07-27: „nie ma zaokrągleń
+   i brakuje konturu z dołu, jeśli zaczyna wisieć, wygląda to na niedorobione". Pasek
+   wraca więc do pełnej szerokości, przyklejony do dolnej krawędzi, z jedną kreską u góry.
+   Skóra musi to odwrócić JAWNIE: zapytanie medialne nie podnosi specyficzności, więc
+   reguły „Tafli" dla left/right/bottom/transform/width nadal by obowiązywały. */
+@media (min-width: 901px) {
+  :root[data-skin="sygnal"]:has(#view-login[hidden]) #nav {
+    left: 0;
+    right: auto;
+    bottom: 0;
+    width: 100%;
+    transform: none;
+    grid-template-columns: repeat(5, 1fr);
+    border: 0;
+    border-top: 2px solid var(--line-strong);
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--bg);
+  }
+  :root[data-skin="sygnal"]:has(#view-login[hidden]) main { margin-bottom: calc(var(--space-8) + 84px); }
+}
+
 /* ---------- 3. Panele: obrys, zero wypełnienia ---------- */
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .card,
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .overflow,

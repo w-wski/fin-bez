@@ -586,6 +586,37 @@ input:disabled, select:disabled, textarea:disabled, .btn:disabled { opacity: .5;
 .fld.quiet > span { font: 400 var(--fs-micro)/1 var(--font); color: var(--ink-faint); }
 .fld.quiet select, .fld.quiet input { background: var(--glass-fill-sunken); font-size: var(--fs-body); }
 .fld-head { display: flex; justify-content: space-between; align-items: baseline; }
+
+/* iOS: pole DATY wychodziło poza kartę prawą krawędzią (Szymon 07-27; na Androidzie
+   i w przeglądarce desktopowej problem nie występuje). Powód nie jest w wyściółce —
+   `box-sizing: border-box` mamy globalnie — tylko w tym, że WebKit nadaje kontrolce
+   daty szeroką wewnętrzną zawartość, a element flexowy ma domyślnie `min-width: auto`,
+   czyli „nie zwężaj mnie poniżej treści". Wtedy `align-items: stretch` przegrywa
+   i pole rozpycha kartę. `min-width: 0` zdejmuje tę blokadę, a `appearance: none`
+   pozbawia kontrolkę dodatkowej wyściółki, którą WebKit rysuje w shadow DOM.
+   Reguła jest wspólna dla obu skór: to naprawa platformy, nie decyzja estetyczna. */
+input[type="date"],
+input[type="month"],
+input[type="time"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+/* Sama wartość w środku kontrolki też ma swoją szerokość minimalną (WebKit). */
+input[type="date"]::-webkit-date-and-time-value,
+input[type="month"]::-webkit-date-and-time-value {
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+}
+/* Pola daty w rzędzie (filtry Historii, zakres Raportów) muszą móc się ZWĘŻAĆ. */
+.row > input[type="date"],
+.row > input[type="month"],
+.rap-okres > input[type="date"],
+.rap-okres > input[type="month"] { min-width: 0; }
 .fld-head em {
   font: 400 var(--fs-micro)/1 var(--mono);
   font-variant-numeric: tabular-nums;
