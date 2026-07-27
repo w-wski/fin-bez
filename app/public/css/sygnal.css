@@ -435,7 +435,173 @@
   border-radius: var(--r-pill);
 }
 
-/* ---------- 9. Wybór skóry (arkusz „Więcej" i Administracja) ---------- */
+/* ---------- 9. Raporty: kafle KPI, słupki kategorii, trend ----------
+   Tu kończy się „jedna karta na widok": kontener `.kpi` przestaje być panelem, a
+   panelem staje się KAŻDY kafel. Bez tego obrys pudełka i obrysy kafli tworzyłyby
+   dwie ramki w odległości 2 px od siebie. */
+:root[data-skin="sygnal"] .kpi {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+:root[data-skin="sygnal"] .kpi .tile {
+  flex-direction: column;          /* nie `column-reverse` — kolejność robi `order` */
+  justify-content: flex-start;     /* „Tafla" dociska do dołu; tu kafle równają się GÓRĄ */
+  gap: 6px;
+  padding: 12px 13px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: transparent;
+}
+/* DOM to „wartość, etykieta, drugi wiersz"; na ekranie ma być etykieta u góry. */
+:root[data-skin="sygnal"] .kpi .tile span { order: 1; }
+:root[data-skin="sygnal"] .kpi .tile b { order: 2; }
+:root[data-skin="sygnal"] .kpi .tile small { order: 3; }
+:root[data-skin="sygnal"] .kpi .tile span {
+  font: 500 var(--t-micro)/1.3 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  overflow-wrap: break-word;
+}
+:root[data-skin="sygnal"] .kpi .tile b {
+  font: 600 var(--num-lg)/1.1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+/* Ton kafla musi być powtórzony w skórze: selektor „Tafli" (`.kpi .tile--minus b`)
+   przegrywa specyficznością z regułą wyżej, która ustawia `color: var(--ink)`. */
+:root[data-skin="sygnal"] .kpi .tile--minus b { color: var(--minus); }
+:root[data-skin="sygnal"] .kpi .tile--plus b { color: var(--plus); }
+:root[data-skin="sygnal"] .kpi .tile--warn b { color: var(--warn); }
+:root[data-skin="sygnal"] .kpi .tile small {
+  font: 400 var(--t-micro)/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pigułki okresu: aktywna jest tu WYPEŁNIONA, nie obrysowana — inaczej trzy obrysy
+   (tor, aktywna pigułka, kafel pod nią) zlewają się w kratkę. */
+:root[data-skin="sygnal"] .chips {
+  padding: 4px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  gap: 6px;
+}
+:root[data-skin="sygnal"] .chips button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-muted);
+  font: 700 var(--t-micro)/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+:root[data-skin="sygnal"] .chips button.active {
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 800;
+}
+
+/* Słupki kategorii: tor to sam obrys, wypełnienie to barwa kategorii BEZ mieszania
+   z tłem („Tafla" mieszała, żeby brzydki hex nie krzyczał — tu krzyk jest na miejscu,
+   bo to jedyny kolor poza duotone). Bez koloru: pełny atrament. */
+:root[data-skin="sygnal"] .bary {
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: transparent;
+}
+:root[data-skin="sygnal"] .bary .barrow { border-bottom: 1.5px solid var(--line); padding: 12px 14px; }
+:root[data-skin="sygnal"] .barrow .bname { font: 600 var(--t-cap)/1.3 var(--font); }
+:root[data-skin="sygnal"] .barrow .bval { font: 600 var(--num-md)/1.2 var(--mono); color: var(--ink); }
+:root[data-skin="sygnal"] .barrow .btrack {
+  height: 8px;
+  border: 1.5px solid var(--line);
+  background: transparent;
+}
+:root[data-skin="sygnal"] .barrow .bar { background: var(--cat-c, var(--ink)); }
+:root[data-skin="sygnal"] .barrow .bpct { font: 500 var(--t-micro)/1 var(--mono); color: var(--ink-muted); }
+:root[data-skin="sygnal"] .barrow .catdot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  outline: 1.5px solid var(--line-strong);
+}
+:root[data-skin="sygnal"] .barrow .catdot.pusta { border: 1.5px solid var(--line-strong); outline: 0; }
+
+/* Nagłówki sekcji dokładanych z JS — Archivo 900, wersaliki, bez tła. */
+:root[data-skin="sygnal"] #view-raporty h2,
+:root[data-skin="sygnal"] #view-import h2,
+:root[data-skin="sygnal"] #view-paragon h2,
+:root[data-skin="sygnal"] #view-przydzial h2,
+:root[data-skin="sygnal"] #view-admin h2 {
+  margin: 0;
+  font: 900 var(--t-body-lg)/1.2 var(--font);
+  font-stretch: 108%;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: transparent;
+}
+
+/* Tabele: obrys zewnętrzny + linie wierszy. Nagłówek mono, rozstrzelony, wersaliki. */
+:root[data-skin="sygnal"] #view-raporty table,
+:root[data-skin="sygnal"] #view-admin table,
+:root[data-skin="sygnal"] #view-import table,
+:root[data-skin="sygnal"] #view-przydzial table {
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: transparent;
+}
+/* W `.overflow` panelem jest KONTENER (to on się przewija) — tabela w środku jest naga,
+   inaczej dwie ramki jadą obok siebie i przy przewijaniu jedna wjeżdża pod drugą. */
+:root[data-skin="sygnal"] .overflow table { border: 0; border-radius: 0; background: transparent; }
+:root[data-skin="sygnal"] #view-raporty th,
+:root[data-skin="sygnal"] #view-admin th,
+:root[data-skin="sygnal"] #view-import th,
+:root[data-skin="sygnal"] #view-przydzial th {
+  border-bottom: 1.5px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink-muted);
+  font: 600 var(--t-micro)/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+:root[data-skin="sygnal"] #view-raporty td,
+:root[data-skin="sygnal"] #view-admin td,
+:root[data-skin="sygnal"] #view-import td,
+:root[data-skin="sygnal"] #view-przydzial td {
+  border-top: 1.5px solid var(--line);
+  font: 500 var(--t-cap)/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+/* Liczba nigdy nie łamie się w środku („121,50" + „zł" w dwóch liniach) — kolumna
+   ma prawo wyjechać za kadr, bo kontener `.overflow` się przewija. */
+:root[data-skin="sygnal"] #view-raporty td.num,
+:root[data-skin="sygnal"] #view-raporty th.num { white-space: nowrap; }
+:root[data-skin="sygnal"] #trend td.inc { color: var(--plus); }
+:root[data-skin="sygnal"] #trend td.exp { color: var(--minus); }
+:root[data-skin="sygnal"] #view-raporty .msg {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  font: 400 var(--t-micro)/1.5 var(--mono);
+}
+
+@media (max-width: 390px) {
+  :root[data-skin="sygnal"] .kpi .tile b { font-size: var(--num-md); }
+}
+
+/* ---------- 10. Wybór skóry (arkusz „Więcej" i Administracja) ---------- */
 .skora { display: flex; flex-direction: column; gap: 8px; padding: 10px 4px 4px; }
 .skora__label {
   font: 500 11.5px/1 var(--mono, ui-monospace);
@@ -458,7 +624,7 @@
 }
 .skora__opcja.is-on { border-color: currentColor; font-weight: 800; }
 
-/* ---------- 10. Ruch: tyle, ile potrzeba ---------- */
+/* ---------- 11. Ruch: tyle, ile potrzeba ---------- */
 @media (prefers-reduced-motion: reduce) {
   :root[data-skin="sygnal"] * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
 }

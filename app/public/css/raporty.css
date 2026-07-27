@@ -28,6 +28,18 @@
   overflow-wrap: break-word;
 }
 .kpi .tile span { color: var(--ink-muted); font: 500 var(--fs-micro)/1.25 var(--font); overflow-wrap: break-word; }
+/* Drugi wiersz kafla (zmiana m/m, saldo narastające). W `column-reverse` `small` jest
+   w DOM ostatni, więc na ekranie ląduje NA GÓRZE — dlatego wypycham go na spód. */
+.kpi .tile small {
+  order: -1;
+  color: var(--ink-muted);
+  font: 500 var(--fs-micro)/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.kpi .tile--minus b { color: var(--minus); }
+.kpi .tile--plus b { color: var(--plus); }
+.kpi .tile--warn b { color: var(--warn); }
 
 /* ---------- Wydatki wg kategorii ----------
    Jedna tafla, w niej wiersze. Nazwa i kwota w pierwszej linii, słupek i udział

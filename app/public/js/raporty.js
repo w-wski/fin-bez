@@ -23,6 +23,28 @@ export function okresRaportu(tryb, month, from, to) {
 // w jednym rzędzie i widać wybór bez rozwijania.
 const trybOkresu = () => $('#rZakres')?.querySelector('.active')?.dataset.zakres || 'miesiac';
 
+// Kafel KPI. DOM zawsze w kolejności „wartość, etykieta, drugi wiersz" — czytnik
+// ekranu czyta liczbę pierwszą, a obie skóry układają to wizualnie po swojemu.
+// `ton` barwi TYLKO liczbę (wydatek/przychód/ostrzeżenie), `pod` to drugi wiersz.
+function kafel(label, wartosc, pod, ton) {
+  const t = el('div', { class: ton ? 'tile tile--' + ton : 'tile' });
+  t.append(el('b', {}, wartosc), el('span', {}, label));
+  if (pod) t.append(el('small', {}, pod));
+  return t;
+}
+
+// Baza porównania zależy od trybu: miesiąc do miesiąca, kwartał do kwartału.
+// Własny zakres nie ma kalendarzowego odpowiednika — mówimy wprost „vs poprz.".
+const SUFIKS = { miesiac: 'm/m', kwartal: 'k/k', rok: 'r/r', wlasny: 'vs poprz.' };
+
+// `null` z API znaczy „nie ma z czym porównać" (pierwszy okres w bazie) — pokazujemy
+// to jako „—", nie jako 0 % i nie jako +∞ %.
+function zmiana(pct, tryb) {
+  if (pct === null || pct === undefined) return '— brak bazy';
+  const znak = pct > 0 ? '+' : (pct < 0 ? '−' : '');
+  return `${znak}${Math.abs(pct).toFixed(1).replace('.', ',')} % ${SUFIKS[tryb] || ''}`.trim();
+}
+
 export async function loadReport() {
   const ledger = $('#rLedger').value || state.me.scope.ledgers[0];
   const month = $('#rMonth').value || new Date().toISOString().slice(0, 7);
@@ -31,16 +53,20 @@ export async function loadReport() {
   if (!o) return;                                  // własny zakres jeszcze niekompletny
   const s = await api(`/api/v1/summary?ledger=${ledger}&${o.qs}`);
   $('#kpi').innerHTML = '';
+  const d = s.delta || {};
   const tiles = [
-    ['Przychody', zl(s.income)], ['Wydatki', zl(s.expenses)],
-    ['Bilans', zl(s.balance)], ['Wpisy', String(s.tx_count)],
+    kafel('Wydatki okresu', zl(s.expenses), zmiana(d.expenses_pct, tryb), 'minus'),
+    kafel('Przychody okresu', zl(s.income), zmiana(d.income_pct, tryb), 'plus'),
+    // Przy bilansie druga linia mówi coś WIĘCEJ niż procent: saldo od zawsze do końca
+    // okresu. Procent bilansu bywa bez sensu (baza blisko zera), narastające nie.
+    kafel('Bilans', zl(s.balance), 'narast. ' + zl(s.cumulative_balance), Number(s.balance) < 0 ? 'minus' : null),
+    kafel('Wpisy', String(s.tx_count), null),
   ];
-  if (s.unmatched_bank_rows !== null) tiles.push(['Bankowe do uzgodnienia', String(s.unmatched_bank_rows)]);
-  for (const [label, val] of tiles) {
-    const t = el('div', { class: 'tile' });
-    t.append(el('b', {}, val), el('span', {}, label));
-    $('#kpi').append(t);
+  if (s.unmatched_bank_rows !== null) {
+    tiles.push(kafel('Bankowe do uzgodnienia', String(s.unmatched_bank_rows), null,
+      Number(s.unmatched_bank_rows) ? 'warn' : null));
   }
+  for (const t of tiles) $('#kpi').append(t);
   // Kolory kategorii (nadane w Admin) barwią słupki raportu; podkategoria bez
   // własnego koloru dziedziczy kolor rodzica. Bez koloru — słupek w szałwii.
   const kolory = {};
@@ -102,7 +128,8 @@ export async function loadReport() {
         el('td', { class: 'num' }, zl(r.total)), el('td', { class: 'num' }, String(r.n)));
       tb2.append(tr);
     }
-    t.append(tb2); f.append(t);
+    t.append(tb2);
+    const w = el('div', { class: 'overflow' }); w.append(t); f.append(w);
   } else $('#fvp').innerHTML = '';
   if (state.me.role === 'admin') loadTelemetry();
   else $('#telemetria').innerHTML = '';
@@ -122,8 +149,17 @@ function sekcja(id) {
   return n;
 }
 
-// Tabela z nagłówkami; `rows` to tablice komórek [{v, num}] lub gołych wartości.
+// Tabela z nagłówkami, ZAWSZE w kontenerze `.overflow` — na 390 px sześć kolumn
+// liczb w kroju o stałej szerokości znaku nie mieści się w żaden sposób, a wtedy
+// alternatywą dla przewijania w poziomie jest łamanie „zł" do drugiej linii.
+// `rows` to tablice komórek [{v, num}] lub gołych wartości.
 function tabela(headers, rows) {
+  const w = el('div', { class: 'overflow' });
+  w.append(goleTabela(headers, rows));
+  return w;
+}
+
+function goleTabela(headers, rows) {
   const t = el('table');
   t.innerHTML = '<thead><tr>' + headers.map((h, i) => `<th${i ? ' class="num"' : ''}>${h}</th>`).join('') + '</tr></thead>';
   const tb = el('tbody');
@@ -162,11 +198,7 @@ async function loadBartus(month) {
   const kafle = [['Kieszonkowe', zl(b.kieszonkowe)]];
   if (b.wplywy) kafle.push(['Inne wpływy', zl(b.wplywy)]);
   kafle.push(['Wydatki Bartka', zl(b.wydatki)], ['Saldo narastająco', zl(b.saldo)]);
-  for (const [label, val] of kafle) {
-    const t = el('div', { class: 'tile' });
-    t.append(el('b', {}, val), el('span', {}, label));
-    kpi.append(t);
-  }
+  for (const [label, val] of kafle) kpi.append(kafel(label, val, null));
   box.append(kpi);
   if (b.months.length) {
     const maWpl = b.months.some((m) => m.wplywy);
@@ -211,7 +243,8 @@ async function loadTelemetry() {
           typeof v === 'number' ? String(v) : (v ?? '—'))));
         body.append(tr);
       }
-      tb.append(body); return tb;
+      tb.append(body);
+      const w = el('div', { class: 'overflow' }); w.append(tb); return w;
     };
     box.append(el('h2', {}, 'Czas na kartach [min] wg osoby'));
     box.append(mk(['Karta', 'Kto', 'Minuty', 'Zdarzenia'],
