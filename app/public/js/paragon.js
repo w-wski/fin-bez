@@ -7,6 +7,7 @@
 import { $, track } from './core.js';
 import { renderReceipt } from './paragon-edit.js';
 import { initLista, odswiezListe, otworz } from './paragon-lista.js';
+import { przyjmijPlik } from './paragon-plik.js';
 
 const deps = { $, track };            // kategorie, kwoty i wywołania API zostały w paragon-edit.js
 let img = null;            // źródłowy obraz
@@ -17,9 +18,24 @@ let currentReceipt = null;
 
 const W_EDIT = 900;        // szerokość robocza edytora
 
+/** Dwa wejścia, dwa przyciski (Szymon 07-27). Jedno pole z `capture` na telefonie od razu
+ *  otwierało aparat i nie dawało wybrać pliku z dysku, a na komputerze odwrotnie — `capture`
+ *  zostaje więc TYLKO przy aparacie. Czyścimy OBA, bo inaczej wybór tego samego pliku
+ *  drugi raz nie wywołuje `change`. */
+function wyczyscWejscia() {
+  for (const id of ['#rcAparat', '#rcPlik']) { const el = $(id); if (el) el.value = ''; }
+}
+
 export function initParagon() {
   initLista({ onOpen: pokazWynik });   // lista paragonów w kroku „start" + odświeżanie przy wejściu na kartę
-  $('#rcFile').onchange = onFile;
+  // Aparat: zawsze zdjęcie, więc prosto w kadrowanie.
+  $('#rcAparat').onchange = onFile;
+  // Plik: rodzaj rozstrzyga paragon-plik.js — zdjęcie wraca tu, e-paragon i PDF idą
+  // własnymi trasami i wracają gotowym paragonem.
+  $('#rcPlik').onchange = (e) => {
+    const f = e.target.files[0];
+    if (f) przyjmijPlik(f, { naObraz: (plik) => wczytajObraz(plik), naWynik: pokazWynik });
+  };
   $('#rcApply').onclick = applyCrop;
   $('#rcBack').onclick = () => step('kadr');
   $('#rcSend').onclick = send;
@@ -37,7 +53,10 @@ function step(name) {
 
 function onFile(e) {
   const f = e.target.files[0];
-  if (!f) return;
+  if (f) wczytajObraz(f);
+}
+
+function wczytajObraz(f) {
   const url = URL.createObjectURL(f);
   img = new Image();
   img.onload = () => {
@@ -212,7 +231,7 @@ async function send() {
     if (res.status === 409 && data.existing_id) {
       msg.textContent = 'Ten paragon już był wgrany — otwieram zapisany odczyt.';
       msg.className = 'msg';
-      $('#rcFile').value = '';
+      wyczyscWejscia();
       return otworz(data.existing_id);
     }
     if (!res.ok) throw new Error(data.error || res.status);
@@ -238,11 +257,11 @@ function pokazWynik(dane) {
   currentReceipt = dane;
   renderReceipt(dane, {
     onDone: () => {
-      deps.$('#rcFile').value = '';
+      wyczyscWejscia();
       setTimeout(() => { step('start'); odswiezListe(); }, 2500);
     },
     // powrót do listy: paragon zostaje w bazie w takim stanie, w jakim jest — wraca się do niego
-    onBack: () => { deps.$('#rcFile').value = ''; step('start'); odswiezListe(); },
+    onBack: () => { wyczyscWejscia(); step('start'); odswiezListe(); },
   });
   step('wynik');
 }

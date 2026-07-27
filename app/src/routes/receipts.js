@@ -8,7 +8,6 @@
 // słownik w ../ocr/slownik, styk z księgą w ../ocr/ksiega, hybryda AI w ../ocr/ai.
 const express = require('express');
 const multer = require('multer');
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { q, pool } = require('../db');
@@ -20,95 +19,79 @@ const { kategoriaWKsiedze } = require('../ocr/slownik');
 const { zapiszNaglowek, ksieguj } = require('../ocr/ksiega');
 const { odczytajAI } = require('../ocr/ai');
 const poz = require('../ocr/pozycje');
+const przyjmij = require('../ocr/przyjmij');
+const { getWorker } = require('../ocr/worker');
+const { ksiega, wlasnyParagon, dataISO } = require('../ocr/dostep');
+const { czytaj: czytajEparagon } = require('../eparagon');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
 
 const RECEIPTS_DIR = process.env.RECEIPTS_DIR || path.join(__dirname, '..', '..', '..', 'receipts');
-const OCR_LANG_DIR = process.env.OCR_LANG_DIR || path.join(__dirname, '..', '..', 'ocr-data');
-
-let workerPromise = null; // jeden worker tesseracta na proces (start ~2-4 s, potem szybciej)
-async function getWorker() {
-  if (!workerPromise) {
-    workerPromise = (async () => {
-      const { createWorker } = require('tesseract.js');
-      return createWorker('pol', 1, {
-        langPath: OCR_LANG_DIR, gzip: true, cachePath: OCR_LANG_DIR,
-        logger: () => {},
-      });
-    })().catch((e) => { workerPromise = null; throw e; });
-  }
-  return workerPromise;
-}
-
-// DATE z MySQL wraca jako napis (db.js: dateStrings) albo obiekt Date — do przeglądarki musi
-// trafić czysta doba lokalna, inaczej strefa czasowa cofa paragon o jeden dzień.
-const dataISO = (v) => {
-  if (!v) return null;
-  if (typeof v === 'string') return v.slice(0, 10);
-  const d = new Date(v.getTime() - v.getTimezoneOffset() * 60000);
-  return d.toISOString().slice(0, 10);
-};
-
-// K9: paragon i jego zdjęcie widzi WYŁĄCZNIE właściciel albo admin. Cudzy = 404 (nie 403 —
-// 403 zdradzałoby, że taki paragon istnieje). Sama rola „adult" nie wystarcza: zakres księgi
-// jest tu za szeroki, a paragon bywa prywatny.
-async function loadOwnedReceipt(req, res) {
-  const scope = ledgerScope(req.user);
-  const rows = await q('SELECT * FROM receipts WHERE id = :id', { id: parseInt(req.params.id, 10) || 0 });
-  const rc = rows[0];
-  const moj = rc && rc.user_id === req.user.uid;
-  if (!rc || !scope.ledgers.includes(rc.ledger_id) || (!moj && req.user.role !== 'admin')) {
-    res.status(404).json({ error: 'not_found' }); return null;
-  }
-  return rc;
-}
-
 // POST /api/v1/receipts — multipart: image (JPEG po obróbce na telefonie), ledger_id?
+// Ciało drogi „obraz" siedzi w ../ocr/przyjmij: dzieli ją z PDF-em, który po wyłuskaniu
+// bitmapy jest dokładnie tym samym przypadkiem.
 router.post('/', upload.single('image'), async (req, res, next) => {
   try {
-    const scope = ledgerScope(req.user);
-    const ledgerId = parseInt(req.body.ledger_id || 1, 10);
-    if (!scope.ledgers.includes(ledgerId)) return res.status(403).json({ error: 'ledger_forbidden' });
+    const ledgerId = ksiega(req, res);
+    if (ledgerId === null) return;
     if (!req.file) return res.status(400).json({ error: 'no_image' });
+    const w = await przyjmij.zObrazu({
+      buffer: req.file.buffer, rozsz: 'jpg', ledgerId, uid: req.user.uid,
+      worker: await getWorker(), source: 'zdjecie',
+    });
+    if (w.duplikat) {
+      return res.status(409).json({ error: 'duplicate_receipt', existing_id: w.duplikat.id, imported_at: w.duplikat.imported_at });
+    }
+    res.status(201).json(w.odpowiedz);
+  } catch (e) { next(e); }
+});
 
-    // OCR (tesseract.js — lokalnie, zero chmury)
-    const worker = await getWorker();
-    const { data } = await worker.recognize(req.file.buffer);
-    const parsed = parseReceipt(data.text);
-
-    // anty-duplikacja: hash treści merytorycznej paragonu. existing_id pozwala frontowi
-    // OTWORZYĆ zapisany paragon zamiast pokazać ślepy komunikat „duplikat".
-    const hash = crypto.createHash('sha256').update([
-      parsed.shop_name || '', parsed.receipt_date || '', parsed.total ?? '',
-      parsed.items.map((i) => `${i.ocr_name}|${i.value}`).join(';'),
-    ].join('#'), 'utf8').digest('hex');
-    const dupe = await q('SELECT id, created_at FROM receipts WHERE receipt_hash = :h', { h: hash });
-    if (dupe.length) return res.status(409).json({ error: 'duplicate_receipt', existing_id: dupe[0].id, imported_at: dupe[0].created_at });
-
-    // plik: receipts/RRRR/MM/<hash>.jpg (poza docrootem)
-    const now = new Date();
-    const rel = path.join(String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0'), hash.slice(0, 24) + '.jpg');
-    const abs = path.join(RECEIPTS_DIR, rel);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, req.file.buffer);
-
-    // paragon + pozycje w JEDNEJ transakcji: pad w połowie nie zostawia paragonu bez pozycji
-    const conn = await pool.getConnection();
-    let id;
+// POST /api/v1/receipts/pdf — PDF z aplikacji sklepu. Sprawdziliśmy: taki PDF NIE MA tekstu,
+// tylko bitmapę (u Biedronki dodatkowo z treścią w masce przezroczystości), więc jedyna droga
+// do jego zawartości prowadzi przez rozpoznawanie tekstu — tak samo jak przy zdjęciu.
+router.post('/pdf', upload.single('plik'), async (req, res, next) => {
+  try {
+    const ledgerId = ksiega(req, res);
+    if (ledgerId === null) return;
+    if (!req.file) return res.status(400).json({ error: 'no_file' });
+    let w;
     try {
-      await conn.beginTransaction();
-      const [r] = await conn.execute(
-        `INSERT INTO receipts (ledger_id, user_id, shop_name, receipt_date, total, ocr_confidence, ocr_text, image_path, receipt_hash)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [ledgerId, req.user.uid, txt(parsed.shop_name, 128), czyData(parsed.receipt_date), parseKwota(parsed.total),
-          data.confidence ?? null, (data.text || '').slice(0, 60000), rel, hash]);
-      id = r.insertId;
-      await poz.saveParsed(conn, id, parsed, ledgerId);
-      await conn.commit();
-    } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
-    res.status(201).json({ id, ...parsed, status: 'NOWY', items: await poz.loadItems(id, ledgerId),
-      ocr_confidence: data.confidence, ai_available: !!process.env.ANTHROPIC_API_KEY });
+      w = await przyjmij.zPdf({ buffer: req.file.buffer, ledgerId, uid: req.user.uid, worker: await getWorker() });
+    } catch (e) {
+      // Błąd czytania PDF-a to wina PLIKU, nie serwera — 400 z powodem po polsku,
+      // żeby użytkownik wiedział, czy ma wgrać .json, czy zrobić zdjęcie.
+      return res.status(400).json({ error: e.message });
+    }
+    if (w.duplikat) {
+      return res.status(409).json({ error: 'duplicate_receipt', existing_id: w.duplikat.id, imported_at: w.duplikat.imported_at });
+    }
+    res.status(201).json(w.odpowiedz);
+  } catch (e) { next(e); }
+});
+
+// POST /api/v1/receipts/eparagon — plik .json w standardzie JPK_KASA_PARAGON_v2-0.
+// Treść przychodzi SUROWA i parsuje ją serwer: o tym, co wchodzi do księgi, nie decyduje
+// przeglądarka. Bramka sumowania siedzi w src/eparagon.js i przy niezgodności rzuca.
+router.post('/eparagon', express.json({ limit: '4mb' }), async (req, res, next) => {
+  try {
+    const ledgerId = ksiega(req, res);
+    if (ledgerId === null) return;
+    let dok;
+    try {
+      dok = czytajEparagon(req.body);
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+    const w = await przyjmij.zEparagonu({ dok, ledgerId, uid: req.user.uid });
+    if (w.duplikat) {
+      const stary = await q('SELECT * FROM receipts WHERE id = :id', { id: w.duplikat.id });
+      return res.json({ duplikat: true, id: w.duplikat.id, imported_at: w.duplikat.imported_at,
+        shop_name: stary[0] && stary[0].shop_name, receipt_date: dataISO(stary[0] && stary[0].receipt_date),
+        total: stary[0] && stary[0].total, status: stary[0] && stary[0].status,
+        items: await poz.loadItems(w.duplikat.id, ledgerId) });
+    }
+    res.status(201).json(w.odpowiedz);
   } catch (e) { next(e); }
 });
 
@@ -129,7 +112,7 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const rc = await loadOwnedReceipt(req, res); if (!rc) return;
+    const rc = await wlasnyParagon(req, res); if (!rc) return;
     const items = await poz.loadItems(rc.id, rc.ledger_id);
     delete rc.ocr_text;
     res.json({ ...rc, receipt_date: dataISO(rc.receipt_date), items,
@@ -139,10 +122,13 @@ router.get('/:id', async (req, res, next) => {
 
 router.get('/:id/image', async (req, res, next) => {
   try {
-    const rc = await loadOwnedReceipt(req, res); if (!rc) return;
+    const rc = await wlasnyParagon(req, res); if (!rc) return;
+    // E-paragon nie ma obrazu i nigdy nie będzie miał — to nie brak pliku, to inna
+    // natura dokumentu. Osobny powód, żeby front nie pokazywał „plik zginął".
+    if (!rc.image_path) return res.status(404).json({ error: 'no_image_eparagon' });
     const abs = path.join(RECEIPTS_DIR, rc.image_path);
     if (!abs.startsWith(RECEIPTS_DIR) || !fs.existsSync(abs)) return res.status(404).json({ error: 'file_missing' });
-    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Type', rc.image_path.endsWith('.png') ? 'image/png' : 'image/jpeg');
     fs.createReadStream(abs).pipe(res);
   } catch (e) { next(e); }
 });
@@ -153,7 +139,7 @@ router.get('/:id/image', async (req, res, next) => {
 // w księdze, żeby paragon i księga nie rozjechały się w ŻADNĄ stronę.
 router.patch('/:id', async (req, res, next) => {
   try {
-    const rc = await loadOwnedReceipt(req, res); if (!rc) return;
+    const rc = await wlasnyParagon(req, res); if (!rc) return;
     const b = req.body || {};
     const zaksiegowany = rc.status === 'POTWIERDZONY' && !!rc.transaction_id;
     const sets = [], params = [], ksiegaSet = {}, zapisane = {};
@@ -202,7 +188,7 @@ const odpowiedzPozycji = (res, out, status) => (out.blad
 // POST /api/v1/receipts/:id/items — pozycja dopisana ręcznie (K2)
 router.post('/:id/items', async (req, res, next) => {
   try {
-    const rc = await loadOwnedReceipt(req, res); if (!rc) return;
+    const rc = await wlasnyParagon(req, res); if (!rc) return;
     return odpowiedzPozycji(res, await poz.createItem(rc.id, req.body || {}, req.user.name, rc.ledger_id), 201);
   } catch (e) { next(e); }
 });
@@ -210,7 +196,7 @@ router.post('/:id/items', async (req, res, next) => {
 // PATCH /api/v1/receipts/:id/items/:itemId — korekta DOWOLNEGO pola pozycji + samouczenie
 router.patch('/:id/items/:itemId', async (req, res, next) => {
   try {
-    const rc = await loadOwnedReceipt(req, res); if (!rc) return;
+    const rc = await wlasnyParagon(req, res); if (!rc) return;
     const out = await poz.updateItem(rc.id, parseInt(req.params.itemId, 10) || 0, req.body || {}, req.user.name, rc.ledger_id);
     if (!out) return res.status(404).json({ error: 'item_not_found' });
     return odpowiedzPozycji(res, out, 200);
@@ -220,7 +206,7 @@ router.patch('/:id/items/:itemId', async (req, res, next) => {
 // DELETE /api/v1/receipts/:id/items/:itemId — usunięcie błędnie rozpoznanej pozycji (K2)
 router.delete('/:id/items/:itemId', async (req, res, next) => {
   try {
-    const rc = await loadOwnedReceipt(req, res); if (!rc) return;
+    const rc = await wlasnyParagon(req, res); if (!rc) return;
     const items = await poz.deleteItem(rc.id, parseInt(req.params.itemId, 10) || 0, rc.ledger_id);
     if (!items) return res.status(404).json({ error: 'item_not_found' });
     res.json({ ok: true, items });
@@ -232,7 +218,7 @@ router.delete('/:id/items/:itemId', async (req, res, next) => {
 // jej nie miał, po cichu przesuwało wydatek na inny miesiąc.
 router.post('/:id/confirm', async (req, res, next) => {
   try {
-    const rc = await loadOwnedReceipt(req, res); if (!rc) return;
+    const rc = await wlasnyParagon(req, res); if (!rc) return;
     if (rc.status === 'POTWIERDZONY') return res.json({ transaction_id: rc.transaction_id, already_confirmed: true });
     const kwota = rc.total === null ? null : Number(rc.total);
     if (kwota === null || !Number.isFinite(kwota) || kwota <= 0) {
@@ -257,7 +243,7 @@ router.post('/:id/confirm', async (req, res, next) => {
 router.post('/:id/ai-fix', async (req, res, next) => {
   try {
     if (!process.env.ANTHROPIC_API_KEY) return res.status(501).json({ error: 'ai_not_configured', hint: 'ustaw ANTHROPIC_API_KEY w .env' });
-    const rc = await loadOwnedReceipt(req, res); if (!rc) return;
+    const rc = await wlasnyParagon(req, res); if (!rc) return;
     if (rc.status === 'POTWIERDZONY') {
       return res.status(409).json({ error: 'already_confirmed', hint: 'Ten paragon jest już w księdze — ponowny odczyt zmieniłby kwotę pod zaksięgowanym wpisem. Popraw pola ręcznie.' });
     }
@@ -268,6 +254,7 @@ router.post('/:id/ai-fix', async (req, res, next) => {
     if (sladyRecznejPracy(rc, items)) {
       return res.status(409).json({ error: 'receipt_edited', hint: 'W tym paragonie są już poprawki (opisy, kwoty, kategorie) — ponowny odczyt AI by je skasował. Popraw pola ręcznie.' });
     }
+    if (!rc.image_path) return res.status(400).json({ error: 'eparagon_nie_wymaga_ai' });
     const abs = path.join(RECEIPTS_DIR, rc.image_path);
     if (!fs.existsSync(abs)) return res.status(404).json({ error: 'file_missing' });
     const parsed = await odczytajAI(fs.readFileSync(abs).toString('base64'));

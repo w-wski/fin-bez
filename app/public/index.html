@@ -199,9 +199,26 @@
     <h1 class="page-title">Paragon</h1>
     <div class="card">
       <div id="rc-start">
-        <h2>Zeskanuj paragon</h2>
-        <p class="msg">Zrób zdjęcie — obróbka (kadr, czerń-biel, kontrast) dzieje się na telefonie, wysyłamy mały plik.</p>
-        <input type="file" id="rcFile" accept="image/*" capture="environment">
+        <h2>Dodaj paragon</h2>
+        <!-- DWIE DROGI, dwa przyciski (Szymon 07-27). Jeden input z `capture` na telefonie
+             od razu otwierał aparat i nie dawał wybrać pliku z dysku, a na komputerze
+             odwrotnie. Rozdzielone: `capture` zostaje TYLKO przy aparacie.
+             Etykieta owija ukryty input — przycisk działa z klawiatury i czytnikiem
+             ekranu bez ani jednej linii JS. -->
+        <div class="row wrap rc-zrodla">
+          <label class="btn primary rc-zrodlo">
+            <span aria-hidden="true">◉</span> Aparat
+            <input type="file" id="rcAparat" accept="image/*" capture="environment" hidden>
+          </label>
+          <label class="btn rc-zrodlo">
+            <span aria-hidden="true">▤</span> Plik
+            <input type="file" id="rcPlik" accept="image/*,application/json,.json,application/pdf,.pdf" hidden>
+          </label>
+        </div>
+        <p class="msg">Aparat: obróbka (kadr, czerń-biel, kontrast) dzieje się na telefonie —
+          wysyłamy mały plik. Plik: <strong>.json</strong> to e-paragon i czytamy go co do
+          grosza, bez OCR. Zdjęcie i <strong>.pdf</strong> idą przez rozpoznawanie tekstu.</p>
+        <p id="rcPlikMsg" class="msg"></p>
       </div>
       <div id="rc-kadr" hidden>
         <p class="msg">Złap zielone rogi i dopasuj do brzegów paragonu (auto-propozycja już ustawiona).</p>

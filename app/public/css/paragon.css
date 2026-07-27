@@ -95,3 +95,21 @@
   #rcResult .rc-naglowek { grid-template-columns: 2fr 1fr 1fr; align-items: end; }
   #rcResult .rc-siatka { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ---------- Dwa źródła paragonu: Aparat i Plik (Szymon 07-27) ----------
+   Przycisk jest ETYKIETĄ owijającą ukryte pole pliku — dzięki temu działa z klawiatury
+   i z czytnikiem ekranu bez ani jednej linii JS, a `capture` (od razu aparat) siedzi
+   TYLKO przy pierwszym z nich. Jedno wspólne pole nie dało się tak podzielić: z `capture`
+   telefon nie pokazywał plików z dysku, bez `capture` nie otwierał aparatu. */
+.rc-zrodla { gap: var(--space-2); margin-bottom: var(--space-3); }
+.rc-zrodlo {
+  flex: 1 1 8rem;
+  min-width: 7rem;
+  justify-content: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+/* Pole jest `hidden`, ale gdyby kiedyś przestało być — nie ma zajmować miejsca w przycisku. */
+.rc-zrodlo input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* Klawiatura: fokus jest na ukrytym polu, więc obwódkę musi pokazać ETYKIETA wokół niego. */
+.rc-zrodlo:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
