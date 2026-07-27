@@ -1,4 +1,9 @@
-/* Trzy warianty kucyka-jednorożca do planszy powitalnej (zamówienie Bartusia,
+/* [NIEAKTUALNE od 2026-07-27] Te warianty są WEKTOROWE (SVG). Produkcja przeszła na
+ * PIXEL ART — Szymon przyniósł referencję i poprosił o „konwencję pixel style", więc
+ * app/public/witaj-kucyk.js nie ma już nic wspólnego z kontraktem opisanym niżej.
+ * Plik zostaje jako zapis tego, jak wyglądał wybór 07-26.
+ *
+ * Trzy warianty kucyka-jednorożca do planszy powitalnej (zamówienie Bartusia,
  * 2026-07-26). Wybór należy do Szymona — dopiero wybrany wariant trafi do
  * app/public/witaj-kucyk.js. To NIE jest kod produkcyjny: leży w docs/, poza
  * zasięgiem bramki preflight, i służy wyłącznie podglądowi.

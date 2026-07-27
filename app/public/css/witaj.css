@@ -16,28 +16,19 @@
   cursor: pointer;             /* tap w dowolnym miejscu pomija */
 }
 
-/* Scena wektorowa: pełna szerokość, kucyk przy dolnej krawędzi kadru, nad nim
-   zapas na łuk tęczy. `meet` + xMidYMax trzyma proporcje i przykleja go do dołu. */
-.witaj__scena {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 6vh;
-  bottom: 14vh;
-}
-.witaj__scena svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-/* Konfetti i napis — jeden canvas na całą warstwę, nad kucykiem. */
-.witaj__konf {
+/* Kucyk I napis leżą na JEDNYM płótnie i jednej siatce pikseli — plansza jest jednym
+   obrazem, nie SVG-iem obok cząstek (przebudowa 07-27 na pixel art).
+   `image-rendering: pixelated` jest zabezpieczeniem: kwadraty rysujemy sami, całymi
+   pikselami, ale przy nietypowym devicePixelRatio przeglądarka i tak potrafi
+   zinterpolować skalowanie płótna, a rozmyty kontur zabija tę konwencję. */
+.witaj__plotno {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 /* Napis dla czytnika ekranu: plansza jest ozdobą, ale powitanie to treść. */
@@ -59,9 +50,8 @@
   transition: opacity 220ms cubic-bezier(.32, .72, 0, 1);
 }
 
-/* Podpowiedzi dla kompozytora tylko na czas planszy — element i tak zaraz zniknie. */
-.witaj__scena svg,
-.witaj__konf { will-change: transform, opacity; }
+/* Podpowiedź dla kompozytora tylko na czas planszy — element i tak zaraz zniknie. */
+.witaj__plotno { will-change: opacity; }
 
 /* Bez ruchu: żadnych sztuczek, sam napis i spokojne wyjście. */
 @media (prefers-reduced-motion: reduce) {

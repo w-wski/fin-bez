@@ -1,40 +1,48 @@
-/* witaj.js — plansza powitalna między logowaniem Google a aplikacją (zamówienie
- * Bartusia, 2026-07-26). Kucyk wbiega, staje, patrzy na widza, PODNOSI OGON, z zadu
- * wydobywa się wąskim otworem konfetti, rozchodzi się w chmurę, z chmury składa się
- * napis „Witaj <Imię>!", OGON OPADA, kucyk się uśmiecha, stoi jeszcze chwilę i wybiega,
- * a POTEM napis zsypuje się poza dolną krawędź i wchodzą formularze.
- * Tęcza była tu wcześniej — wypadła 07-26 na życzenie Szymona („zbędna").
- * Kolejność taktów z ogonem jest wymogiem Szymona (07-26) — dlatego są osobnymi
- * aktami osi czasu, a nie efektem ubocznym innego ruchu.
+/* witaj.js — plansza powitalna między logowaniem Google a aplikacją (zamówienie Bartusia,
+ * 2026-07-26; przebudowa na PIXEL ART i nową reżyserię 2026-07-27).
  *
- * Dyscyplina jak w scenie logowania (sześć rund nauki na iPhonie):
- * wszystko jest CZYSTĄ FUNKCJĄ czasu (jedyny wyjątek: zsyp konfetti, jednokierunkowy),
- * animujemy tylko transform i opacity, zero filtrów, jeden requestAnimationFrame,
- * jeden canvas na wszystkie cząstki, pomiary układu robione RAZ.
+ * Reżyseria (Szymon 07-27, dosłownie): unicorn wchodzi z LEWEJ → staje → podnosi ogon →
+ * wypuszcza chmurę z zadu (PÓŁ napisu) → opuszcza ogon → wypluwa z pyska drugą chmurę
+ * (drugie pół) → z chmur formuje się napis, a unicorn obraca się do nas z uśmiechem →
+ * chwila pauzy → schodzi do PRAWEJ → napis spada, gdy unicorna już nie ma. Około 8 s.
+ *
+ * Które pół którą chmurą: zad jest z TYŁU (lewa strona kadru), pysk z PRZODU (prawa), więc
+ * chmura z zadu nosi LEWĄ połowę napisu, a chmura z pyska PRAWĄ. Inaczej połowy musiałyby
+ * się mijać w powietrzu.
+ *
+ * Kucyk i napis leżą na JEDNYM canvasie i JEDNEJ siatce pikseli — inaczej „pixel style"
+ * rozjeżdża się na dwie różne rozdzielczości. Kolejność klatki: czyść → kucyk → cząstki.
+ *
+ * Dyscyplina jak w scenie logowania (sześć rund nauki na iPhonie): wszystko jest CZYSTĄ
+ * FUNKCJĄ czasu (jedyny wyjątek: zsyp konfetti, jednokierunkowy), jeden requestAnimationFrame,
+ * jeden canvas, zero filtrów, pomiary układu robione RAZ.
  */
 
-import { sceneSVG, zbierz } from './witaj-kucyk.js';
+import { rysuj as rysujKucyka, rozmiar, OTWORY } from './witaj-kucyk.js';
 import { silnik } from './witaj-konfetti.js';
 import { track } from './js/core.js';
 
-/* Osada czasowa (ms od startu). 6,2 s — Szymon 07-26: „raczej 6 s". */
+/* Osada czasowa (ms od startu). ~8 s — Szymon 07-27: „może być nawet 8 s". */
 const A = {
-  wbieg: [0, 800], spojrzy: [800, 1250], ogonUp: [1250, 1600],
-  struga: [1600, 2350],        // wyrzut wąskim otworem w lewo
-  chmura: [2350, 3150],        // rozejście się w chmurę
-  napis: [3150, 4100],         // z chmury składa się powitanie
-  ogonDown: [4100, 4400], usmiech: [4400, 4800],
-  // 4800–5150: POSTÓJ na uśmiechu (Szymon: „konik powinien zostać chwilę dłużej")
-  wybieg: [5150, 5600], zsyp: [5600, 6200],   // zsyp DOPIERO po wyjściu kucyka
+  wbieg: [0, 950],             // wchodzi z lewej i staje na środku
+  ogonUp: [1050, 1400],
+  chmura1: [1400, 2250],       // z zadu, lewa połowa napisu
+  ogonDown: [2350, 2650],
+  chmura2: [2700, 3550],       // z pyska, prawa połowa
+  napis: [3600, 4600],         // obie chmury składają się w powitanie
+  obrot: [4250, 4500],         // obraca się do widza W TRAKCIE składania napisu
+  obrotZ: [5900, 6050],        // z powrotem w bok, przed wybiegiem
+  wybieg: [6050, 6950],        // schodzi do prawej
+  zsyp: [7050, 8000],          // napis spada DOPIERO, gdy kucyka już nie ma
 };
-const KONIEC = 6200;
-const FADE = 340;                  // ostatnie ms: gaśnie zasłona, wchodzą formularze
+const KONIEC = 8200;
+const FADE = 380;              // ostatnie ms: gaśnie zasłona, wchodzą formularze
+const LINIA = 0.70;            // linia ziemi w ułamku wysokości kadru
+const NAPIS_Y = 0.27;          // środek napisu w ułamku wysokości kadru
 
 const f = (t, [a, b]) => (t <= a ? 0 : t >= b ? 1 : (t - a) / (b - a));
 const easeOut = (x) => 1 - Math.pow(1 - x, 3);
 const easeIO = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
-/* Ogon nie staje jak zapora: wychyla się o 8% za daleko i wraca. */
-const zOdbiciem = (x) => (x >= 1 ? 1 : easeOut(x) * (1 + 0.08 * Math.sin(x * Math.PI)));
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -56,8 +64,7 @@ function zbudujDOM(tekst) {
   el.id = 'witaj';
   el.setAttribute('role', 'status');
   el.innerHTML = `<p class="witaj__czytnik">${tekst}</p>
-    <div class="witaj__scena">${sceneSVG()}</div>
-    <canvas class="witaj__konf" aria-hidden="true"></canvas>`;
+    <canvas class="witaj__plotno" aria-hidden="true"></canvas>`;
   document.body.appendChild(el);
   return el;
 }
@@ -66,12 +73,12 @@ class Plansza {
   constructor(el, imie) {
     this.el = el;
     this.tekst = `Witaj ${imie}!`;
-    this.fx = zbierz(el);
-    this.konf = silnik(el.querySelector('.witaj__konf'));
+    this.konf = silnik(el.querySelector('.witaj__plotno'));
+    this.g = this.konf.ctx;
+    this.mapa = rozmiar();
     this.t = 0;
     this.raf = 0;
     this.last = 0;
-    this.wysypStart = false;
     this.pominiete = false;
     this.koniec = null;
     this.onSkip = this.onSkip.bind(this);
@@ -79,63 +86,71 @@ class Plansza {
     this.przemierz = this.przemierz.bind(this);
   }
 
-  /** Wszystko, co zależy od układu strony — mierzone RAZ (i po zmianie rozmiaru
-      oraz po doładowaniu fontu, bo od niego zależy wysokość napisu). */
+  /** Wszystko, co zależy od układu okna — mierzone RAZ (i po zmianie rozmiaru oraz po
+      doładowaniu fontu, bo od niego zależy szerokość napisu). */
   przemierz() {
-    // preserveAspectRatio="meet": skala = mniejsze z dopasowań kadru 320×380.
-    const s = this.el.querySelector('.w-scena').getBoundingClientRect();
-    const skala = Math.max(0.01, Math.min(s.width / 320, s.height / 380));
-    this.droga = (window.innerWidth / 2 + 90) / skala + 72;   // 72 = pół szerokości kucyka
-    const r = this.fx.rump.getBoundingClientRect();
-    this.konf.przemierz(this.tekst, window.innerHeight * 0.24);
+    const w = window.innerWidth, h = window.innerHeight;
+    // Bok piksela: KORPUS ma zajmować ~58 % szerokości kadru. Liczymy z korpusu, nie
+    // z pełnego zasięgu figury — ten drugi obejmuje ogon w pozie „w górę", więc kucyk
+    // wychodził o trzecią część za mały. Piksel musi być LICZBĄ CAŁKOWITĄ, inaczej
+    // sprite trafia na pół piksela ekranu i cały kontur się rozmywa.
+    this.S = Math.max(4, Math.min(12, Math.round(w * 0.58 / this.mapa.wKorpus)));
+    const S = this.S;
+    this.ziemia = Math.round(h * LINIA / S) * S;
+    this.oy = this.ziemia - this.mapa.bokDol * S;
+    this.srodekX = Math.round((w / 2 - this.mapa.bokSrodek * S) / S) * S;
+    // Droga wbiegu/wybiegu liczona z FAKTYCZNEJ szerokości figury (z ogonem w górze),
+    // żeby kucyk naprawdę zszedł za krawędź, a nie stanął na niej.
+    this.droga = w / 2 + (this.mapa.w - this.mapa.lewo) * S;
     this.konf.osCzasu(A);
-    this.konf.zrodlo(r.left + r.width / 2, r.top + r.height / 2);
+    // Napis dostaje siatkę DWA RAZY drobniejszą od kucyka. Ta sama siatka co sprite dawała
+    // literom siedem rzędów pikseli — za mało, żeby „ś" różniło się od „s", a wyraz od
+    // plamy. Pół piksela sprite'a to nadal ta sama siatka (jeden piksel kucyka = 2×2
+    // piksele napisu), więc obraz zostaje spójny, a powitanie jest czytelne.
+    this.konf.przemierz(this.tekst, Math.round(h * NAPIS_Y), Math.max(2, Math.round(S / 2)));
+    // Otwory liczymy dla pozycji ŚRODKOWEJ: obie chmury lecą, gdy kucyk stoi.
+    this.konf.zrodla(
+      [this.srodekX + OTWORY.zad[0] * S, this.oy + OTWORY.zad[1] * S],
+      [this.srodekX + OTWORY.pysk[0] * S, this.oy + OTWORY.pysk[1] * S],
+    );
+  }
+
+  /** Poza kucyka jako czysta funkcja czasu. Obrót to CIĘCIE na inną mapę w połowie
+   *  taktu plus mały podskok — pixel art nie interpoluje obrotu. */
+  poza(t) {
+    const przod = t >= (A.obrot[0] + A.obrot[1]) / 2 && t < (A.obrotZ[0] + A.obrotZ[1]) / 2;
+    const skok = Math.max(f(t, A.obrot) * (1 - f(t, A.obrot)), f(t, A.obrotZ) * (1 - f(t, A.obrotZ)));
+    return { przod, podskok: skok * 4 };     // 0…1 skali, ×4 = do 1 piksela siatki w górę
   }
 
   klatka(t, dt) {
-    const fx = this.fx;
-    const wb = f(t, A.wbieg);
-    const wy = f(t, A.wybieg);
+    const S = this.S;
+    const wb = f(t, A.wbieg), wy = f(t, A.wybieg);
+    const x = this.srodekX - this.droga * (1 - easeOut(wb)) + this.droga * easeIO(wy);
+    // Chód: dwie klatki nóg, tempo stałe; kiedy stoi — poza stojąca, nie losowe wychylenie.
+    const idzie = wb < 1 || wy > 0;
+    const p = this.poza(t);
+    const ogon = f(t, A.ogonUp) - f(t, A.ogonDown);
+    const bob = idzie ? (Math.floor(t / 110) % 2) * S : 0;   // podskok kłusu: 0 albo 1 piksel
+    const oy = Math.round(this.oy - p.podskok * S - bob);
 
-    // 1+8. Wbieg i wybieg: pozycja + kłus. Amplituda kroku gaśnie razem z dojazdem,
-    // więc nogi nie zatrzymują się w losowym wychyleniu.
-    const x = -this.droga * (1 - easeOut(wb)) + this.droga * easeIO(wy);
-    const amp = 17 * Math.max(1 - wb * wb, Math.min(1, wy * 3));
-    const faza = t / 125;
-    const bob = amp > 1 ? -Math.abs(Math.sin(faza)) * 3 : 0;
-    fx.pony.style.transform = `translate(${x.toFixed(1)}px, ${bob.toFixed(2)}px)`;
-    fx.legs.forEach((g, i) => {
-      if (g) g.style.transform = `rotate(${(Math.sin(faza + i * 1.57) * amp).toFixed(2)}deg)`;
-    });
-
-    // 2. Staje i patrzy na widza (przenikanie dwóch twarzy) + mrugnięcie.
-    const fr = f(t, A.spojrzy);
-    if (fx.faceSide) fx.faceSide.style.opacity = (1 - fr).toFixed(3);
-    if (fx.faceFront) fx.faceFront.style.opacity = fr.toFixed(3);
-    if (fx.head) fx.head.style.transform = `rotate(${(-5 * fr).toFixed(2)}deg)`;
-    const mrug = fr > 0.58 && fr < 0.76 ? 1 - Math.sin((fr - 0.58) / 0.18 * Math.PI) * 0.92 : 1;
-    for (const e of fx.eyes) e.style.transform = `scaleY(${mrug.toFixed(3)})`;
-
-    // 3+7. OGON: w górę PRZED konfetti, w dół PO napisie — nigdy razem z uśmiechem.
-    const ogon = zOdbiciem(f(t, A.ogonUp)) - easeIO(f(t, A.ogonDown));
-    if (fx.tail) fx.tail.style.transform = `rotate(${(85 * ogon).toFixed(2)}deg)`;
-
-    // 4+5+6+9. Konfetti: wyrzut wąskim otworem → chmura → napis → zsyp poza ekran.
-    // Trzy pierwsze fazy prowadzi silnik z jednego czasu (czysta funkcja t), zsyp
-    // całkuje, bo jest jednokierunkowy i zaczyna się po wyjściu kucyka.
-    if (t >= A.zsyp[0]) {
-      this.konf.zsyp(dt, !this.wysypStart);
-      this.wysypStart = true;
-    } else if (t >= A.struga[0] - 16) {
-      this.konf.rusz(t);
+    this.konf.czysc();
+    if (p.przod) {
+      // Obie pozy na TEJ SAMEJ linii ziemi i tym samym środku figury.
+      rysujKucyka(this.g,
+        Math.round(x) + (this.mapa.bokSrodek - this.mapa.przodSrodek) * S,
+        oy + (this.mapa.bokDol - this.mapa.przodDol) * S,
+        S, { poza: 'przod', ogon: 0, krok: null });
+    } else {
+      rysujKucyka(this.g, Math.round(x / S) * S, oy, S,
+        { poza: 'bok', ogon, krok: idzie ? t / 220 : null });
     }
-    if (t >= A.struga[0] - 16) this.konf.rysuj();
 
-    // 7. Uśmiech — dopiero po opadnięciu ogona.
-    const sm = f(t, A.usmiech);
-    for (const s of fx.smiles) s.style.opacity = sm.toFixed(3);
+    // Konfetti: dwie chmury → napis → zsyp poza ekran.
+    if (t >= A.zsyp[0]) this.konf.zsyp(dt);
+    else if (t >= A.chmura1[0] - 16) this.konf.rusz(t);
+    if (t >= A.chmura1[0] - 16) this.konf.rysuj();
 
-    // Zasłona gaśnie na końcu: formularze wchodzą fadeinem.
     this.el.style.opacity = (1 - f(t, [KONIEC - FADE, KONIEC])).toFixed(3);
   }
 
@@ -171,23 +186,23 @@ class Plansza {
       if (window.__stopKlatki) return;   // rig: zegar prowadzi test, nie przeglądarka
       // Font zmienia szerokość napisu, a od niej zależą cele cząstek — przemierz po
       // doładowaniu, ale tylko dopóki konfetti jeszcze nie wystartowało.
-      document.fonts?.ready?.then(() => { if (this.t < A.struga[0]) this.przemierz(); });
+      document.fonts?.ready?.then(() => { if (this.t < A.chmura1[0]) this.przemierz(); });
       if (reduceMotion.matches) return this.bezRuchu();
       this.raf = requestAnimationFrame(this.frame);
     });
   }
 
-  /** prefers-reduced-motion: sam napis, bez ruchu, krótko. */
+  /** prefers-reduced-motion: gotowy napis i kucyk patrzący na widza, bez ruchu, krótko. */
   bezRuchu() {
-    this.klatka(A.usmiech[1], 16.7);
+    this.klatka(A.napis[1], 16.7);
     this.konf.rusz(A.napis[1]);
     this.konf.rysuj();
-    setTimeout(() => this.finisz(false), 1200);
+    setTimeout(() => this.finisz(false), 1400);
   }
 }
 
-/** Punkt wejścia. Nie rzuca: plansza jest ozdobą, więc każdy jej błąd musi
- *  kończyć się wpuszczeniem użytkownika do aplikacji, a nie białym ekranem. */
+/** Punkt wejścia. Nie rzuca: plansza jest ozdobą, więc każdy jej błąd musi kończyć się
+ *  wpuszczeniem użytkownika do aplikacji, a nie białym ekranem. */
 export async function zagraj(imie) {
   try {
     await styl();
