@@ -350,24 +350,28 @@
 }
 
 /* ---------- 6. Segmenty: tor z obrysem, aktywny w pigułce ---------- */
+/* KAŻDY kafelek w swoim konturze, nie w zbiorowym (Szymon 07-27). Canvas proponował
+   „tor" z obrysem, a w nim aktywną pigułkę też z obrysem — na ekranie dawało to dwie
+   ramki w odległości 4 px i wyglądało jak błąd renderowania, nie jak wybór. Tor traci
+   obrys; przełącznikiem jest teraz sam kafelek: nieaktywny cienką kreską, aktywny grubą. */
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .seg {
   display: grid;
-  gap: 4px;
-  padding: 4px;
-  border: 1.5px solid var(--line-strong);
-  border-radius: var(--r-pill);
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   background: transparent;
 }
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .seg-2 { grid-template-columns: 1fr 1fr; }
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .seg-3 { grid-template-columns: repeat(3, 1fr); }
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .seg button {
-  min-height: 46px;
+  min-height: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  border: 2px solid transparent;
+  border: 1.5px solid var(--line);
   border-radius: var(--r-pill);
   background: transparent;
   color: var(--ink-muted);
@@ -375,11 +379,11 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-:root[data-skin="sygnal"]:has(#view-login[hidden]) .seg button.active { border-color: var(--ink); color: var(--ink); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) .seg button.active { border: 2.5px solid var(--ink); color: var(--ink); font-weight: 800; }
 /* Semantyka +/− zostaje, ale ŚCISZONA do dwóch ciemnych odcieni w gamie farby. */
-:root[data-skin="sygnal"]:has(#view-login[hidden]) #segType button[data-type="WYDATEK"].active { border-color: var(--minus); color: var(--minus); }
-:root[data-skin="sygnal"]:has(#view-login[hidden]) #segType button[data-type="PRZYCHÓD"].active { border-color: var(--plus); color: var(--plus); }
-:root[data-skin="sygnal"]:has(#view-login[hidden]) #segType button[data-type="TRANSFER"].active { border-color: var(--flow); color: var(--flow); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #segType button[data-type="WYDATEK"].active { border: 2.5px solid var(--minus); color: var(--minus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #segType button[data-type="PRZYCHÓD"].active { border: 2.5px solid var(--plus); color: var(--plus); }
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #segType button[data-type="TRANSFER"].active { border: 2.5px solid var(--flow); color: var(--flow); }
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .seg .sig { font: 600 var(--t-body)/1 var(--mono); }
 
 /* ---------- 7. Przyciski ---------- */
@@ -553,16 +557,16 @@
 /* Pigułki okresu: aktywna jest tu WYPEŁNIONA, nie obrysowana — inaczej trzy obrysy
    (tor, aktywna pigułka, kafel pod nią) zlewają się w kratkę. */
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .chips {
-  padding: 4px;
-  border: 1.5px solid var(--line-strong);
-  border-radius: var(--r-pill);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   background: transparent;
   gap: 6px;
 }
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .chips button {
   min-height: 44px;
   padding: 0 16px;
-  border: 0;
+  border: 1.5px solid var(--line);
   border-radius: var(--r-pill);
   background: transparent;
   color: var(--ink-muted);
@@ -571,6 +575,7 @@
   text-transform: uppercase;
 }
 :root[data-skin="sygnal"]:has(#view-login[hidden]) .chips button.active {
+  border-color: var(--ink);
   background: var(--ink);
   color: var(--bg);
   font-weight: 800;
