@@ -25,6 +25,13 @@ require('../src/config'); // ładuje .env
     'ER_CANT_DROP_FIELD_OR_KEY', // 1091 DROP czegoś, czego nie ma
     'ER_TABLE_EXISTS_ERROR',     // 1050
     'ER_DUP_ENTRY',       // 1062 unikat już nałożony na te same dane (nic do zrobienia)
+    // 1826 klucz obcy o tej nazwie już istnieje. Bez tego powtórka migracji, która padła
+    // W POŁOWIE, wywracała się na własnym FK — a to jest dokładnie ten przebieg, w którym
+    // powtórka jest potrzebna. Trafiło się na 012 (`fk_item_prod`) i było opisane w RUNBOOK-u
+    // jako pułapka „nie naprawiaj ręcznie"; pułapka przestaje istnieć, zamiast być pamiętana.
+    // Nazwa klucza obcego musi być nadana JAWNIE (CONSTRAINT <nazwa>), inaczej MySQL wygeneruje
+    // kolejną (tabela_ibfk_2) i przy powtórce założy drugi, zdublowany klucz zamiast pominąć.
+    'ER_FK_DUP_NAME',     // 1826
   ]);
 
   for (const f of files) {
