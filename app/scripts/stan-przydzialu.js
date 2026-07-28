@@ -21,6 +21,13 @@ const AKTUALNE = "p.status = 'NOWA' AND t.deleted_at IS NULL AND (t.category_id 
 
 const zl = (v) => (Number(v || 0)).toFixed(2).replace('.', ',') + ' zł';
 
+// Baza porównuje nazwy kolacją `utf8mb4_polish_ci` — NIECZULE na wielkość liter. Reorganizacja
+// pyta `WHERE name=?` i trafia w istniejący wiersz zapisany inaczej („Bar Mleczny" dla planowego
+// „Bar mleczny"), więc słusznie go nie dubluje. Porównywanie tych samych nazw w JavaScripcie
+// przez `===` jest CZULE, więc pokazywało widmowe braki i kazało powtarzać udany przebieg.
+// Diakrytyki zostają nietknięte: w polskiej kolacji „ą" to osobna litera, nie wariant „a".
+const klucz = (n) => String(n == null ? '' : n).trim().replace(/\s+/g, ' ').toLocaleLowerCase('pl');
+
 async function tabelaJest(nazwa) {
   const r = await q('SELECT COUNT(*) n FROM information_schema.tables'
     + ' WHERE table_schema = DATABASE() AND table_name = :t', { t: nazwa });
@@ -49,13 +56,13 @@ async function main() {
   let brakiRazem = 0;
   for (const led of [F, P]) {
     const moje = wgKsiegi.get(led) || [];
-    const nazwy = new Set(moje.map((c) => `${c.parent_id == null ? '' : c.parent_id}|${c.name}`));
-    const korzenie = new Map(moje.filter((c) => c.parent_id == null).map((c) => [c.name, c.id]));
+    const nazwy = new Set(moje.map((c) => `${c.parent_id == null ? 0 : c.parent_id}|${klucz(c.name)}`));
+    const korzenie = new Map(moje.filter((c) => c.parent_id == null).map((c) => [klucz(c.name), c.id]));
     const braki = [];
     for (const [root, kids] of Object.entries(TREE[led] || {})) {
-      const rid = korzenie.get(root);
+      const rid = korzenie.get(klucz(root));
       if (rid === undefined) { braki.push(root); continue; }
-      for (const kid of kids) if (!nazwy.has(`${rid}|${kid}`)) braki.push(`${root} > ${kid}`);
+      for (const kid of kids) if (!nazwy.has(`${rid}|${klucz(kid)}`)) braki.push(`${root} > ${kid}`);
     }
     brakiRazem += braki.length;
     const zywe = moje.filter((c) => c.active).length;
@@ -103,11 +110,22 @@ async function main() {
   // 6) Werdykt — jedno zdanie, żeby nie trzeba było interpretować liczb powyżej.
   console.log('\n' + '='.repeat(60));
   const doPrz = doPrzydzialu.reduce((a, r) => a + Number(r.n), 0);
-  if (!razem) console.log('WERDYKT: reorganizacja NIE przeszła — uruchom --dry-run, potem przebieg właściwy.');
-  else if (brakiRazem) console.log('WERDYKT: propozycje są, ale drzewo docelowe niepełne —'
-    + ' przebieg prawdopodobnie padł w połowie. Powtórz go (jest idempotentny).');
-  else if (doPrz) console.log(`WERDYKT: reorganizacja przeszła, Przydział ma ${doPrz} wpisów do decyzji.`);
-  else console.log('WERDYKT: reorganizacja przeszła i nie ma nic do przydziału (wszystko rozstrzygnięte).');
+  // Kolejność ma znaczenie: ISTNIENIE PROPOZYCJI jest mocniejszym dowodem, że przebieg
+  // doszedł do końca, niż kompletność drzewa. Propozycje zapisują się na SAMYM KOŃCU tej samej
+  // transakcji, co zakładanie kategorii — więc skoro są, commit przeszedł w całości. Wcześniej
+  // brak jednej gałęzi przebijał ten fakt i kazał powtarzać udany przebieg.
+  if (!razem) {
+    console.log('WERDYKT: reorganizacja NIE przeszła — uruchom --dry-run, potem przebieg właściwy.');
+  } else if (doPrz) {
+    console.log(`WERDYKT: reorganizacja przeszła, Przydział ma ${doPrz} wpisów do decyzji.`);
+  } else {
+    console.log('WERDYKT: reorganizacja przeszła i nie ma nic do przydziału (wszystko rozstrzygnięte).');
+  }
+  if (brakiRazem) {
+    console.log(`UWAGA: ${brakiRazem} gałęzi z planu nie widać w bazie. Przy istniejących`
+      + ' propozycjach to NIE jest przerwany przebieg — najczęściej kategoria stoi pod inną'
+      + ' nazwą, a plan i baza rozjechały się nazewniczo. Sprawdź, zanim cokolwiek powtórzysz.');
+  }
 }
 
 main()
