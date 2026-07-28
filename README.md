@@ -18,7 +18,8 @@ npm start            # serwer (domyślnie port z .env)
 ```
 
 Konfiguracja przez `.env` **poza repo** (wzór: `app/.env.example`).
-Procedura wdrożenia na serwer: `RUNBOOK-WDROZENIE.md` w repo `finansowe`.
+Procedura wdrożenia na serwer: [`RUNBOOK-WDROZENIE.md`](RUNBOOK-WDROZENIE.md) — w TYM repo,
+obok kodu, bo to kod się do niej odwołuje.
 
 ## Układ
 
