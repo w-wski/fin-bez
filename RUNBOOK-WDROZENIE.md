@@ -32,6 +32,7 @@ którejkolwiek psuje produkcję, a odtworzenie nie jest możliwe z gita:
 | `app/node_modules/` | zależności | instalowane na miejscu |
 | `receipts/` | wgrane paragony | dane, nie kod |
 | `app/tmp/` | `restart.txt` Passengera | artefakt runtime'u |
+| `app/*.log` | `stderr.log` i spółka | ślad po awarii, jedyny — powstaje na serwerze |
 
 Dlatego `rsync` niżej ma `--exclude` na każdą z nich. **`--exclude` w rsyncu chroni też przed
 `--delete`** — pliki wykluczone nie są kasowane po stronie odbiorcy. Usunięcie któregokolwiek
@@ -49,14 +50,14 @@ git pull origin main          # albo gałąź zadaniowa, jeśli wdrażasz przed 
 
 # 2. Podgląd: co rsync by zmienił. Nic nie zapisuje — zawsze rób ten krok pierwszy.
 rsync -a --delete --itemize-changes --dry-run \
-  --exclude '.env' --exclude 'node_modules/' --exclude 'tmp/' \
+  --exclude '.env' --exclude 'node_modules/' --exclude 'tmp/' --exclude '*.log' \
   --exclude 'public/fonts/sf-pro-*.woff2' \
   ~/domains/finanse.bezprzemocowo.pl/repo/app/ \
   ~/domains/finanse.bezprzemocowo.pl/app/
 
 # 3. To samo bez --dry-run, gdy podgląd wygląda sensownie
 rsync -a --delete \
-  --exclude '.env' --exclude 'node_modules/' --exclude 'tmp/' \
+  --exclude '.env' --exclude 'node_modules/' --exclude 'tmp/' --exclude '*.log' \
   --exclude 'public/fonts/sf-pro-*.woff2' \
   ~/domains/finanse.bezprzemocowo.pl/repo/app/ \
   ~/domains/finanse.bezprzemocowo.pl/app/
