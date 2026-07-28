@@ -18,7 +18,12 @@ const KOLUMNY = '(receipt_id, line_no, ocr_name, code, name, quantity, unit, uni
 const ZNAKI = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
 async function loadItems(receiptId, ledgerId) {
-  const items = await q('SELECT * FROM receipt_items WHERE receipt_id=:r ORDER BY line_no, id', { r: receiptId });
+  // JOIN po nazwę produktu: bez niej karta pozycji po odświeżeniu strony pokazywałaby
+  // „nieprzypisany" przy pozycji, która produkt ma — identyfikator sam nic człowiekowi nie mówi.
+  const items = await q(
+    `SELECT i.*, p.name AS product_name
+       FROM receipt_items i LEFT JOIN products p ON p.id = i.product_id
+      WHERE i.receipt_id = :r ORDER BY i.line_no, i.id`, { r: receiptId });
   return withSuggestions(items, ledgerId);   // K3: podpowiedź ze słownika dla każdej pozycji, jednym zapytaniem
 }
 

@@ -6,7 +6,8 @@
 // wartością zwróconą przez serwer, a wartość, której serwer NIE przyjął, dostaje czerwony
 // komunikat przy polu — nigdy zielone mrugnięcie „zapisane".
 import { el, zl, api, track, toast } from './core.js';
-import { parseKwota } from './kwota.js';         // jedyne miejsce, gdzie napis staje się kwotą
+import { parseKwota } from './kwota.js';                       // jedyne miejsce, gdzie napis staje się kwotą
+import { produktPozycji } from './paragon-produkt.js';
 
 export const JEDNOSTKI = ['szt.', 'kg', 'g', 'l', 'ml', 'm', 'opak.'];
 const TOL_POZYCJA = 0.02;                        // zgodne z src/ocr/pola.js (K6)
@@ -193,7 +194,9 @@ export function pozycja(it, ctx) {
 
   const siatka = el('div', { class: 'rc-siatka' });
   siatka.append(pole('Ilość', il), pole('Jedn.', jedn), pole('Cena', cena), pole('Wartość', wart));
-  box.append(l1, opis, hint, siatka, kat, ostrz);
+  // Scalanie z katalogiem produktów (pkt 6 planu) — bez niego aliasy nigdy nie powstaną,
+  // a bez aliasów tabela `products` jest martwa: nie ma historii cen ani „gdzie taniej".
+  box.append(l1, opis, hint, siatka, kat, produktPozycji(it, { zapisz }), ostrz);
   odswiezHint(it, hint, { kod, opis, jedn, kat, zapisz });
   odswiezOstrzezenie(it, box, ostrz, wart);
   return box;

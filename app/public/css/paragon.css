@@ -113,3 +113,26 @@
 .rc-zrodlo input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 /* Klawiatura: fokus jest na ukrytym polu, więc obwódkę musi pokazać ETYKIETA wokół niego. */
 .rc-zrodlo:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Scalanie pozycji z katalogiem produktów (paragon-produkt.js).
+   Stan jest widoczny bez klikania: kropka pełna = produkt przypisany, pusta = jeszcze nie.
+   „Nieprzypisany" to normalny stan nowego towaru, nie błąd — stąd ton neutralny, nie alarmowy. */
+.rc-prod { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; }
+.rc-prod-stan { display: inline-flex; align-items: center; gap: .15rem;
+  font-size: .875rem; color: var(--ink-muted); min-width: 0; }
+.rc-prod-ok { color: var(--plus); }
+.rc-prod-brak { color: var(--ink-faint); }
+.rc-prod-panel { flex: 1 0 100%; display: flex; flex-direction: column; gap: .5rem;
+  padding: .625rem; border: 1px solid var(--line); border-radius: .625rem;
+  background: var(--panel-deep, var(--panel)); }
+.rc-prod-info, .rc-prod-czekaj { margin: 0; font-size: .8125rem; color: var(--ink-muted); }
+.rc-prod-lista { display: flex; flex-direction: column; gap: .375rem; }
+.rc-prod-kand { display: flex; justify-content: space-between; align-items: center;
+  gap: .5rem; width: 100%; text-align: left; }
+.rc-prod-nazwa { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Pewność dopasowania zawsze na wierzchu: człowiek ma wiedzieć, czy potwierdza pewniaka,
+   czy dopasowanie tuż nad progiem. Bez tej liczby „propozycja" brzmi jak „to jest to". */
+.rc-prod-pewnosc { flex: 0 0 auto; font-size: .75rem; color: var(--ink-faint);
+  font-variant-numeric: tabular-nums; }
+.rc-prod-szukaj { width: 100%; }
+.rc-prod-odlacz { align-self: flex-start; }
