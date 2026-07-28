@@ -20,6 +20,10 @@
 <link rel="stylesheet" href="css/sygnal.css">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<!-- iOS nie bierze ikony ani z manifestu, ani z SVG-a: bez tej linijki „Dodaj do ekranu
+     początkowego" wstawia zrzut strony zamiast kafla. PNG jest pełnokrwisty (bez własnych
+     zaokrągleń) — róg dokłada iOS, a podwójne zaokrąglenie zostawia jasny rant. -->
+<link rel="apple-touch-icon" href="icon-512.png">
 <meta name="theme-color" content="#f4ece9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1b1b20" media="(prefers-color-scheme: dark)">
 <script>

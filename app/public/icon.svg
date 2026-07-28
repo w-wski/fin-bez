@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="22" fill="#1f6f43"/>
+  <rect width="100" height="100" rx="22" fill="#F06D35"/>
   <text x="50" y="66" font-size="52" font-family="system-ui, sans-serif" font-weight="700"
-        text-anchor="middle" fill="#ffffff">zł</text>
+        text-anchor="middle" fill="#19110D">zł</text>
 </svg>
