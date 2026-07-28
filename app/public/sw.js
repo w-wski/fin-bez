@@ -1,6 +1,6 @@
 // Service worker „finansowej" — offline-ready (app shell w cache, API zawsze z sieci).
 // Po każdym deployu podbij CACHE_VERSION (RUNBOOK) — stary cache zostanie usunięty.
-const CACHE_VERSION = 'finansowa-v38';
+const CACHE_VERSION = 'finansowa-v39';
 const SHELL = [
   '/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-512.png',
   '/styles.css', '/css/wpis.css', '/css/historia.css', '/css/raporty.css',

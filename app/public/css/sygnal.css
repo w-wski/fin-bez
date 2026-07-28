@@ -707,3 +707,26 @@
 @media (prefers-reduced-motion: reduce) {
   :root[data-skin="sygnal"]:has(#view-login[hidden]) * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
 }
+
+/* ---------- 12. Podpowiedź ze słownika: w Sygnale ma być WIDAĆ ----------
+   Domyślnie podpowiedź jest drugoplanowa (przygaszone tło `--accent-quiet`, tekst w kolorze
+   akcentu). W Sygnale akcentem jest niemal czerń, więc chip wychodził czarnym tekstem na ledwie
+   zabarwionym tle — w skórce, która cała stoi na mocnym kontraście, ginął zupełnie.
+
+   Polecenie Szymona (2026-07-28): w ciemnym motywie pomarańczowe tło i czarny napis,
+   w jasnym odwrotnie — czarne tło i biały napis. W obu wypadkach chip jest najmocniejszym
+   punktem wiersza, bo to jedyny element, który człowiek ma tam KLIKNĄĆ.
+
+   Kolory bierzemy z tokenów skórki, nie z literałów: gdy paleta Sygnału kiedyś drgnie,
+   podpowiedź pojedzie razem z nią, zamiast zostać osieroconym odcieniem. */
+:root[data-skin="sygnal"]:has(#view-login[hidden]) #rcResult .rc-uzyj {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ink-on-accent);
+  font-weight: 700;
+}
+:root[data-skin="sygnal"][data-theme="dark"]:has(#view-login[hidden]) #rcResult .rc-uzyj {
+  background: var(--card);          /* w ciemnym motywie `--card` to właśnie pomarańcz Sygnału */
+  border-color: var(--card);
+  color: var(--card-ink);           /* …a `--card-ink` jego czerń */
+}
