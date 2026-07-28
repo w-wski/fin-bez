@@ -19,6 +19,7 @@ const { parseReceipt } = require('./parse-receipt');
 const { txt, czyData } = require('./pola');
 const poz = require('./pozycje');
 const { obrazZPdf } = require('../pdf-obraz');
+const { normSklep } = require('../produkty');
 
 const RECEIPTS_DIR = process.env.RECEIPTS_DIR || path.join(__dirname, '..', '..', '..', 'receipts');
 const gr = (v) => (v === null || v === undefined ? null : (v / 100).toFixed(2));
@@ -34,14 +35,45 @@ function zapiszPlik(buf, skrot, rozsz) {
   return rel;
 }
 
+/** Czy ten sam zakup już jest w księdze, wgrany INNĄ DROGĄ?
+ *
+ *  Klucz: dzień + kwota do grosza + sieć sklepu. Godziny nie ma po co dokładać — DATE
+ *  w bazie jej nie trzyma, a odczyt godziny z obrazu jest najmniej pewną liczbą na całym
+ *  paragonie; dzień i kwota co do grosza wystarczają, żeby zapytać.
+ *
+ *  Sklep porównujemy PO SIECI (`normSklep`), bo e-paragon podaje „Biedronka", a OCR czyta
+ *  z nagłówka „BIEDRONKA "CODZIENNIE NISKIE CENY" 3135". Gdy którakolwiek strona nie ma
+ *  nazwy, sklep po prostu nie bierze udziału w porównaniu — brak danych nie jest różnicą.
+ *
+ *  Odpowiedzią jest OSTRZEŻENIE (409 z identyfikatorem starego paragonu), nie ciche
+ *  odrzucenie: gdyby to naprawdę były dwa różne zakupy, decyzja należy do człowieka.
+ */
+async function tenSamZakup(parsed, ledgerId) {
+  const data = czyData(parsed.receipt_date);
+  const suma = parseKwota(parsed.total);
+  if (!data || suma === null) return null;                    // bez daty albo kwoty nie ma o czym mówić
+  const rows = await q(
+    `SELECT id, created_at, shop_name, source FROM receipts
+      WHERE ledger_id = :l AND receipt_date = :d AND ABS(total - :t) < 0.005
+      ORDER BY id LIMIT 5`, { l: ledgerId, d: data, t: suma });
+  const moj = normSklep(parsed.shop_name);
+  const trafiony = rows.find((r) => !r.shop_name || !parsed.shop_name || normSklep(r.shop_name) === moj);
+  if (!trafiony) return null;
+  return {
+    id: trafiony.id, imported_at: trafiony.created_at,
+    powod: `ten sam dzień (${data}), ta sama kwota (${suma.toFixed(2)} zł)`
+      + (trafiony.shop_name ? ` i ten sam sklep (${trafiony.shop_name})` : '')
+      + `; tamten wpis wszedł jako ${{ eparagon: 'e-paragon .json', pdf: 'PDF', zdjecie: 'zdjęcie' }[trafiony.source] || trafiony.source}`,
+  };
+}
+
 /** Wspólna droga dla ZDJĘCIA i PDF-a: rozpoznanie tekstu → parser → zapis.
  *  Zwraca `{ duplikat: {id, imported_at} }` albo gotową odpowiedź dla przeglądarki. */
 async function zObrazu({ buffer, rozsz, ledgerId, uid, worker, source }) {
   const { data } = await worker.recognize(buffer);
   const parsed = parseReceipt(data.text);
 
-  // Anty-duplikacja po TREŚCI (przy obrazie nie ma lepszego klucza — inaczej niż
-  // w e-paragonie, który ma własny identyfikator dokumentu).
+  // Anty-duplikacja po TREŚCI: ten sam odczyt tego samego pliku.
   const hash = crypto.createHash('sha256').update([
     parsed.shop_name || '', parsed.receipt_date || '', parsed.total ?? '',
     parsed.items.map((i) => `${i.ocr_name}|${i.value}`).join(';'),
@@ -49,15 +81,22 @@ async function zObrazu({ buffer, rozsz, ledgerId, uid, worker, source }) {
   const dupe = await q('SELECT id, created_at FROM receipts WHERE receipt_hash = :h', { h: hash });
   if (dupe.length) return { duplikat: { id: dupe[0].id, imported_at: dupe[0].created_at } };
 
+  // Anty-duplikacja MIĘDZY DROGAMI WEJŚCIA (Szymon 07-28). Ten sam zakup wgrany raz
+  // jako .json, raz jako .pdf ma dwa różne odczyty, więc i dwa różne skróty treści —
+  // powyższe go nie złapie. Wspólne zostają dzień, kwota i sklep.
+  const podw = await tenSamZakup(parsed, ledgerId);
+  if (podw) return { duplikat: podw };
+
   const rel = zapiszPlik(buffer, hash, rozsz);
   const conn = await pool.getConnection();
   let id;
   try {
     await conn.beginTransaction();
     const [r] = await conn.execute(
-      `INSERT INTO receipts (ledger_id, source, user_id, shop_name, receipt_date, total, ocr_confidence, ocr_text, image_path, receipt_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO receipts (ledger_id, source, user_id, shop_name, receipt_date, total, discount_total, discount_global, ocr_confidence, ocr_text, image_path, receipt_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [ledgerId, source, uid, txt(parsed.shop_name, 128), czyData(parsed.receipt_date), parseKwota(parsed.total),
+        parsed.discount_total ?? null, parsed.discount_global ?? null,
         data.confidence ?? null, (data.text || '').slice(0, 60000), rel, hash]);
     id = r.insertId;
     await poz.saveParsed(conn, id, parsed, ledgerId);
@@ -83,6 +122,10 @@ async function zPdf({ buffer, ledgerId, uid, worker }) {
 async function zEparagonu({ dok, ledgerId, uid }) {
   const dupe = await q('SELECT id, created_at FROM receipts WHERE doc_key = :k', { k: dok.klucz });
   if (dupe.length) return { duplikat: { id: dupe[0].id, imported_at: dupe[0].created_at } };
+  // …a jeśli ten sam zakup wszedł WCZEŚNIEJ jako zdjęcie albo PDF, klucza dokumentu tam
+  // nie ma i trzeba go poznać po dniu, kwocie i sklepie — tak samo jak w drugą stronę.
+  const podw = await tenSamZakup({ shop_name: dok.sklep, receipt_date: dok.data, total: gr(dok.total) }, ledgerId);
+  if (podw) return { duplikat: podw };
 
   // Kształt zgodny z parserem OCR, żeby zapis pozycji (i podpowiedzi ze słownika) był
   // JEDNĄ funkcją dla obu dróg. `unit_price` to cena KATALOGOWA, `value` — zapłacone.
@@ -99,10 +142,14 @@ async function zEparagonu({ dok, ledgerId, uid }) {
   try {
     await conn.beginTransaction();
     const [r] = await conn.execute(
-      `INSERT INTO receipts (ledger_id, source, user_id, shop_name, nip, receipt_date, total, discount_total, payment, receipt_hash, doc_key, ocr_engine)
-       VALUES (?, 'eparagon', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'tesseract')`,
+      `INSERT INTO receipts (ledger_id, source, user_id, shop_name, nip, receipt_date, total, discount_total, discount_global, payment, receipt_hash, doc_key, ocr_engine)
+       VALUES (?, 'eparagon', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'tesseract')`,
       [ledgerId, uid, txt(dok.sklep, 128), txt(dok.nip, 16), czyData(dok.data), gr(dok.total),
-        gr(Math.abs(dok.opusty || 0)), txt(zaplata, 32),
+        gr(Math.abs(dok.opusty || 0)),
+        // Bony z e-paragonu trafiają w to samo miejsce co bony z OCR — obie drogi mają
+        // dawać ten sam wiersz w bazie, inaczej porównywanie ich niczego nie dowodzi.
+        gr(Math.abs((dok.rabatyGlobalne || []).reduce((a, x) => a + (x.wartosc || 0), 0))),
+        txt(zaplata, 32),
         crypto.createHash('sha256').update('eparagon:' + dok.klucz).digest('hex'), dok.klucz]);
     id = r.insertId;
     await poz.saveParsed(conn, id, parsed, ledgerId);

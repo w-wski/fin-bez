@@ -14,8 +14,8 @@ const { suggestFromDict, withSuggestions, learnItem, kategoriaWKsiedze,
   suggestCategoryByName, learnCategoryPattern } = require('./slownik');
 const produkt = require('./produkt-baza');
 
-const KOLUMNY = '(receipt_id, line_no, ocr_name, code, name, quantity, unit, unit_price, value, category_id, low_confidence)';
-const ZNAKI = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+const KOLUMNY = '(receipt_id, line_no, ocr_name, code, name, quantity, unit, unit_price, value, category_id, low_confidence, discount)';
+const ZNAKI = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
 async function loadItems(receiptId, ledgerId) {
   const items = await q('SELECT * FROM receipt_items WHERE receipt_id=:r ORDER BY line_no, id', { r: receiptId });
@@ -52,7 +52,7 @@ async function saveParsed(conn, receiptId, parsed, ledgerId) {
     const catId = (d && d.category_id) || await suggestCategoryByName(it.ocr_name, ledgerId);
     wiersze.push([receiptId, ++nr, String(it.ocr_name || '').slice(0, 255), txt(it.code, 255), (d && d.name) || null,
       iloscPola(it.quantity).value, (d && d.unit) || null, kwotaPola(it.unit_price).value,
-      kwotaPola(it.value).value, catId, isInconsistent(it) ? 1 : 0]);
+      kwotaPola(it.value).value, catId, isInconsistent(it) ? 1 : 0, kwotaPola(it.discount).value]);
   }
   await conn.execute('DELETE FROM receipt_items WHERE receipt_id = ?', [receiptId]);
   for (const w of wiersze) await conn.execute(`INSERT INTO receipt_items ${KOLUMNY} VALUES ${ZNAKI}`, w);
@@ -152,7 +152,7 @@ async function createItem(receiptId, b, userName, ledgerId) {
   const [max] = await q('SELECT COALESCE(MAX(line_no),0)+1 AS n FROM receipt_items WHERE receipt_id = :r', { r: receiptId });
   const ins = await q(`INSERT INTO receipt_items ${KOLUMNY} VALUES ${ZNAKI}`, [
     receiptId, max.n, txt(b.ocr_name, 255) || '', d.code, d.name, d.quantity, d.unit,
-    d.unit_price, d.value, d.category_id, isInconsistent(d) ? 1 : 0]);
+    d.unit_price, d.value, d.category_id, isInconsistent(d) ? 1 : 0, null]);
   const item = await pobierz(ins.insertId);
   // K3: podpowiedź to stan słownika SPRZED tej korekty — dopiero potem uczymy (patrz updateItem).
   const suggestion = await suggestFromDict(item.code || item.ocr_name, ledgerId);

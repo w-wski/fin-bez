@@ -94,6 +94,15 @@ async function pdf(plik, h) {
     h.naWynik(r);
   } catch (err) {
     if (err.message === 'auth') return;
+    // DUPLIKAT to nie awaria: to ten sam zakup wgrany drugą drogą (u nas: najpierw .json,
+    // potem ten sam paragon jako PDF). Otwieramy TAMTEN wpis, zamiast zostawiać człowieka
+    // z czerwonym komunikatem i bez wyjścia.
+    if (err.data && err.data.error === 'duplicate_receipt' && err.data.existing_id) {
+      komunikat(err.data.powod
+        ? `Ten zakup już jest w księdze (${err.data.powod}) — otwieram zapisany paragon.`
+        : 'Ten paragon już był wgrany — otwieram zapisany.');
+      return h.naZapisany(err.data.existing_id);
+    }
     komunikat('Nie udało się odczytać PDF-a: ' + (err.data?.error || err.message), true);
   }
 }

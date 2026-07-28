@@ -660,6 +660,22 @@ input[type="month"]::-webkit-date-and-time-value {
   font-weight: 600;
 }
 .btn.small { min-height: 44px; padding: 0 var(--space-3); font-size: var(--fs-micro); }
+/* Przycisk-IKONA: koło (Szymon 07-28: „jeśli jakiś przycisk (x) czy inny mały może być
+   okrągły, to niech będzie — tak jak przełącznik ciemno/jasno"). Powód jest praktyczny,
+   nie ozdobny: krótka pigułka z jednym znakiem czyta się jak przypadkowa plamka i ucieka
+   wzrokowi, a koło o stałym rozmiarze zawsze wygląda na cel do naciśnięcia. Ten sam bok
+   44 px co `.theme-dot`, więc oba kółka w interfejsie są tej samej wielkości. */
+.btn--kolo {
+  width: 44px; height: 44px;
+  min-width: 44px; min-height: 44px;
+  flex: 0 0 auto;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: var(--fs-body);
+  line-height: 1;
+}
 /* Cichy wariant — „Pomiń", „Anuluj" i inne trzecioplanowe wyjścia. */
 .btn.quiet { background: var(--glass-fill-sunken); border-color: var(--line); color: var(--ink-muted); }
 

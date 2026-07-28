@@ -34,7 +34,7 @@ export function initParagon() {
   // własnymi trasami i wracają gotowym paragonem.
   $('#rcPlik').onchange = (e) => {
     const f = e.target.files[0];
-    if (f) przyjmijPlik(f, { naObraz: (plik) => wczytajObraz(plik), naWynik: pokazWynik });
+    if (f) przyjmijPlik(f, { naObraz: (plik) => wczytajObraz(plik), naWynik: pokazWynik, naZapisany: otworz });
   };
   $('#rcApply').onclick = applyCrop;
   $('#rcBack').onclick = () => step('kadr');
@@ -229,7 +229,9 @@ async function send() {
     // DUPLIKAT: ten sam paragon już jest w bazie — otwieramy TAMTEN zamiast zostawiać człowieka
     // z komunikatem. Wcześniej to była ślepa uliczka: do zapisanego paragonu nie było wejścia.
     if (res.status === 409 && data.existing_id) {
-      msg.textContent = 'Ten paragon już był wgrany — otwieram zapisany odczyt.';
+      msg.textContent = data.powod
+        ? `Ten zakup już jest w księdze (${data.powod}) — otwieram zapisany paragon.`
+        : 'Ten paragon już był wgrany — otwieram zapisany odczyt.';
       msg.className = 'msg';
       wyczyscWejscia();
       return otworz(data.existing_id);

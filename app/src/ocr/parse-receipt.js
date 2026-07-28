@@ -22,9 +22,42 @@ const RE_DATE = /(\d{4})[-.\/](\d{2})[-.\/](\d{2})|(\d{2})[-.\/](\d{2})[-.\/](\d
 const RE_NIP = /NIP[:\s]*((?:\d[- ]?){10})(?!\d)/i; // formaty 3-3-2-2 i 3-2-2-3
 const NOISE = /PARAGON|FISKALNY|NIEFISKALNY|PTU|VAT|SPRZED|OPODATK|ROZLICZENIE|GOTÓWKA|GOTOWKA|KARTA|RESZTA|KASA|KASJER|WYDRUK|^\s*[-=*#.]{3,}\s*$/i;
 
+/* OPUSTY (Szymon 07-28: „interpretuje Odpusty jako produkty"). Na paragonie Biedronki
+   rabat to OSOBNA LINIA pod pozycją, a pod nią jeszcze jedna — sama kwota po rabacie:
+
+     Czereśnie Luz C 1,980x 24,99 49,48     ← pozycja, wartość KATALOGOWA
+     Opust -26,73                           ← rabat do pozycji WYŻEJ
+     22,75                                  ← ile z niej naprawdę zeszło
+
+   Bez tej reguły „Opust" wpadał jako towar za 26,73 zł, a „22,75" ginęło — stąd suma
+   pozycji 443,90 przy paragonie na 107,24. Rabat NIE JEST towarem.
+
+   Zapisujemy tak samo jak przy e-paragonie: `unit_price` zostaje ceną KATALOGOWĄ,
+   `value` staje się kwotą ZAPŁACONĄ, a różnica ląduje w `discount`. Dzięki temu obie
+   drogi wejścia dają te same liczby i historia cen się nie rozjeżdża. */
+const RE_OPUST_SUMA = /(OPUST|RABAT|UPUST)\w*\s*(ŁĄCZNIE|LACZNIE|RAZEM)|SUMA\s*(OPUST|RABAT|UPUST)/i;
+const RE_OPUST = /^\s*(OPUST|UPUST|RABAT|ZNI[ŻZ]KA)\w*/i;
+const RE_TYLKO_KWOTA = new RegExp(`^\\s*-?\\s*(${KWOTA})\\s*[A-D]?\\s*$`);
+const kwotaZLinii = (l) => { const m = l.match(RE_TRAILING_VALUE); return m ? parseKwota(m[1]) : null; };
+
+/* Rabat do POZYCJI czy rabat do CAŁEGO paragonu? Na tym samym paragonie są oba:
+
+     Opust -26,73             ← do pozycji wyżej (czereśnie)
+     Opust Voucher B -3,92    ← do całego rachunku (bon), nie da się przypisać do towaru
+
+   Rozstrzyga to, co zostaje z linii po odjęciu słowa „Opust" i kwoty. Nic nie zostaje →
+   rabat pozycji. Zostaje słowo („Voucher") → rabat całego paragonu. Litery stawek VAT
+   (B, C) i śmieci OCR („(©;") nie liczą się jako słowo — stąd odsiew krótszych niż dwie
+   litery. */
+function opisRabatu(l) {
+  return l.replace(RE_OPUST, '').replace(RE_TRAILING_VALUE, '')
+    .replace(/[^\p{L} ]/gu, ' ').split(/\s+/).filter((w) => w.length > 1).join(' ').trim();
+}
+
 function parseReceipt(text) {
   const lines = String(text || '').split('\n').map((l) => l.trim()).filter(Boolean);
-  const out = { shop_name: null, receipt_date: null, total: null, nip: null, items: [], warnings: [] };
+  const out = { shop_name: null, receipt_date: null, total: null, nip: null,
+    discount_total: null, discount_global: null, items: [], warnings: [] };
 
   // sklep: pierwsza sensowna linia (litery, nie same cyfry, przed linią z NIP/adresem)
   for (const l of lines.slice(0, 5)) {
@@ -46,6 +79,37 @@ function parseReceipt(text) {
   for (let i = 0; i < body.length; i++) {
     const l = body[i];
     if (NOISE.test(l) || RE_NIP.test(l) || RE_DATE.test(l)) continue;
+    // Podsumowanie rabatów całego paragonu — informacja o dokumencie, nie pozycja.
+    if (RE_OPUST_SUMA.test(l)) {
+      const k = kwotaZLinii(l);
+      if (k !== null) out.discount_total = Math.abs(k);
+      continue;
+    }
+    // Rabat do pozycji WYŻEJ. Pod nim bywa jeszcze linia z samą kwotą po rabacie —
+    // wtedy to ona jest tym, co naprawdę zapłacono, więc ją zabieramy i pomijamy.
+    if (RE_OPUST.test(l)) {
+      const k = kwotaZLinii(l);
+      const poprzednia = out.items[out.items.length - 1];
+      if (k !== null && opisRabatu(l)) {
+        // Bon/voucher: obniża CAŁY rachunek, nie da się go przypisać do towaru. Trzymamy
+        // osobno, bo bez tego suma pozycji nigdy nie zgodzi się z sumą paragonu.
+        out.discount_global = Math.round(((out.discount_global || 0) + Math.abs(k)) * 100) / 100;
+        continue;
+      }
+      if (k !== null && poprzednia) {
+        poprzednia.discount = Math.abs(k);
+        const nast = body[i + 1];
+        const poRabacie = nast && RE_TYLKO_KWOTA.test(nast) ? parseKwota(nast) : null;
+        // Ufamy linii „po rabacie" tylko wtedy, gdy zgadza się z arytmetyką (±1 gr):
+        // jeśli nie, zostawiamy wartość katalogową i sami odejmujemy rabat — kwota
+        // wzięta z sufitu jest gorsza niż kwota policzona.
+        const wyliczona = Math.round(((poprzednia.value || 0) - poprzednia.discount) * 100) / 100;
+        if (poRabacie !== null && Math.abs(poRabacie - wyliczona) <= 0.01) { poprzednia.value = poRabacie; i++; }
+        else if (poprzednia.value !== null) { poprzednia.value = wyliczona; if (poRabacie !== null) i++; }
+        poprzednia.low_confidence = false;   // rabat TŁUMACZY różnicę ilość×cena ≠ wartość
+      }
+      continue;
+    }
     let m = l.match(RE_QTY_PRICE);
     if (m) {
       const name = l.slice(0, l.indexOf(m[0])).replace(/[.…_-]+$/, '').trim();
@@ -75,11 +139,15 @@ function parseReceipt(text) {
     }
   }
 
-  // sanity: suma pozycji vs SUMA paragonu (K7 — ostrzeżenie, nigdy blokada)
-  const roznica = sumDiff(out.items, out.total);
+  // sanity: suma pozycji vs SUMA paragonu (K7 — ostrzeżenie, nigdy blokada).
+  // Rabaty CAŁEGO paragonu (bony) siedzą poza pozycjami, więc równanie brzmi
+  // „suma pozycji − bony = SUMA", a nie „suma pozycji = SUMA".
+  const bony = out.discount_global || 0;
+  const roznica = sumDiff(out.items, out.total === null ? null : out.total + bony);
   if (roznica !== null) {
     const s = out.items.reduce((a, b) => a + (b.value || 0), 0);
-    out.warnings.push(`Suma pozycji (${s.toFixed(2)}) ≠ SUMA paragonu (${out.total.toFixed(2)}) — sprawdź pozycje.`);
+    out.warnings.push(`Suma pozycji (${s.toFixed(2)})${bony ? ` − bony (${bony.toFixed(2)})` : ''}`
+      + ` ≠ SUMA paragonu (${out.total.toFixed(2)}) — sprawdź pozycje.`);
   }
   if (!out.items.length) out.warnings.push('Nie rozpoznano żadnej pozycji — spróbuj lepszego kadru/kontrastu albo „popraw AI".');
   return out;

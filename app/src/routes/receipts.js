@@ -50,7 +50,7 @@ router.post('/', upload.single('image'), async (req, res, next) => {
       worker: silnik, source: 'zdjecie',
     });
     if (w.duplikat) {
-      return res.status(409).json({ error: 'duplicate_receipt', existing_id: w.duplikat.id, imported_at: w.duplikat.imported_at });
+      return res.status(409).json({ error: 'duplicate_receipt', existing_id: w.duplikat.id, imported_at: w.duplikat.imported_at, powod: w.duplikat.powod || null });
     }
     res.status(201).json(w.odpowiedz);
   } catch (e) { next(e); }
@@ -76,7 +76,7 @@ router.post('/pdf', upload.single('plik'), async (req, res, next) => {
       return res.status(400).json({ error: e.message });
     }
     if (w.duplikat) {
-      return res.status(409).json({ error: 'duplicate_receipt', existing_id: w.duplikat.id, imported_at: w.duplikat.imported_at });
+      return res.status(409).json({ error: 'duplicate_receipt', existing_id: w.duplikat.id, imported_at: w.duplikat.imported_at, powod: w.duplikat.powod || null });
     }
     res.status(201).json(w.odpowiedz);
   } catch (e) { next(e); }

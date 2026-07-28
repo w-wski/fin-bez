@@ -158,7 +158,7 @@ export function pozycja(it, ctx) {
     return track('Paragon: korekta pozycji', 'paragon');
   };
 
-  const kosz = el('button', { class: 'btn small rc-kosz', type: 'button', title: 'Usuń pozycję', 'aria-label': 'Usuń pozycję' }, '✕');
+  const kosz = el('button', { class: 'btn small btn--kolo rc-kosz', type: 'button', title: 'Usuń pozycję', 'aria-label': 'Usuń pozycję' }, '✕');
   kosz.onclick = () => ctx.onUsun(it);
   const l1 = el('div', { class: 'rc-l1' });
   l1.append(el('span', { class: 'rc-nr' }, String(it.line_no)), kod, kosz);

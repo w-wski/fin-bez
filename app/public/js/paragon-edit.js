@@ -83,8 +83,12 @@ function odswiezSumy() {
   const t = parseKwota(rc.total);
   sumaBox.innerHTML = '';
   sumaBox.append(el('span', {}, `Pozycje (${rc.items.length}): ${zl(s)}`));
+  // Bony (rabaty CAŁEGO paragonu) nie są pozycjami, a obniżają rachunek — bez nich
+  // różnica świeciła zawsze, choć odczyt był poprawny. Równanie: pozycje − bony = SUMA.
+  const bony = parseKwota(rc.discount_global) || 0;
+  if (bony) sumaBox.append(el('span', {}, `bony i rabaty rachunku: −${zl(bony)}`));
   if (t !== null) sumaBox.append(el('span', {}, `SUMA z paragonu: ${zl(t)}`));
-  const d = t === null ? 0 : Math.round((s - t) * 100) / 100;
+  const d = t === null ? 0 : Math.round((s - bony - t) * 100) / 100;
   if (Math.abs(d) > TOL_SUMA) sumaBox.append(el('span', { class: 'rc-roznica' }, `różnica ${d > 0 ? '+' : ''}${zl(d)} — sprawdź pozycje`));
   if (btnOK) btnOK.textContent = zaksiegowany() ? 'Ten paragon jest w księdze' : `Potwierdź → wpis ${t !== null ? zl(t) : '—'} w księdze`;
 }

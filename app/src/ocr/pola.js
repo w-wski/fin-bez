@@ -62,7 +62,11 @@ function isInconsistent(item) {
   const price = parseKwota(item && item.unit_price);
   const value = parseKwota(item && item.value);
   if (qty === null || price === null || value === null) return false;
-  return Math.abs(qty * price - value) > TOL_POZYCJA + 1e-9;
+  // RABAT tłumaczy różnicę i nie jest niezgodnością: cena jednostkowa jest KATALOGOWA,
+  // a `value` to kwota ZAPŁACONA. Bez tego składnika każda przeceniona pozycja
+  // (czereśnie 1,98 kg × 24,99 = 49,48, zapłacone 22,75) świeciła jako podejrzana.
+  const rabat = parseKwota(item && item.discount) || 0;
+  return Math.abs(qty * price - (value + rabat)) > TOL_POZYCJA + 1e-9;
 }
 
 // K7: różnica „suma pozycji − SUMA z paragonu"; null = brak danych albo mieści się w tolerancji.

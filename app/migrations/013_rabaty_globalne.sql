@@ -1,0 +1,23 @@
+-- 013: RABATY CAŁEGO PARAGONU (bony, vouchery) — osobna kolumna, bo to inna liczba
+-- niż `discount_total` z migracji 012.
+--
+-- Na paragonie Biedronki z 27.07.2026 są OBA rodzaje rabatu i mylenie ich psuje rachunek:
+--
+--   discount_total  = 112,22   „OPUSTY ŁĄCZNIE" — WSZYSTKIE opusty razem, w tym te
+--                              przypisane do konkretnych towarów (receipt_items.discount)
+--   discount_global =  15,00   dwa bony („Opust Voucher"), których NIE DA SIĘ przypisać
+--                              do żadnej pozycji — obniżają cały rachunek
+--
+-- Dopiero z tą kolumną domyka się równanie, po którym poznajemy, że odczyt jest kompletny:
+--
+--   SUMA(receipt_items.value) − receipts.discount_global = receipts.total
+--   122,24                    − 15,00                   = 107,24
+--
+-- Bez niej suma pozycji zawsze różniła się od sumy paragonu o wartość bonów, a różnica
+-- wyglądała jak błąd odczytu, więc kazała szukać usterki tam, gdzie jej nie było.
+--
+-- Bonu NIE zapisujemy jako pozycji z ujemną kwotą, choć tak jest wydrukowany: pozycje
+-- paragonu zasilają analizę zakupów (products), a „Opust Voucher" nie jest towarem
+-- i nie ma ceny za kilogram.
+
+ALTER TABLE receipts ADD COLUMN discount_global DECIMAL(12,2) NULL AFTER discount_total;
