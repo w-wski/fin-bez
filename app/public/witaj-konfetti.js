@@ -23,6 +23,10 @@ import { TECZA } from './witaj-kucyk.js';
 const MAX = 900;
 const TAU = Math.PI * 2;
 const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+// Wznoszenie po paraboli: pion RUSZA POWOLI i przyspiesza, podczas gdy poziom (easeOut)
+// robi swoje od razu. Zestawione razem dają tor, który najpierw ucieka w bok i lekko
+// w dół, a dopiero potem zakręca w górę — czyli to, co widać, gdy coś zostaje wyplute.
+const easeIn = (x) => x * x;
 const easeIO = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 const WYRZUT_MS = 300;          // ile trwa sam wyrzut jednej cząstki przez otwór
 /* Deterministyczny szum z indeksu: chmura ma wyglądać na przypadkową, ale plansza musi
@@ -137,7 +141,10 @@ export function silnik(canvas) {
       st.sx[i] = zr[0];
       st.sy[i] = zr[1] + (a - 0.5) * 3.5;            // otwór: ~3,5 px wysokości
       st.jx[i] = zr[0] + kier * (26 + b * 44);
-      st.jy[i] = st.sy[i] + (c2 - 0.5) * 14;
+      // Koniec wyrzutu leży PONIŻEJ otworu (Szymon 07-28: „pod lekkim kątem w dół,
+      // dopiero potem parabolą w górę”). Wcześniej otwór pluł poziomo i cząstki od razu
+      // szły do chmury, więc strumień czytał się jak linia, a nie jak wyrzut.
+      st.jy[i] = st.sy[i] + 7 + c2 * 12;
       // Chmura: gęstsza w środku (pierwiastek z promienia daje równomierne pole).
       const kat = a * TAU + b;
       const prom = Math.sqrt(c2) * rozrzut;
@@ -170,9 +177,9 @@ export function silnik(canvas) {
       st.op[i] = 1;
       const koniecWyrzutu = ur + WYRZUT_MS;
       if (t < koniecWyrzutu) {
-        const e = easeOut((t - ur) / WYRZUT_MS);
-        st.x[i] = st.sx[i] + (st.jx[i] - st.sx[i]) * e;
-        st.y[i] = st.sy[i] + (st.jy[i] - st.sy[i]) * e;
+        const u = (t - ur) / WYRZUT_MS;
+        st.x[i] = st.sx[i] + (st.jx[i] - st.sx[i]) * easeOut(u);
+        st.y[i] = st.sy[i] + (st.jy[i] - st.sy[i]) * easeIn(u);   // opada, przyspieszając
         continue;
       }
       // Kołysanie chmury: drobne, deterministyczne, gaśnie przy składaniu napisu.
@@ -180,7 +187,8 @@ export function silnik(canvas) {
       const kol2 = Math.cos(t / 540 + i * 1.1) * 3.5;
       const eCh = Math.min(1, (t - koniecWyrzutu) / Math.max(1, napisA - koniecWyrzutu));
       const chX = st.jx[i] + (st.cx[i] - st.jx[i]) * easeOut(eCh);
-      const chY = st.jy[i] + (st.cy[i] - st.jy[i]) * easeOut(eCh);
+      // Poziom easeOut, pion easeIn — razem parabola w górę, w stronę napisu.
+      const chY = st.jy[i] + (st.cy[i] - st.jy[i]) * easeIn(eCh);
       if (t < napisA) { st.x[i] = chX + kol; st.y[i] = chY + kol2; continue; }
       const p = (t - napisA) / (napisB - napisA);
       const e = easeIO(Math.max(0, Math.min(1, (p - st.del[i]) / (1 - st.del[i]))));

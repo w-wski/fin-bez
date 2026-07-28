@@ -94,7 +94,10 @@ class Plansza {
     // z pełnego zasięgu figury — ten drugi obejmuje ogon w pozie „w górę", więc kucyk
     // wychodził o trzecią część za mały. Piksel musi być LICZBĄ CAŁKOWITĄ, inaczej
     // sprite trafia na pół piksela ekranu i cały kontur się rozmywa.
-    this.S = Math.max(4, Math.min(12, Math.round(w * 0.58 / this.mapa.wKorpus)));
+    // 0,29 zamiast 0,58 (Szymon 07-28: „powinien być 2× mniejszy”). Dolna granica spada
+    // z 4 na 3, bo przy wąskim telefonie połowa z czterech to trzy — inaczej ograniczenie
+    // zjadłoby całą zmianę i kucyk zostałby tej samej wielkości.
+    this.S = Math.max(3, Math.min(12, Math.round(w * 0.29 / this.mapa.wKorpus)));
     const S = this.S;
     this.ziemia = Math.round(h * LINIA / S) * S;
     this.oy = this.ziemia - this.mapa.bokDol * S;

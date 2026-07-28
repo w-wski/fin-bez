@@ -35,35 +35,34 @@ const PASMO = 2;       // ile rzędów pikseli ma jedno pasmo tęczy
 
 /* ------------------------------------------------------------------ sylwetki */
 /* Kucyk z profilu, PYSKIEM W PRAWO. Wchodzi z lewej i wychodzi w prawo, więc ta sama
-   mapa obsługuje oba przebiegi — nic nie trzeba odbijać. */
+   mapa obsługuje oba przebiegi — nic nie trzeba odbijać.
+
+   Proporcje przerysowane 07-28 wprost z referencji Bartusia: GŁOWA JEST WIELKA (prawie
+   tak duża jak reszta), grzywa to bujna masa spływająca po karku, a nie wąski pasek na
+   grzbiecie, tułów jest krótki i zwarty. Poprzednia sylwetka była wydłużonym bochenkiem
+   z małą głową — czyli dokładnie tym, na co Szymon zwrócił uwagę. */
 const KORPUS = [
-  '..........................G',
-  '.........................GG',
-  '.............MM..........GG',
-  '............MMMM........GGG',
-  '...........MMMMMM.W....GGG',
-  '..........MMMMMMM.WWW.GGG',
-  '.........MMMMMMMMWWWWWWWWWW',
-  '.........MMMMMMMMWWWWWWWWWWWW',
-  '........MMMMMMMMMWWWWWWWWWWWWW',
-  '........MMMMMMMMMWWWWWWWooWWWWW',
-  '.......MMMMMMMMMMWWWWWWWooWWWWW',
-  '.......MMMMMMMMMMWWWWWWWWWWWWWWWWWW',
-  '.......MMMMMMMMMMWWWWWWWWWWWWWWWWPP',
-  '......MMMMMMMMMMMWWWWWWWWWWWWWWWPP',
-  '......MMMMMMMMMMMWWWWWWWWWWWWWW',
-  '......MMMMMMMMMMWWWWWWWWWWWW',
-  '...WWWMMMMMMMMMWWWWWWWWWW',
-  '.WWWWWWWMMMMMMWWWWWWWWWW',
-  'WWWWWWWWWMMMMWWWWWWWWWWW',
-  'WWWWWWWWWWWWWWWWWWWWWWWW',
-  'WWWWWWWWWWWWWWWWWWWWWWWW',
-  'WWWWWWWWWWWWWWWWWWWWWWWW',
-  'WWWWWWWWWWWWWWWWWWWWWWWW',
-  '.WWWWWWWWWWWWWWWWWWWWWWW',
-  '.WWWWWWWWWWWWWWWWWWWWWW',
-  '.SWWWWWWWWWWWWWWWWWWWWS',
-  '..SSWWWWWWWWWWWWWWWWSS',
+  '.......................G',
+  '......................GG',
+  '...........MMM.......GG',
+  '.........MMMMMMM....GG',
+  '........MMMMMMMMM..GG',
+  '.......MMMMMMMMMMMWWWWW',
+  '.......MMMMMMMMMMWWWWWWW',
+  '......MMMMMMMMMMWWWWWWWWW',
+  '......MMMMMMMMMWWWWWooWWWW',
+  '......MMMMMMMMWWWWWWooWWWWW',
+  '......MMMMMMMMWWWWWWWWWWWWW',
+  '.....MMMMMMMMMWWWWWWWWWWWPP',
+  '.....MMMMMMMMWWWWWWWWWWWWPP',
+  '..WWWMMMMMMMWWWWWWWWWWWWW',
+  '.WWWWWWMMMMWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWWWWWW',
+  'WWWWWWWWWWWWWWWWWWWW',
+  '.WWWWWWWWWWWWWWWWWW',
+  '..SWWWWWWWWWWWWWWS',
 ];
 
 /* Ogon: trzy pozy, bo obrót pixel artu wygląda jak błąd. Nasada każdej mapy siada
@@ -163,7 +162,7 @@ const PRZOD = [
 
 /* Kotwice warstw w pikselach siatki KORPUSU (kolumna, rząd mapy — nie konturu). */
 const KOTWICE = {
-  ogonDol: [-9, 17], ogonSrod: [-10, 16], ogonGora: [-12, 11], nogi: [1, 26],
+  ogonDol: [-6, 12], ogonSrod: [-7, 11], ogonGora: [-8, 7], nogi: [1, 20],
 };
 
 /* ----------------------------------------------------------- rasteryzacja */
@@ -291,4 +290,4 @@ export function rysuj(ctx, ox, oy, S, p) {
 
 /** Otwory, z których lecą chmury — w pikselach siatki, od lewego górnego piksela
  *  figury. Zad jest z TYŁU (lewo), pysk z PRZODU (prawo). */
-export const OTWORY = { zad: [1, 20], pysk: [35, 12] };
+export const OTWORY = { zad: [1, 15], pysk: [27, 12] };
