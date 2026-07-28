@@ -778,7 +778,15 @@ th {
   background: var(--glass-fill-sunken);
 }
 tbody tr:last-child td { border-bottom: 0; }
-tbody tr:hover td { background: var(--accent-quiet); }
+/* Podświetlenie wiersza pod kursorem maluje WIERSZ, nie komórki. Na szerokim ekranie
+   różnicy nie widać (komórki w tabeli stykają się bokami), ale poniżej 901 px wiersz
+   Historii jest siatką — komórki są wtedy osobnymi polami z przerwami, więc tło na nich
+   rozpadało się na PASKI. Tło wiersza leży pod komórkami i wypełnia go w całości.
+   `@media (hover: hover)`: na ekranie dotykowym „hover" zostaje przyklejony po dotknięciu
+   i wpis świeciłby długo po tym, jak Szymon poszedł dalej. */
+@media (hover: hover) and (pointer: fine) {
+  tbody tr:hover { background-color: var(--accent-quiet); }
+}
 th.num, td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 td.exp { color: var(--minus); } td.inc { color: var(--plus); } td.trf { color: var(--flow); }
 /* Szerokie tabele przewijają się WEWNĄTRZ tafli — strona nigdy nie jedzie w bok. */

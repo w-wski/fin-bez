@@ -36,9 +36,18 @@ router.post('/', upload.single('image'), async (req, res, next) => {
     const ledgerId = ksiega(req, res);
     if (ledgerId === null) return;
     if (!req.file) return res.status(400).json({ error: 'no_image' });
+    let silnik;
+    try {
+      silnik = await getWorker();
+    } catch (e) {
+      // Silnik OCR bez modelu języka albo z uszkodzonym modelem: to wina WDROŻENIA,
+      // nie zdjęcia — ale użytkownik ma prawo przeczytać powód po polsku, zamiast
+      // patrzeć na „500". 503 mówi wprost: dziś nie umiem, jutro po naprawie umiem.
+      return res.status(503).json({ error: e.message });
+    }
     const w = await przyjmij.zObrazu({
       buffer: req.file.buffer, rozsz: 'jpg', ledgerId, uid: req.user.uid,
-      worker: await getWorker(), source: 'zdjecie',
+      worker: silnik, source: 'zdjecie',
     });
     if (w.duplikat) {
       return res.status(409).json({ error: 'duplicate_receipt', existing_id: w.duplikat.id, imported_at: w.duplikat.imported_at });
@@ -55,9 +64,12 @@ router.post('/pdf', upload.single('plik'), async (req, res, next) => {
     const ledgerId = ksiega(req, res);
     if (ledgerId === null) return;
     if (!req.file) return res.status(400).json({ error: 'no_file' });
-    let w;
+    let w, silnik;
     try {
-      w = await przyjmij.zPdf({ buffer: req.file.buffer, ledgerId, uid: req.user.uid, worker: await getWorker() });
+      silnik = await getWorker();
+    } catch (e) { return res.status(503).json({ error: e.message }); }   // jak wyżej: wina wdrożenia
+    try {
+      w = await przyjmij.zPdf({ buffer: req.file.buffer, ledgerId, uid: req.user.uid, worker: silnik });
     } catch (e) {
       // Błąd czytania PDF-a to wina PLIKU, nie serwera — 400 z powodem po polsku,
       // żeby użytkownik wiedział, czy ma wgrać .json, czy zrobić zdjęcie.
