@@ -111,9 +111,12 @@ działa na nowszej bazie. Jeśli migracja padła w połowie — patrz niżej, ni
 
 ## Znane pułapki
 
-- **Migracja 012 (`fk_item_prod`).** Runner toleruje „kolumna/indeks już istnieje", ale **nie**
-  „klucz obcy o tej nazwie już istnieje". Jeśli 012 padnie w połowie, powtórka wywali się na
-  kluczu obcym. Wtedy: zapisz kod błędu i zgłoś, nie naprawiaj ręcznie.
+- **Migracja 012 (`fk_item_prod`) — ROZBROJONE 2026-07-28.** Runner nie tolerował błędu 1826
+  („klucz obcy o tej nazwie już istnieje"), więc powtórka migracji przerwanej w połowie
+  wywracała się na własnym kluczu obcym. Od commita z migracją 014 kod 1826 jest na liście
+  tolerowanych i powtórka przechodzi. Warunek: każdy klucz obcy musi mieć nazwę nadaną
+  JAWNIE (`CONSTRAINT <nazwa> FOREIGN KEY …`) — bez tego MySQL wygeneruje kolejną nazwę
+  (`tabela_ibfk_2`) i przy powtórce założy drugi, zdublowany klucz zamiast pominąć.
 - **Dziura w numeracji migracji na 011.** Runner sortuje po nazwach i pamięta, co wykonał —
   nieszkodliwe, ale niech nie zaskakuje.
 - **`npm run migrate` z korzenia domeny** kończy się `ENOENT: package.json`. `package.json`
