@@ -12,6 +12,7 @@ const { parseKwota } = require('../kwota');
 const { txt, normUnit, parseIlosc, czyData, isInconsistent } = require('./pola');
 const { suggestFromDict, withSuggestions, learnItem, kategoriaWKsiedze,
   suggestCategoryByName, learnCategoryPattern } = require('./slownik');
+const produkt = require('./produkt-baza');
 
 const KOLUMNY = '(receipt_id, line_no, ocr_name, code, name, quantity, unit, unit_price, value, category_id, low_confidence)';
 const ZNAKI = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
@@ -57,6 +58,10 @@ async function saveParsed(conn, receiptId, parsed, ledgerId) {
   for (const w of wiersze) await conn.execute(`INSERT INTO receipt_items ${KOLUMNY} VALUES ${ZNAKI}`, w);
   await conn.execute('UPDATE receipts SET shop_name=?, receipt_date=?, total=? WHERE id=?',
     [txt(parsed.shop_name, 128), czyData(parsed.receipt_date), kwotaPola(parsed.total).value, receiptId]);
+  // Pozycje wskazują na produkty, które JUŻ znamy z wcześniejszych decyzji człowieka.
+  // Nierozpoznane zostają z product_id = NULL — to normalny stan, nie błąd. Nowych
+  // produktów maszyna nie zakłada (powód w nagłówku produkt-baza.js).
+  await produkt.przypiszPozycje(conn, receiptId, parsed.shop_name);
 }
 
 // K4: korekta człowieka wchodzi do słownika (kod → opis/jednostka/kategoria) oraz — dla
@@ -65,8 +70,12 @@ async function saveParsed(conn, receiptId, parsed, ledgerId) {
 // NAPRAWA (audyt Z4): uczymy WYŁĄCZNIE tym, co człowiek zatwierdził dla TEGO kodu. Zmiana samego
 // kodu nie uczy niczego — opis „masło extra" należał do starego kodu; wpisanie go pod nowym
 // skasowałoby kilkanaście wcześniejszych decyzji i wróciło jako fałszywa „podpowiedź ze słownika".
-async function ucz(item, b, userName) {
-  const dotkniete = ['name', 'unit', 'category_id'].filter((k) => b[k] !== undefined);
+//
+// PRODUKTY (2026-07-28): ta sama korekta zakłada albo dowiązuje produkt i alias
+// (kod → produkt w TYM sklepie). Robi to wyłącznie ręczna poprawka, nigdy OCR — katalog
+// rodziny ma zawierać towary, a nie literówki maszyny.
+async function ucz(item, b, userName, sklep) {
+  const dotkniete = ['name', 'unit', 'category_id', 'product_id'].filter((k) => b[k] !== undefined);
   if (!dotkniete.length) return false;
   // learnItem odmawia zapisu bez opisu (kolumna name jest NOT NULL) — wtedy nie mówimy
   // człowiekowi „zapamiętane w słowniku", bo nic nie zapamiętaliśmy.
@@ -76,8 +85,22 @@ async function ucz(item, b, userName) {
   if (b.category_id !== undefined && item.category_id && item.ocr_name) {
     await learnCategoryPattern(item.ocr_name, item.category_id, userName);
   }
+  // Produkt zakłada/dowiązuje TA korekta, ale tylko gdy jest już czym go nazwać. Sama
+  // zmiana kategorii bez opisu nie tworzy produktu — powstałby katalog nazwany kodami OCR.
+  const pid = await produkt.zapamietaj({
+    sklep, kod: item.code || item.ocr_name, nazwa: item.name, unit: item.unit,
+    categoryId: item.category_id, productId: b.product_id !== undefined ? item.product_id : null,
+  });
+  if (pid && Number(item.product_id) !== pid) {
+    await q('UPDATE receipt_items SET product_id = :p WHERE id = :id', { p: pid, id: item.id });
+    item.product_id = pid;
+  }
   return zapisane;
 }
+
+/** Nazwa sklepu z paragonu — potrzebna, żeby alias trafił do właściwej sieci. */
+const sklepParagonu = async (receiptId) =>
+  ((await q('SELECT shop_name FROM receipts WHERE id = :r', { r: receiptId }))[0] || {}).shop_name || null;
 
 // K6: znacznik spójności liczony z aktualnego stanu pozycji (nie zerowany „na wiarę"),
 // ale NIGDY nie blokuje zapisu — rabaty i wagowe zaokrąglenia to normalne paragony.
@@ -107,6 +130,16 @@ async function pola(b, ledgerId, wszystkie) {
     if (c !== null && (!Number.isInteger(c) || c <= 0 || !(await kategoriaWKsiedze(c, ledgerId)))) return { blad: 'bad_category' };
     out.category_id = c;
   }
+  if (chce('product_id')) {
+    // Scalenie zatwierdzone ręcznie („to jest ten sam produkt co…”). Istnienie sprawdzamy
+    // TU, bo nieistniejący klucz obcy wywróciłby zapis błędem MySQL-a, czyli pustym 500.
+    const pr = puste(b.product_id) ? null : Number(b.product_id);
+    if (pr !== null && (!Number.isInteger(pr) || pr <= 0
+      || !(await q('SELECT id FROM products WHERE id = :p AND active = 1', { p: pr })).length)) {
+      return { blad: 'bad_product' };
+    }
+    out.product_id = pr;
+  }
   return { pola: out };
 }
 
@@ -123,7 +156,8 @@ async function createItem(receiptId, b, userName, ledgerId) {
   const item = await pobierz(ins.insertId);
   // K3: podpowiedź to stan słownika SPRZED tej korekty — dopiero potem uczymy (patrz updateItem).
   const suggestion = await suggestFromDict(item.code || item.ocr_name, ledgerId);
-  const nauczone = await ucz(item, { name: b.name, unit: b.unit, category_id: b.category_id }, userName);
+  const nauczone = await ucz(item, { name: b.name, unit: b.unit, category_id: b.category_id,
+    product_id: b.product_id }, userName, await sklepParagonu(receiptId));
   return { item, suggestion, nauczone };
 }
 
@@ -143,7 +177,7 @@ async function updateItem(receiptId, itemId, b, userName, ledgerId) {
   // dopiero potem nauka. Odwrotnie serwer zwracał człowiekowi jego własny wpis jako
   // „podpowiedź ze słownika" i kasował wcześniejsze decyzje dla tego kodu.
   const suggestion = await suggestFromDict(item.code || item.ocr_name, ledgerId);
-  const nauczone = await ucz(item, b, userName);
+  const nauczone = await ucz(item, b, userName, await sklepParagonu(receiptId));
   return { item, suggestion, nauczone };
 }
 
