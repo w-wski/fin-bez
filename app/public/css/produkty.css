@@ -1,0 +1,35 @@
+/* Karta „Produkty" (js/produkty.js) — katalog + szczegół z historią cen. */
+#view-produkty .pr-szukaj { width: 100%; min-height: 44px; font-size: 1rem; margin-bottom: .75rem; }
+.pr-lista { display: flex; flex-direction: column; gap: .5rem; }
+.pr-karta { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+  padding: .625rem; border: 1px solid var(--line); border-radius: .625rem; background: var(--card, var(--panel)); }
+.pr-glowna { flex: 1 1 14rem; display: flex; flex-direction: column; gap: .15rem; align-items: flex-start;
+  background: none; border: 0; padding: .25rem; text-align: left; cursor: pointer; color: inherit; }
+.pr-tytul { font-weight: 600; }
+.pr-meta { font-size: .8125rem; color: var(--ink-muted, var(--muted)); font-variant-numeric: tabular-nums; }
+.pr-kat { min-height: 40px; max-width: 15rem; }
+.pr-naglowek { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
+.pr-nazwa { flex: 1 1 14rem; min-height: 44px; font-size: 1.05rem; font-weight: 600; }
+
+/* Wykres: kolory z tokenów — czerwień/zieleń są zajęte przez minus/plus księgi,
+   więc półkowa idzie w tuszu wyciszonym, zapłacona w akcencie (to na nią patrzymy). */
+.pr-wykres svg { width: 100%; height: auto; display: block; }
+.pr-siatka { stroke: var(--line); stroke-width: 1; }
+.pr-os { fill: var(--ink-muted, var(--muted)); font-size: 11px; font-variant-numeric: tabular-nums; }
+.pr-linia { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.pr-linia--kat { stroke: var(--ink-faint, var(--muted)); stroke-dasharray: 5 4; }
+.pr-linia--zap { stroke: var(--accent); }
+.pr-kropka--kat { fill: var(--ink-faint, var(--muted)); }
+.pr-kropka--zap { fill: var(--accent); }
+.pr-legenda { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .8125rem; margin: .375rem 0 1rem; }
+.pr-leg--kat { color: var(--ink-faint, var(--muted)); }
+.pr-leg--zap { color: var(--accent); }
+
+.pr-tabela { width: 100%; border-collapse: collapse; font-size: .875rem; font-variant-numeric: tabular-nums; }
+.pr-tabela th { text-align: left; font-weight: 600; padding: .375rem .5rem; border-bottom: 1px solid var(--line-strong, var(--line)); }
+.pr-tabela td { padding: .375rem .5rem; border-bottom: 1px solid var(--line); }
+@media (max-width: 640px) {
+  /* na telefonie tabela nie mieści 6 kolumn — przewija się w swoim pudle, nie łamie strony */
+  #view-produkty { overflow-x: hidden; }
+  .pr-tabela { display: block; overflow-x: auto; }
+}

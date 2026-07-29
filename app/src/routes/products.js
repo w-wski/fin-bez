@@ -15,7 +15,7 @@
  * Bez tego junior poznałby zakupy PERSEVERY po cenach jednostkowych.
  */
 const express = require('express');
-const { q } = require('../db');
+const { q, pool } = require('../db');
 const { ledgerScope } = require('../auth');
 const { propozycje } = require('../ocr/produkt-baza');
 const { dataISO } = require('../ocr/dostep');
@@ -44,6 +44,7 @@ router.get('/', async (req, res, next) => {
     const szukaj = String(req.query.szukaj || '').trim().slice(0, 64);
     const rows = await q(
       `SELECT p.id, p.name, p.unit, p.pack_size, p.category_id, c.name AS category_name,
+              p.product_category_id, pc.name AS product_category_name,
               COUNT(i.id) AS zakupow,
               ROUND(SUM(i.value), 2) AS wydano,
               MAX(r.receipt_date) AS ostatni_zakup
@@ -51,6 +52,7 @@ router.get('/', async (req, res, next) => {
          LEFT JOIN receipt_items i ON i.product_id = p.id
          LEFT JOIN receipts r ON r.id = i.receipt_id AND ${z.sql}
          LEFT JOIN categories c ON c.id = p.category_id
+         LEFT JOIN product_categories pc ON pc.id = p.product_category_id
         WHERE p.active = 1 ${szukaj ? 'AND p.name LIKE :szukaj' : ''}
         GROUP BY p.id
         ORDER BY ostatni_zakup IS NULL, ostatni_zakup DESC, p.name
@@ -62,6 +64,58 @@ router.get('/', async (req, res, next) => {
         ostatni_zakup: dataISO(r.ostatni_zakup),
       })),
     });
+  } catch (e) { next(e); }
+});
+
+// GET /api/v1/products/kategorie — drzewo kategorii PRODUKTOWYCH (migracja 014).
+// Osobna oś od kategorii budżetowych: budżet opisuje przelew, ta oś opisuje towar.
+router.get('/kategorie', async (req, res, next) => {
+  try {
+    const rows = await q('SELECT id, parent_id, name FROM product_categories'
+      + ' WHERE active = 1 ORDER BY sort_order, name', {});
+    res.json({ items: rows });
+  } catch (e) { next(e); }
+});
+
+// PATCH /api/v1/products/:id — korekta produktu przez człowieka: nazwa, jednostka,
+// kategoria PRODUKTOWA. Kategorii budżetowej celowo tu nie ma — ona należy do wpisu
+// w księdze, nie do towaru (dwie osie, decyzja Szymona 2026-07-28).
+router.patch('/:id', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10) || 0;
+    const [prod] = await q('SELECT id FROM products WHERE id = :id AND active = 1', { id });
+    if (!prod) return res.status(404).json({ error: 'not_found' });
+    const b = req.body || {};
+    const sets = [], vals = [];
+    if (b.name !== undefined) {
+      const n = typeof b.name === 'string' ? b.name.trim().slice(0, 160) : '';
+      if (!n) return res.status(400).json({ error: 'bad_name' });
+      sets.push('name = ?'); vals.push(n);
+    }
+    if (b.unit !== undefined) {
+      const u = typeof b.unit === 'string' ? b.unit.trim().slice(0, 8) : '';
+      sets.push('unit = ?'); vals.push(u || null);
+    }
+    if (b.product_category_id !== undefined) {
+      const raw = b.product_category_id;
+      let pc = null;
+      if (raw !== null && raw !== '') {
+        pc = Number(raw);
+        // nieistniejąca kategoria = 400 tutaj, nie surowy błąd klucza obcego z MySQL-a (pusty 500)
+        if (!Number.isInteger(pc) || pc <= 0
+          || !(await q('SELECT id FROM product_categories WHERE id = :p AND active = 1', { p: pc })).length) {
+          return res.status(400).json({ error: 'bad_product_category' });
+        }
+      }
+      sets.push('product_category_id = ?'); vals.push(pc);
+    }
+    if (!sets.length) return res.status(400).json({ error: 'nothing_to_update' });
+    // pool.execute z `?`, nie helper q: q używa namedPlaceholders, a sets budujemy pozycyjnie
+    await pool.execute(`UPDATE products SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
+    const [po] = await q(`SELECT p.id, p.name, p.unit, p.pack_size, p.product_category_id,
+        pc.name AS product_category_name FROM products p
+        LEFT JOIN product_categories pc ON pc.id = p.product_category_id WHERE p.id = :id`, { id });
+    res.json({ ok: true, product: po });
   } catch (e) { next(e); }
 });
 

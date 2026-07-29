@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="css/kategorie.css">
 <link rel="stylesheet" href="css/paragon.css">
 <link rel="stylesheet" href="css/przydzial.css">
+<link rel="stylesheet" href="css/produkty.css">
 <link rel="stylesheet" href="css/sygnal.css">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -282,6 +283,13 @@
     <div id="przydzialBox"></div>
   </section>
 
+  <!-- PRODUKTY: katalog + historia cen (js/produkty.js). Kategoria produktowa = osobna
+       oś od budżetu (migracja 014) — to tu się ją przypisuje. -->
+  <section id="view-produkty" hidden>
+    <h1 class="page-title">Produkty</h1>
+    <div id="produktyBox"></div>
+  </section>
+
   <!-- ADMIN (tylko rola admin; treść renderowana z js/admin.js) -->
   <section id="view-admin" hidden>
     <h1 class="page-title">Administracja</h1>
@@ -304,6 +312,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Więcej">
     <span class="sheet-grip" aria-hidden="true"></span>
     <button class="sheet-item" data-view="import">Import z banku</button>
+    <button class="sheet-item" data-view="produkty">Produkty</button>
     <button class="sheet-item" data-view="przydzial" data-admin hidden>Przydział</button>
     <button class="sheet-item" data-view="admin" data-admin hidden>Administracja</button>
     <div class="sheet-sep" aria-hidden="true"></div>
