@@ -120,8 +120,10 @@ function czytaj(obj) {
       + `= ${wyliczone}, a paragon mówi ${total} (w groszach)`);
   }
 
+  // `forma` to surowy kod słownikowy JPK (np. "1") — bez tłumaczenia na tekst NIE jest wiedzą
+  // o formie płatności, więc nie ląduje jako `nazwa` (Z6/K5: nie fabrykujemy nazwy z kodu).
   const zaplata = (p.platnosc || []).filter((x) => !x.reszta)
-    .map((x) => ({ nazwa: String(x.nazwa || x.forma || ''), wartosc: grosze(x.wart) || 0 }));
+    .map((x) => ({ nazwa: x.nazwa ? String(x.nazwa) : null, wartosc: grosze(x.wart) || 0 }));
 
   return {
     format: 'jpk', wersja: wersja || null,

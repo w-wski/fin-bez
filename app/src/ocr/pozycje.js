@@ -69,24 +69,26 @@ async function saveParsed(conn, receiptId, parsed, ledgerId) {
   await produkt.przypiszPozycje(conn, receiptId, parsed.shop_name);
 }
 
-// K4: korekta człowieka wchodzi do słownika (kod → opis/jednostka/kategoria) oraz — dla
-// kategorii — do mapping_cache po wzorcu nazwy OCR, jak samouczenie importu w imports.js.
+// K4: korekta człowieka zakłada/dowiązuje produkt i alias (kod → produkt w TYM sklepie) — od
+// Z7 przez produkt-baza.js#zapamietaj WYŁĄCZNIE (item_dict/learnItem już nie piszą, patrz
+// slownik.js). Dla kategorii — osobno do mapping_cache po wzorcu nazwy OCR, jak samouczenie
+// importu w imports.js.
 //
 // NAPRAWA (audyt Z4): uczymy WYŁĄCZNIE tym, co człowiek zatwierdził dla TEGO kodu. Zmiana samego
 // kodu nie uczy niczego — opis „masło extra" należał do starego kodu; wpisanie go pod nowym
 // skasowałoby kilkanaście wcześniejszych decyzji i wróciło jako fałszywa „podpowiedź ze słownika".
+// Flagi `uczJednostke`/`uczKategorie` mówią zapamietaj(), które pole człowiek NAPRAWDĘ dotknął w
+// TYM żądaniu — dotknięte zapisuje się dosłownie (nawet puste, świadome „oduczenie"), niedotknięte
+// zostaje przy tym, co produkt już wie (COALESCE po stronie zapamietaj()).
 //
-// PRODUKTY (2026-07-28): ta sama korekta zakłada albo dowiązuje produkt i alias
-// (kod → produkt w TYM sklepie). Robi to wyłącznie ręczna poprawka, nigdy OCR — katalog
-// rodziny ma zawierać towary, a nie literówki maszyny.
+// PRODUKTY (2026-07-28): robi to wyłącznie ręczna poprawka, nigdy OCR — katalog rodziny ma
+// zawierać towary, a nie literówki maszyny.
 async function ucz(item, b, userName, sklep) {
   const dotkniete = ['name', 'unit', 'category_id', 'product_id'].filter((k) => b[k] !== undefined);
   if (!dotkniete.length) return false;
-  // learnItem odmawia zapisu bez opisu (kolumna name jest NOT NULL) — wtedy nie mówimy
-  // człowiekowi „zapamiętane w słowniku", bo nic nie zapamiętaliśmy.
-  const zapisane = await learnItem({ code: item.code || item.ocr_name, name: item.name, unit: item.unit,
-    categoryId: item.category_id, userName,
-    uczJednostke: b.unit !== undefined, uczKategorie: b.category_id !== undefined });
+  // learnItem to dziś czysta WALIDACJA (kod ≥2 znaki, opis niepusty) — zapisu dokonuje wyłącznie
+  // zapamietaj() niżej. Bez czego uczyć = nie ma sensu nawet próbować zapamietaj().
+  if (!learnItem({ code: item.code || item.ocr_name, name: item.name })) return false;
   if (b.category_id !== undefined && item.category_id && item.ocr_name) {
     await learnCategoryPattern(item.ocr_name, item.category_id, userName);
   }
@@ -95,12 +97,16 @@ async function ucz(item, b, userName, sklep) {
   const pid = await produkt.zapamietaj({
     sklep, kod: item.code || item.ocr_name, nazwa: item.name, unit: item.unit,
     categoryId: item.category_id, productId: b.product_id !== undefined ? item.product_id : null,
+    uczJednostke: b.unit !== undefined, uczKategorie: b.category_id !== undefined,
   });
   if (pid && Number(item.product_id) !== pid) {
     await q('UPDATE receipt_items SET product_id = :p WHERE id = :id', { p: pid, id: item.id });
     item.product_id = pid;
   }
-  return zapisane;
+  // P4 (korekta po weryfikacji): „nauczone” odzwierciedla, czy zapis FAKTYCZNIE zaszedł
+  // (zapamietaj zwróciło product_id), nie samą walidację learnItem — inaczej człowiek widziałby
+  // „zapamiętane”, mimo że produkt-baza.js po cichu odmówiła (np. wskazany productId nie istnieje).
+  return Boolean(pid);
 }
 
 /** Nazwa sklepu z paragonu — potrzebna, żeby alias trafił do właściwej sieci. */

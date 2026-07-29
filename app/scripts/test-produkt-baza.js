@@ -40,8 +40,8 @@ const ostatnie = () => baza.zapytania[baza.zapytania.length - 1];
     { code_norm: 'MLEKO 1L', product_id: 3, shop: '*' },
   ]);
   const mapa = await pb.mapaAliasow(['Ser', 'SER', 'Mleko 1L', 'A', ''], 'BIEDRONKA "CNC" 3135');
-  rowne(mapa.get('SER'), 7, 'alias sklepowy wygrywa z globalnym');
-  rowne(mapa.get('MLEKO 1L'), 3, 'alias globalny działa, gdy sklepowego nie ma');
+  rowne(mapa.get('SER'), { productId: 7, shop: 'BIEDRONKA' }, 'alias sklepowy wygrywa z globalnym');
+  rowne(mapa.get('MLEKO 1L'), { productId: 3, shop: '*' }, 'alias globalny działa, gdy sklepowego nie ma');
   rowne(ostatnie().par.s, 'BIEDRONKA', 'nagłówek paragonu sprowadzony do sieci');
   rowne(Object.keys(ostatnie().par).filter((k) => k.startsWith('k')).length, 2,
     'jednoznakowy kod i pusty odpadają przed zapytaniem, duplikaty scalone');
@@ -58,25 +58,57 @@ const ostatnie = () => baza.zapytania[baza.zapytania.length - 1];
     'pusta nazwa: nie zakładamy produktu nazwanego kodem OCR');
   rowne(baza.zapytania.length, 0, 'odmowa następuje PRZED dotknięciem bazy');
 
-  // nowy produkt: (1) szukanie po nazwie → pusto, (2) INSERT products, (3) upsert aliasu
+  // nowy produkt: (1) szukanie po nazwie → pusto, (2) INSERT products, (3) alias sklepowy,
+  // (4) alias globalny — P0: KAŻDA ręczna korekta niesie ostatnią decyzję też do aliasu '*'.
   zeruj([], { insertId: 42 });
   const pid = await pb.zapamietaj({ sklep: 'BIEDRONKA "CNC" 3135', kod: 'Jog Naturalny 400g',
     nazwa: 'Jogurt naturalny 400 g', categoryId: 5 });
   rowne(pid, 42, 'nowy produkt założony');
-  rowne(baza.zapytania.length, 3, 'trzy zapytania: sprawdzenie nazwy, INSERT, alias');
+  rowne(baza.zapytania.length, 4, 'cztery zapytania: sprawdzenie nazwy, INSERT, alias sklepowy, alias globalny');
   ok(/INSERT INTO products/.test(baza.zapytania[1].sql), 'drugie zapytanie zakłada produkt');
   rowne(baza.zapytania[1].par.p, 0.4, 'gramatura z nazwy trafia do pack_size (400 g → 0,4 kg)');
   rowne(baza.zapytania[1].par.c, 5, 'kategoria z korekty człowieka zapisana przy produkcie');
-  rowne(ostatnie().par.s, 'BIEDRONKA', 'alias przypisany do SIECI, nie do numeru placówki');
-  rowne(ostatnie().par.cn, 'JOG NATURALNY 400G', 'kod w aliasie znormalizowany');
-  rowne(ostatnie().par.cr, 'Jog Naturalny 400g', 'oryginalna pisownia zachowana jako ślad');
+  const aliasSklepowy1 = baza.zapytania[2];
+  rowne(aliasSklepowy1.par.s, 'BIEDRONKA', 'alias przypisany do SIECI, nie do numeru placówki');
+  rowne(aliasSklepowy1.par.cn, 'JOG NATURALNY 400G', 'kod w aliasie znormalizowany');
+  rowne(aliasSklepowy1.par.cr, 'Jog Naturalny 400g', 'oryginalna pisownia zachowana jako ślad');
+  ok(/VALUES \(:p, '\*', :cn, :cr, :src, 1\)/.test(ostatnie().sql),
+    'korekta w sklepie upsertuje TAKŻE alias globalny — pętla uczenia się zamyka (P0)');
+  rowne(ostatnie().par.cn, 'JOG NATURALNY 400G', 'globalny alias niesie ten sam znormalizowany kod');
 
-  // ta sama nazwa drugi raz: żadnego nowego produktu
+  // ta sama nazwa drugi raz: żadnego nowego produktu, ŻADEN update products.name (P1) —
+  // dopasowanie po `name` już jest niewrażliwe na wielkość liter/diakrytyki (kolacja).
   zeruj([{ id: 42 }]);
   rowne(await pb.zapamietaj({ sklep: 'Lidl', kod: 'JOGURT NAT 400G', nazwa: 'Jogurt naturalny 400 g' }), 42,
     'ta sama nazwa = ten sam produkt, nowy alias dla innej sieci');
   ok(!baza.zapytania.some((x) => /INSERT INTO products/.test(x.sql)), 'drugi katalog NIE powstał');
-  rowne(ostatnie().par.s, 'LIDL', 'drugi alias wskazuje Lidla');
+  ok(!baza.zapytania.some((x) => /UPDATE products SET.*name/.test(x.sql)),
+    'dopasowanie po nazwie nie nadpisuje products.name (P1)');
+  const aliasSklepowy2 = baza.zapytania[baza.zapytania.length - 2];
+  rowne(aliasSklepowy2.par.s, 'LIDL', 'drugi alias wskazuje Lidla');
+  ok(/VALUES \(:p, '\*', :cn, :cr, :src, 1\)/.test(ostatnie().sql),
+    'korekta w drugiej sieci też upsertuje alias globalny (P0)');
+
+  // scalenie ręczne z podanym productId: name produktu NIE jest ruszane w ogóle (P1)
+  zeruj([{ id: 55 }]);
+  rowne(await pb.zapamietaj({ sklep: 'Lidl', kod: 'X JOGURT', nazwa: 'Jogurt inaczej nazwany', productId: 55 }),
+    55, 'scalenie ręczne z istniejącym productId');
+  ok(!baza.zapytania.some((x) => /UPDATE products SET.*name/.test(x.sql)),
+    'scalenie ręczne nie zmienia nazwy WSKAZANEGO produktu (P1)');
+
+  // flagi uczJednostke/uczKategorie: pole dotknięte zapisuje się dosłownie, TAKŻE puste (oduczenie)
+  zeruj([{ id: 42 }]);
+  await pb.zapamietaj({ sklep: 'Lidl', kod: 'JOGURT NAT 400G', nazwa: 'Jogurt naturalny 400 g',
+    unit: null, uczJednostke: true });
+  const twardyZapis = baza.zapytania.find((x) => /UPDATE products SET/.test(x.sql));
+  ok(/unit = :u/.test(twardyZapis.sql) && twardyZapis.par.u === null,
+    'uczJednostke=true zapisuje NULL dosłownie — świadome oduczenie (Z4)');
+
+  zeruj([{ id: 42 }]);
+  await pb.zapamietaj({ sklep: 'Lidl', kod: 'JOGURT NAT 400G', nazwa: 'Jogurt naturalny 400 g', unit: null });
+  const bezpiecznyZapis = baza.zapytania.find((x) => /UPDATE products SET/.test(x.sql));
+  ok(/COALESCE\(:u, unit\)/.test(bezpiecznyZapis.sql),
+    'pole niedotknięte (brak uczJednostke) trzyma COALESCE — nie zeruje starej jednostki');
 
   // scalenie ręczne: wskazany produkt musi istnieć
   zeruj([]);
@@ -104,7 +136,10 @@ const ostatnie = () => baza.zapytania[baza.zapytania.length - 1];
   rowne(update[0].par, [42, 1], 'przypisanie trafiło we właściwy wiersz');
   ok(/product_id IS NULL/.test(wykonane[0].sql),
     'ruszamy tylko pozycje bez produktu — ręcznego przypisania nie nadpisujemy');
-  ok(wykonane.some((x) => /UPDATE product_aliases SET hits/.test(x.sql)), 'licznik trafień aliasu rośnie');
+  const hitsUpdate = wykonane.find((x) => /UPDATE product_aliases SET hits/.test(x.sql));
+  ok(!!hitsUpdate, 'licznik trafień aliasu rośnie');
+  rowne(hitsUpdate.par, ['BIEDRONKA', 'JOG NATURALNY 400G'],
+    'hits podbite TYLKO dla FAKTYCZNIE użytego aliasu — jeden konkretny wiersz, nie shop IN (?, \'*\') dla wszystkich kodów naraz (P3)');
 
   // ---------- propozycje scalenia ----------
   zeruj([{ id: 42, name: 'Jogurt naturalny 400 g' }, { id: 43, name: 'Czereśnie' }]);

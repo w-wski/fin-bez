@@ -1,0 +1,14 @@
+-- 015: FORMA PŁATNOŚCI (Z6, decyzja Szymona 2026-07-28: „gotówka czy elektronicznie").
+--
+-- Do tej pory wpis w księdze nie mówił NIC o formie zapłaty — a przelew i gotówka z portfela
+-- to dwa różne budżety domowe (gotówka nie zostawia śladu w wyciągu, więc jej brak w raporcie
+-- jest inny rodzaj „nie wiem", niż brak importu bankowego).
+--
+--   payment_method NULL          = nieznane — wpisy sprzed tej migracji, niczego nie zgadujemy
+--   payment_method 'ELEKTRONICZNA' = domyślna dla ręcznego wpisu i twarda dla importu bankowego
+--   payment_method 'GOTÓWKA'       = jawny wybór użytkownika albo odczyt z paragonu
+--
+-- NULL nie jest tu „trzecią wartością formularza" — to ślad braku danych. Dlatego w API
+-- (routes/transactions.js) raz ustawionej wartości nie da się wyczyścić z powrotem na NULL:
+-- cofnięcie wiedzy, którą już mamy, byłoby gorsze niż jej brak.
+ALTER TABLE transactions ADD COLUMN payment_method ENUM('ELEKTRONICZNA','GOTÓWKA') NULL AFTER currency;

@@ -7,6 +7,11 @@
 #ledgerSeg[hidden] { display: none; }        /* jedna księga w zasięgu — segment nic nie wnosi */
 #ledgerSeg button { font-size: var(--fs-cap); letter-spacing: .04em; }
 
+/* ---------- Forma płatności (Z6) ---------- */
+/* Zero własnych reguł koloru/rozmiaru: to ten sam .seg/.seg-2 co #segType (styles.css),
+   więc wygląda 1:1 jak segment typu — tylko ukrywa się przy TRANSFER (js/wpis.js). */
+#segPayment[hidden] { display: none; }
+
 /* ---------- Tafla kwoty ---------- */
 .amount-card {
   display: flex;

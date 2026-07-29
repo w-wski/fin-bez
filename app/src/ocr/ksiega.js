@@ -5,6 +5,21 @@
 // Dlatego każda zmiana, która dotyka obu tabel, idzie w JEDNEJ transakcji SQL.
 const { pool } = require('../db');
 
+// Forma płatności z paragonu (Z6, poprawka K5 po recenzji): `receipts.payment` to wolny tekst
+// z OCR/JPK — NULL/pusty/sam kod słownikowy (np. "1") NIE są wiedzą, więc zostają NULL, a nie
+// domyślnym zgadywaniem 'ELEKTRONICZNA'. Kolejność sprawdzeń ma znaczenie: „CASHLESS"/„CASHBACK"
+// zawierają literalnie „CASH", więc muszą być złapane PRZED wzorcem gotówkowym, inaczej
+// „płatność bezgotówkowa” (cashless) wpadałaby do GOTÓWKA.
+function platnoscZParagonu(payment) {
+  if (payment === null || payment === undefined) return null;
+  const s = String(payment).trim();
+  if (!s) return null;                                  // biały znak/pusty napis — brak wiedzy
+  if (/CASHLESS|CASHBACK|BEZGOT/i.test(s)) return 'ELEKTRONICZNA';
+  if (/GOT[OÓ]WK|\bCASH\b/i.test(s)) return 'GOTÓWKA';
+  if (/^\d+$/.test(s)) return null;                     // sam kod słownikowy — nieprzetłumaczony
+  return 'ELEKTRONICZNA';
+}
+
 // Nagłówek paragonu + (gdy paragon jest już zaksięgowany) kwota/data wpisu w księdze.
 // `sets`/`params` to gotowe fragmenty UPDATE-a receipts, `ksiegaSet` to pola transactions.
 // Zwraca stan księgi: 'zaktualizowany' | 'w koszu' | null (paragon jeszcze nie zaksięgowany).
@@ -42,9 +57,9 @@ async function ksieguj(rc, user, kwota, data, categoryId) {
       return { transaction_id: cur ? cur.transaction_id : null, already_confirmed: true };
     }
     const [r] = await conn.execute(
-      `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, category_id, description, source, legacy_id)
-       VALUES (?, ?, ?, 'WYDATEK', ?, ?, ?, 'RECEIPT', ?)`,
-      [rc.ledger_id, user.uid, data, kwota, categoryId,
+      `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, payment_method, category_id, description, source, legacy_id)
+       VALUES (?, ?, ?, 'WYDATEK', ?, ?, ?, ?, 'RECEIPT', ?)`,
+      [rc.ledger_id, user.uid, data, kwota, platnoscZParagonu(rc.payment), categoryId,
         ('Paragon: ' + (rc.shop_name || '')).slice(0, 512), 'rcpt:' + rc.receipt_hash.slice(0, 24)]);
     await conn.execute('UPDATE receipts SET transaction_id=? WHERE id=?', [r.insertId, rc.id]);
     await conn.commit();
@@ -52,4 +67,4 @@ async function ksieguj(rc, user, kwota, data, categoryId) {
   } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
 }
 
-module.exports = { zapiszNaglowek, ksieguj };
+module.exports = { zapiszNaglowek, ksieguj, platnoscZParagonu };

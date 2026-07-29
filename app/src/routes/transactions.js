@@ -2,6 +2,7 @@ const express = require('express');
 const { q } = require('../db');
 const { ledgerScope } = require('../auth');
 const { parseKwota } = require('../kwota');   // jedyne miejsce, gdzie napis staje się kwotą
+const { domyslnaPlatnosc, platnoscDoPatcha } = require('../platnosc');
 
 const router = express.Router();
 
@@ -49,7 +50,7 @@ router.get('/', async (req, res, next) => {
     // Nazwę kategorii pokazujemy tylko wtedy, gdy kategoria jest z tej samej księgi co wpis —
     // stary wpis z kategorią cudzej księgi (dane sprzed walidacji w PATCH) ma pokazać „—", nie nazwę.
     const rows = await q(
-      `SELECT t.id, t.ledger_id, t.tx_date, t.type, t.amount, t.currency, t.description,
+      `SELECT t.id, t.ledger_id, t.tx_date, t.type, t.amount, t.currency, t.payment_method, t.description,
               t.source, t.bank_tx_id, t.category_id, c.name AS category, u.name AS user_name
        FROM transactions t
        JOIN users u ON u.id = t.user_id
@@ -74,6 +75,12 @@ router.post('/', async (req, res, next) => {
     if (!b.tx_date || !TYPY.includes(b.type) || amount === null || amount <= 0) {
       return res.status(400).json({ error: 'bad_input', fields: ['tx_date', 'type', 'amount'] });
     }
+    // Brak pola przy WYDATEK/PRZYCHÓD -> domyślna ELEKTRONICZNA (decyzja Szymona 2026-07-28).
+    // TRANSFER nie jest płatnością: zapisujemy NULL, a jawnie podaną wartość odrzucamy — to nie
+    // pole klienta do wypełnienia przy przesunięciu między własnymi kontami.
+    const platnoscWynik = domyslnaPlatnosc(b);
+    if (platnoscWynik.error) return res.status(400).json({ error: platnoscWynik.error });
+    const paymentMethod = platnoscWynik.value;
     // Idempotencja kolejki offline: client_ref (legacy_id) — ponowna wysyłka tego samego
     // wpisu (np. sieć padła po INSERT, przed odpowiedzią) zwraca istniejący rekord, nie dubluje.
     const clientRef = typeof b.client_ref === 'string' && /^off:[\w-]{6,64}$/.test(b.client_ref) ? b.client_ref : null;
@@ -99,11 +106,11 @@ router.post('/', async (req, res, next) => {
       categoryId = found[0]?.id || null;
     }
     const r = await q(
-      `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, currency, category_id, description, source, legacy_id)
-       VALUES (:l, :u, :d, :t, :a, :c, :cat, :desc, 'MANUAL', :ref)`,
+      `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, currency, payment_method, category_id, description, source, legacy_id)
+       VALUES (:l, :u, :d, :t, :a, :c, :pm, :cat, :desc, 'MANUAL', :ref)`,
       { l: ledgerId, u: req.user.uid, d: b.tx_date, t: b.type, a: amount,
-        c: (b.currency || 'PLN').slice(0, 3), cat: categoryId, desc: (b.description || '').slice(0, 512) || null,
-        ref: clientRef });
+        c: (b.currency || 'PLN').slice(0, 3), pm: paymentMethod, cat: categoryId,
+        desc: (b.description || '').slice(0, 512) || null, ref: clientRef });
     res.status(201).json({ id: r.insertId });
   } catch (e) { next(e); }
 });
@@ -117,7 +124,7 @@ router.patch('/:id', async (req, res, next) => {
     const params = { id: parseInt(req.params.id, 10) };
     const where = scopeWhere(req.user, params);
     if (!where) return res.status(403).json({ error: 'forbidden' });
-    const cur = await q(`SELECT t.id, t.ledger_id FROM transactions t WHERE t.id = :id AND ${where}`, params);
+    const cur = await q(`SELECT t.id, t.ledger_id, t.type FROM transactions t WHERE t.id = :id AND ${where}`, params);
     if (!cur.length) return res.status(404).json({ error: 'not_found' });
     const b = req.body || {};
     const sets = [], p2 = { ...params };
@@ -145,6 +152,12 @@ router.patch('/:id', async (req, res, next) => {
       sets.push('t.description = :desc');
       p2.desc = (b.description === null ? '' : String(b.description)).slice(0, 512) || null;
     }
+    // Formę płatności można PRZEŁĄCZYĆ (elektroniczna <-> gotówka), ale nie wyczyścić na NULL
+    // (patrz migracja 015), i nigdy przy TRANSFER — typ liczy się PO tym PATCH-u (nowy z body,
+    // jeśli podany, inaczej ten z bazy), więc zmiana typu na TRANSFER też odrzuca płatność.
+    const platnoscWynik = platnoscDoPatcha(b, b.type !== undefined ? b.type : cur[0].type);
+    if (platnoscWynik.error) return res.status(400).json({ error: platnoscWynik.error });
+    if (platnoscWynik.touched) { sets.push('t.payment_method = :pm'); p2.pm = platnoscWynik.value; }
     if (!sets.length) return res.status(400).json({ error: 'nothing_to_update' });
     // Warunek zasięgu wchodzi TAKŻE do UPDATE: między SELECT-em a zapisem wpis mógł trafić do Kosza
     // (admin, druga karta) — bez tego zapis lądowałby na rekordzie usuniętym albo cudzym.

@@ -148,17 +148,11 @@ router.post('/match', async (req, res, next) => {
       'SELECT id FROM transactions WHERE id = :t AND ledger_id = :l AND deleted_at IS NULL AND bank_tx_id IS NULL',
       { t: txId, l: bt[0].ledger_id });
     if (!tx.length) return res.status(404).json({ error: 'transaction_not_matchable' });
-    // Typ wpisu: kierunek bierzemy ze znaku kwoty, ale gdy w tej kategorii dotychczasowe wpisy
-    // to w większości TRANSFER (spłaty, cele), księgujemy TRANSFER — inaczej każda rata wpadałaby
-    // do wydatków i psuła raport konsumpcji. To ta sama zasada, co przy kategoriach: uczymy się
-    // z decyzji człowieka, zamiast trzymać osobną listę „kategorii transferowych".
-    let typ = bt.amount < 0 ? 'WYDATEK' : 'PRZYCHÓD';
-    if (effectiveCategory) {
-      const dom = await q(
-        `SELECT type FROM transactions WHERE category_id = :c AND deleted_at IS NULL
-         GROUP BY type ORDER BY COUNT(*) DESC LIMIT 1`, { c: effectiveCategory });
-      if (dom[0]?.type === 'TRANSFER') typ = 'TRANSFER';
-    }
+    // /match TYLKO spina istniejący wiersz bankowy z istniejącym wpisem księgi — typ wpisu
+    // (WYDATEK/PRZYCHÓD/TRANSFER) już tam jest, ustalony przy jego utworzeniu. Właściwa logika
+    // wyznaczania typu (kierunek + „dominujący typ kategorii") żyje w /book niżej, bo TAM
+    // dopiero powstaje NOWY wpis. Martwy blok, który tu kiedyś liczył `typ` z odwołaniem do
+    // niezadeklarowanego `effectiveCategory` (zmienna z /book), usunięty — nikt go nie używał.
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -192,12 +186,28 @@ router.post('/book', async (req, res, next) => {
     } else {
       learnMapping(bt, effectiveCategory, req.user.name).catch(() => {});
     }
+    // Typ wpisu: kierunek ze znaku kwoty, a gdy kategoria jest w praktyce transferowa (spłaty,
+    // cele), TRANSFER — uczymy się z decyzji człowieka, zamiast trzymać listę „kategorii
+    // transferowych". Do 2026-07-28 ten handler używał `typ` zadeklarowanego wyłącznie w /match
+    // — każdy realny POST /book kończył się ReferenceError (bug złapany przy zleceniu Z6).
+    let typ = bt.amount < 0 ? 'WYDATEK' : 'PRZYCHÓD';
+    if (effectiveCategory) {
+      // Zawężone do księgi wiersza bankowego (K1b, poprawka po recenzji): bez tego dominujący
+      // typ liczył się ze WSZYSTKICH ksiąg naraz, więc kategoria o tym samym id w cudzej księdze
+      // (np. RODZINA vs PERSEVERA) mogła przegłosować typ wpisu, którego wcale nie dotyczyła.
+      const dom = await q(
+        `SELECT type FROM transactions WHERE category_id = :c AND ledger_id = :l AND deleted_at IS NULL
+         GROUP BY type ORDER BY COUNT(*) DESC LIMIT 1`, { c: effectiveCategory, l: bt.ledger_id });
+      if (dom[0]?.type === 'TRANSFER') typ = 'TRANSFER';
+    }
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      // Wyciąg bankowy z definicji nie jest gotówką (Z6) — forma płatności jest tu twarda,
+      // nie domyślna: nikt nie może jej zmienić przy zaksięgowaniu, bo to nie decyzja użytkownika.
       const [r] = await conn.execute(
-        `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, currency, category_id, description, source, bank_tx_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CSV', ?)`,
+        `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, currency, payment_method, category_id, description, source, bank_tx_id)
+         VALUES (?, ?, ?, ?, ?, ?, 'ELEKTRONICZNA', ?, ?, 'CSV', ?)`,
         [bt.ledger_id, req.user.uid, bt.transaction_date,
          typ, Math.abs(bt.amount), bt.currency,
          effectiveCategory,

@@ -1,6 +1,7 @@
 // Historia: lista wpisów z filtrami, edycja w miejscu, miękkie usuwanie z cofnięciem i Kosz.
 import { $, el, zl, api, track, toast, refreshers, KSIEGI } from './core.js';
 import { parseKwota } from './kwota.js';   // jedyne miejsce, gdzie napis staje się kwotą
+import { selectPlatnosci, zmienionaPlatnosc } from './historia-platnosc.js';
 
 const TYPY = ['WYDATEK', 'PRZYCHÓD', 'TRANSFER'];
 const ZNAK = { WYDATEK: '−', PRZYCHÓD: '+', TRANSFER: '⇄' };
@@ -14,7 +15,9 @@ let kosz = false;                  // widok „Kosz": pokazuje wpisy usunięte m
 let wersjaListy = 0;               // rośnie przy każdym przerysowaniu listy (patrz removeTx)
 let catsCache = {};                // płaska lista kategorii per księga (lista wyboru w edycji)
 
-const wiersz = (...n) => { const d = el('div', { class: 'row wrap' }); d.append(...n); return d; };
+// filter(Boolean): pola formularza bywają null (np. selectPlatnosci przy TRANSFER) — bez
+// odsiania null trafiłby do append() jako tekst "null", widoczny w wierszu edycji.
+const wiersz = (...n) => { const d = el('div', { class: 'row wrap' }); d.append(...n.filter(Boolean)); return d; };
 const dzien = (v) => String(v).slice(0, 10);       // tx_date przychodzi jako 'RRRR-MM-DD' (db.js: dateStrings)
 
 // Błąd API pokazujemy w toaście — bez tego akcja „nic nie robi" i wygląda na zawieszoną.
@@ -78,6 +81,9 @@ function fillRow(tr, r) {
   kat.append(r.category || '—');
   // Wpis uzgodniony z wierszem wyciągu — widać to od razu, bo zmiana kwoty/daty rozjedzie uzgodnienie.
   if (r.bank_tx_id) kat.append(el('span', { class: 'pill bank', title: 'Uzgodniony z wyciągiem bankowym' }, '✓ uzgodniony'));
+  // Gotówka jest wyjątkiem, więc dostaje znaczek; elektroniczna to norma (nic), a NULL to
+  // brak wiedzy (stary wpis sprzed migracji 015) — też nic, bo nie zgadujemy.
+  if (r.payment_method === 'GOTÓWKA') kat.append(el('span', { class: 'pill', title: 'Gotówka' }, '💵'));
   // Typ niesie ZNAK i SŁOWO — barwa tylko je wzmacnia (§5 briefu: kolor nigdy sam).
   const typ = el('td', { 'data-label': 'Typ', class: KLASA[r.type] || '' });
   typ.append(el('span', { class: 'typ' }, `${ZNAK[r.type] || '·'} ${SLOWO[r.type] || r.type}`));
@@ -167,15 +173,16 @@ async function openEdit(tr, r) {
   for (const t of (TYPY.includes(r.type) ? TYPY : [...TYPY, r.type])) typ.append(el('option', { value: t }, t));
   typ.value = r.type;
   const kwota = el('input', { type: 'text', inputmode: 'decimal', title: 'Kwota', value: Number(r.amount).toFixed(2).replace('.', ',') });
+  const platnosc = selectPlatnosci(r);              // null dla TRANSFER (K6b) — patrz historia-platnosc.js
   const opis = el('input', { type: 'text', placeholder: 'Opis', value: r.description || '' });
   const zapisz = el('button', { class: 'btn primary', type: 'button' }, 'Zapisz');
   const anuluj = el('button', { class: 'btn', type: 'button' }, 'Anuluj');
-  zapisz.onclick = () => zapiszEdycje(tr, r, { data, typ, kwota, kat, opis });
+  zapisz.onclick = () => zapiszEdycje(tr, r, { data, typ, kwota, kat, opis, platnosc });
   anuluj.onclick = () => { delete tr.dataset.edit; fillRow(tr, r); };
   // Klasa `field` zapala blask edytowanego wiersza (styles.css §6) — animowana jest
   // wyłącznie opacity warstwy, więc lista pozostaje płynna nawet przy 300 wierszach.
   const td = el('td', { colspan: '7', class: 'edycja field' });
-  td.append(wiersz(data, typ, kwota), wiersz(kat), wiersz(opis), wiersz(zapisz, anuluj));
+  td.append(wiersz(data, typ, kwota), wiersz(kat, platnosc), wiersz(opis), wiersz(zapisz, anuluj));
   tr.innerHTML = '';
   tr.onclick = null;
   tr.append(td);
@@ -193,6 +200,8 @@ function zmienionePola(r, p, kwota) {
   if (kwota.toFixed(2) !== Number(r.amount).toFixed(2)) body.amount = kwota;
   if (katId !== (r.category_id == null ? null : Number(r.category_id))) body.category_id = katId;
   if (p.opis.value !== (r.description || '')) body.description = p.opis.value;
+  const platnosc = zmienionaPlatnosc(r, p.platnosc);
+  if (platnosc !== undefined) body.payment_method = platnosc;
   return body;
 }
 

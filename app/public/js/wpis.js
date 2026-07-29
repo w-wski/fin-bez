@@ -23,7 +23,20 @@ export async function submitTx(e) {
     // idempotencja: unikalny znacznik klienta — serwer nie zdubluje wpisu przy ponownej wysyłce
     client_ref: 'off:' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
   };
-  const clearForm = () => { $('#amount').value = ''; $('#desc').value = ''; odswiezLicznik(); $('#amount').focus(); };
+  // TRANSFER nie jest płatnością (segment ukryty) — pole pomijamy, serwer i tak zapisze
+  // domyślną ELEKTRONICZNA, tak samo jak przy każdym innym ręcznym wpisie bez wyboru.
+  const segPay = $('#segPayment');
+  if (segPay && !segPay.hidden) body.payment_method = segPay.querySelector('.active')?.dataset.payment;
+  // Segment płatności MUSI wrócić do domyślnej: bez resetu jedno kliknięcie „Gotówka" zostaje
+  // aktywne wizualnie i zaraża wszystkie kolejne wpisy tej sesji, choć użytkownik o tym nie wie.
+  const resetSegPlatnosci = () => {
+    const s = $('#segPayment'); if (!s) return;
+    s.querySelector('.active')?.classList.remove('active');
+    s.querySelector('[data-payment="ELEKTRONICZNA"]')?.classList.add('active');
+  };
+  const clearForm = () => {
+    $('#amount').value = ''; $('#desc').value = ''; odswiezLicznik(); resetSegPlatnosci(); $('#amount').focus();
+  };
   const queueIt = () => {
     const q = getQueue();
     if (q.length >= QUEUE_LIMIT) { msg.textContent = `Kolejka offline pełna (${QUEUE_LIMIT}) — połącz się z internetem.`; msg.className = 'msg err'; return; }
@@ -83,6 +96,10 @@ const odswiezLicznik = () => {
 // wyboru, a nie w atrybucie title, którego na telefonie nikt nie zobaczy.
 const notaTransferu = (typ) => { const n = $('#transferNote'); if (n) n.hidden = typ !== 'TRANSFER'; };
 
+// Forma płatności nie ma sensu przy TRANSFER (przesunięcie między własnymi kontami, nie
+// zapłata za nic) — segment znika, dokładnie jak transferNote wyżej.
+const odswiezSegPlatnosci = (typ) => { const s = $('#segPayment'); if (s) s.hidden = typ === 'TRANSFER'; };
+
 // Bez sieci przycisk nie może obiecywać zapisu, którego nie będzie — wpis idzie do kolejki.
 export function odswiezPrzyciskZapisu() {
   const b = $('#txSave');
@@ -101,6 +118,13 @@ export function initWpis() {
       $('#segType .active').classList.remove('active');
       b.classList.add('active');
       notaTransferu(b.dataset.type);
+      odswiezSegPlatnosci(b.dataset.type);
+    };
+  });
+  $('#segPayment')?.querySelectorAll('button').forEach((b) => {
+    b.onclick = () => {
+      $('#segPayment .active').classList.remove('active');
+      b.classList.add('active');
     };
   });
   $('#txForm').onsubmit = submitTx;

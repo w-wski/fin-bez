@@ -148,3 +148,32 @@
   .kpi { grid-template-columns: 1fr 1fr; }        /* dwa kafle w rzędzie także na 320 px */
   .kpi .tile b { font-size: var(--num-md); }
 }
+
+/* ---------- Z9: układ kafli/widgetów raportu ----------
+   Pasek strzałek/widoczności doklejany na czas trybu „Ułóż" (public/js/raporty-uklad.js).
+   Bez drag&drop celowo — na iPhonie jedną ręką strzałki trafiają się pewniej. Kafel
+   ukryty na co dzień ma `[hidden]` z HTML-a — przeglądarka i tak go nie pokazuje,
+   dopisujemy tylko wygląd samego trybu edycji i paska sterowania. */
+.uklad-tryb > [data-kafel] {
+  outline: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+}
+.kafel-pasek {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-2);
+  margin-bottom: var(--space-1);
+  background: var(--glass-fill-sunken);
+  border-radius: var(--r-sm, var(--r-md));
+  font: 500 var(--fs-micro)/1 var(--font);
+}
+.kafel-pasek .btn-min {
+  min-width: 2rem;
+  padding: 2px 8px;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-pill);
+  background: var(--glass-fill);
+  font: 600 var(--fs-cap)/1 var(--mono);
+}
+.kafel-widocznosc { display: flex; align-items: center; gap: 4px; color: var(--ink-muted); }

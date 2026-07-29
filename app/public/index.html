@@ -137,6 +137,12 @@
       </div>
       <p class="note" id="transferNote" hidden>Transfer nie liczy się do wydatków ani przychodów okresu — przesuwa środki między kontami tej samej księgi.</p>
 
+      <!-- Forma płatności (Z6): tylko WYDATEK/PRZYCHÓD — transfer między kontami nie jest płatnością. -->
+      <div class="seg seg-2" id="segPayment" role="group" aria-label="Forma płatności">
+        <button type="button" data-payment="ELEKTRONICZNA" class="active"><span>Elektronicznie</span></button>
+        <button type="button" data-payment="GOTÓWKA"><span>Gotówka</span></button>
+      </div>
+
       <div class="card">
         <label class="fld field"><span>Data</span><input id="txDate" type="date" required></label>
         <label class="fld field"><span>Kategoria</span><select id="catMain"><option value="">Kategoria…</option></select></label>
