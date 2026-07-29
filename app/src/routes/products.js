@@ -19,6 +19,7 @@ const { q, pool } = require('../db');
 const { ledgerScope } = require('../auth');
 const { propozycje } = require('../ocr/produkt-baza');
 const { dataISO } = require('../ocr/dostep');
+const { czyData } = require('../ocr/pola');
 
 const router = express.Router();
 
@@ -116,6 +117,67 @@ router.patch('/:id', async (req, res, next) => {
         pc.name AS product_category_name FROM products p
         LEFT JOIN product_categories pc ON pc.id = p.product_category_id WHERE p.id = :id`, { id });
     res.json({ ok: true, product: po });
+  } catch (e) { next(e); }
+});
+
+// GET /api/v1/products/koszyk?od=2026-07-01&do=2026-07-31 — koszyk okresu (pkt 7 planu):
+// co i za ile naprawdę kupiliśmy, per produkt, posortowane po wydanych złotówkach.
+router.get('/koszyk', async (req, res, next) => {
+  try {
+    const z = zasieg(req.user);
+    const od = czyData(req.query.od), doD = czyData(req.query.do);
+    if (!z) return res.json({ items: [] });
+    if (!od || !doD) return res.status(400).json({ error: 'bad_period' });
+    const rows = await q(
+      `SELECT p.id, p.name, p.unit, pc.name AS product_category_name,
+              COUNT(*) AS zakupow, ROUND(SUM(i.quantity), 3) AS ilosc,
+              ROUND(SUM(i.value), 2) AS wydano,
+              ROUND(SUM(COALESCE(i.discount, 0)), 2) AS rabaty
+         FROM receipt_items i
+         JOIN receipts r ON r.id = i.receipt_id
+         JOIN products p ON p.id = i.product_id
+         LEFT JOIN product_categories pc ON pc.id = p.product_category_id
+        WHERE ${z.sql} AND r.receipt_date BETWEEN :od AND :doD
+        GROUP BY p.id ORDER BY wydano DESC LIMIT 300`, { ...z.p, od, doD });
+    // Pozycje BEZ produktu nie znikają po cichu — wracają jedną liczbą, żeby suma koszyka
+    // zgadzała się z księgą i było widać, ile paragonów czeka na scalenie.
+    const [poza] = await q(
+      `SELECT COUNT(*) AS n, ROUND(SUM(i.value), 2) AS wydano
+         FROM receipt_items i JOIN receipts r ON r.id = i.receipt_id
+        WHERE ${z.sql} AND r.receipt_date BETWEEN :od AND :doD AND i.product_id IS NULL`,
+      { ...z.p, od, doD });
+    res.json({ items: rows.map((x) => ({ ...x, ilosc: liczba(x.ilosc), wydano: liczba(x.wydano),
+      rabaty: liczba(x.rabaty), zakupow: Number(x.zakupow) })),
+      bez_produktu: { pozycji: Number(poza.n), wydano: liczba(poza.wydano) } });
+  } catch (e) { next(e); }
+});
+
+// GET /api/v1/products/drozeje?od=&do= — ranking „co najbardziej zdrożało" (pkt 7).
+// Porównanie: średnia CENA ZAPŁACONA za jednostkę w okresie vs w POPRZEDNIM okresie tej
+// samej długości. Zapłacona, nie półkowa — interesuje nas, co realnie uderza w portfel.
+// Produkt wchodzi tylko z zakupami PO OBU stronach; nowość w koszyku nie „zdrożała".
+router.get('/drozeje', async (req, res, next) => {
+  try {
+    const z = zasieg(req.user);
+    const od = czyData(req.query.od), doD = czyData(req.query.do);
+    if (!z) return res.json({ items: [] });
+    if (!od || !doD) return res.status(400).json({ error: 'bad_period' });
+    const rows = await q(
+      `SELECT p.id, p.name, p.unit,
+              ROUND(AVG(CASE WHEN r.receipt_date BETWEEN :od AND :doD
+                    THEN i.value / NULLIF(i.quantity, 0) END), 2) AS teraz,
+              ROUND(AVG(CASE WHEN r.receipt_date < :od
+                    AND r.receipt_date >= DATE_SUB(:od, INTERVAL DATEDIFF(:doD, :od) + 1 DAY)
+                    THEN i.value / NULLIF(i.quantity, 0) END), 2) AS poprzednio
+         FROM receipt_items i
+         JOIN receipts r ON r.id = i.receipt_id
+         JOIN products p ON p.id = i.product_id
+        WHERE ${z.sql} AND i.quantity > 0
+        GROUP BY p.id
+       HAVING teraz IS NOT NULL AND poprzednio IS NOT NULL AND poprzednio > 0
+        ORDER BY (teraz - poprzednio) / poprzednio DESC LIMIT 100`, { ...z.p, od, doD });
+    res.json({ items: rows.map((x) => ({ ...x, teraz: liczba(x.teraz), poprzednio: liczba(x.poprzednio),
+      zmiana_proc: Math.round(((Number(x.teraz) - Number(x.poprzednio)) / Number(x.poprzednio)) * 1000) / 10 })) });
   } catch (e) { next(e); }
 });
 
