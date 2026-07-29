@@ -146,8 +146,9 @@ function zerujCzas() {
 const TYTULY = {
   login: 'Finansowa', wpis: 'Nowy wpis', historia: 'Historia', raporty: 'Raporty',
   import: 'Import z banku', paragon: 'Paragon', przydzial: 'Przydział', admin: 'Administracja',
+  produkty: 'Produkty',
 };
-const W_ARKUSZU = ['import', 'przydzial', 'admin'];    // widoki spod zakładki „Więcej"
+const W_ARKUSZU = ['import', 'przydzial', 'admin', 'produkty'];    // widoki spod zakładki „Więcej"
 
 export function otworzArkusz() {
   const a = document.getElementById('sheet');

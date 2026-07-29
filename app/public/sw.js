@@ -1,6 +1,6 @@
 // Service worker „finansowej" — offline-ready (app shell w cache, API zawsze z sieci).
 // Po każdym deployu podbij CACHE_VERSION (RUNBOOK) — stary cache zostanie usunięty.
-const CACHE_VERSION = 'finansowa-v40';
+const CACHE_VERSION = 'finansowa-v41';
 const SHELL = [
   '/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-512.png',
   '/styles.css', '/css/wpis.css', '/css/historia.css', '/css/raporty.css',
@@ -26,7 +26,14 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache:'reload' OMIJA HTTP cache przeglądarki. Bez tego addAll potrafi zbudować NOWĄ
+  // wersję shella ze STARYCH plików z dysku (serwer daje statykom heurystyczną świeżość,
+  // więc przeglądarka nie pyta o main.js) — i aplikacja rusza z nowym index.html, ale
+  // starym kodem: nowa zakładka jest, a jej widok zostaje pusty. Tak wyglądał debiut
+  // karty „Produkty" 2026-07-28.
+  e.waitUntil(caches.open(CACHE_VERSION)
+    .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
