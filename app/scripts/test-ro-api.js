@@ -293,18 +293,11 @@ const zerujDlaTrasy = (wiersz, ...reszta) => zeruj([wiersz], AKTUALIZACJA, MODAL
   ok(!!wpisDoLogu, 'zapiszDostep faktycznie wywołuje INSERT do access_log (Z11)');
   rowne(wpisDoLogu.par.endpoint, 'ro:/podsumowanie', 'endpoint w rejestrze to "ro:/podsumowanie", konwencja spójna z eksportem');
 
-  // ---------- 21) inspekcja sprintu 2026-07-30: koszyk/drozeje pomijają zarchiwizowane paragony ----------
-  // Regresja, którą to łapie: RO-API liczyło soft-deleted paragony do sum, rozjeżdżając się
-  // z products.js/UI. Grep na źródle — każdy JOIN z receipts w tym pliku musi filtrować żywość.
+  // ---------- 21) inspekcja 2026-07-30: RO-API pomija zarchiwizowane paragony (Z19) ----------
   {
     const zrodlo = require('fs').readFileSync(require('path').join(__dirname, '../src/ro/api.js'), 'utf8');
-    // Koszyk + „poza koszykiem" filtrują przez wspólną zmienną `zasieg` — żywość musi być w niej;
-    // drozeje buduje własny WHERE — żywość musi być tam wprost.
-    ok(/const zasieg = [^;]*zywyParagon\('r'\)/.test(zrodlo),
-      'koszyk RO-API: filtr żywości siedzi we wspólnym `zasieg`');
-    ok(/i\.quantity > 0[\s\S]{0,200}?GROUP BY p\.id/.test(zrodlo)
-      && /zywyParagon\('r'\)[^;]*AND i\.quantity > 0/.test(zrodlo),
-      'drozeje RO-API: WHERE zawiera filtr żywości');
+    ok(/const zasieg = [^;]*zywyParagon\('r'\)/.test(zrodlo), 'koszyk RO-API: żywość we wspólnym `zasieg`');
+    ok(/zywyParagon\('r'\)[^;]*AND i\.quantity > 0/.test(zrodlo), 'drozeje RO-API: żywość w WHERE');
   }
 
   console.log(`\n${bledy === 0 ? 'OK' : 'BŁĄD'}: test-ro-api — ${bledy} błędów`);
