@@ -298,10 +298,13 @@ const zerujDlaTrasy = (wiersz, ...reszta) => zeruj([wiersz], AKTUALIZACJA, MODAL
   // z products.js/UI. Grep na źródle — każdy JOIN z receipts w tym pliku musi filtrować żywość.
   {
     const zrodlo = require('fs').readFileSync(require('path').join(__dirname, '../src/ro/api.js'), 'utf8');
-    const joinyZReceipts = (zrodlo.match(/JOIN receipts r/g) || []).length;
-    const filtryZywosci = (zrodlo.match(/r\.deleted_at IS NULL|zywyParagon\('r'\)/g) || []).length;
-    ok(joinyZReceipts > 0 && filtryZywosci >= joinyZReceipts,
-      `każdy JOIN receipts w ro/api.js ma filtr żywości (${filtryZywosci}/${joinyZReceipts})`);
+    // Koszyk + „poza koszykiem" filtrują przez wspólną zmienną `zasieg` — żywość musi być w niej;
+    // drozeje buduje własny WHERE — żywość musi być tam wprost.
+    ok(/const zasieg = [^;]*zywyParagon\('r'\)/.test(zrodlo),
+      'koszyk RO-API: filtr żywości siedzi we wspólnym `zasieg`');
+    ok(/i\.quantity > 0[\s\S]{0,200}?GROUP BY p\.id/.test(zrodlo)
+      && /zywyParagon\('r'\)[^;]*AND i\.quantity > 0/.test(zrodlo),
+      'drozeje RO-API: WHERE zawiera filtr żywości');
   }
 
   console.log(`\n${bledy === 0 ? 'OK' : 'BŁĄD'}: test-ro-api — ${bledy} błędów`);
