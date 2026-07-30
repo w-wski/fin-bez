@@ -105,7 +105,10 @@ if (fs.existsSync(SW_FILE)) {
     console.error('PREFLIGHT: nie znaleziono tablicy SHELL w public/sw.js — sprawdź format pliku');
     process.exit(1);
   }
-  const shellEntries = [...shellMatch[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  // Komentarze wycinamy PRZED wyłuskaniem wpisów (weryfikacja Z23): nazwa pliku zostawiona
+  // w komentarzu „// usunięto: '/js/x.js'" nie może udawać żywego wpisu tablicy.
+  const bezKomentarzy = shellMatch[1].replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const shellEntries = [...bezKomentarzy.matchAll(/'([^']+)'/g)].map((m) => m[1]);
   const shellJs = new Set(shellEntries.filter((u) => u.startsWith('/js/')).map((u) => u.slice('/js/'.length)));
   const shellCss = new Set(shellEntries.filter((u) => u.startsWith('/css/')).map((u) => u.slice('/css/'.length)));
   const diskList = (dir, ext) => {

@@ -127,6 +127,13 @@ const adminReq = (over) => ({ user: { role: 'admin', uid: 1 }, body: {}, params:
   await new Promise((resolve) => { res7.json = (b) => { res7.body = b; resolve(); }; res7.status = (c) => { res7.statusCode = c; return res7; }; r7.handle(req7, res7, resolve); });
   rowne(res7.statusCode, 404, 'PATCH cudzego/nieistniejącego wpisu → 404 (nie zdradza istnienia)');
   rowne(res7.body.error, 'not_found', 'kod błędu not_found');
+  // Weryfikacja Z23: sam „pusty SELECT → 404" byłby atrapą — dowód autoryzacji leży w SQL.
+  // Junior (ownOnly) MUSI dostać filtr własności w zapytaniu; bez tej asercji usunięcie
+  // `AND t.user_id = :uid` ze scopeWhere przechodziłoby test bezszelestnie (IDOR).
+  ok(baza.zapytania.length >= 1 && /user_id\s*=\s*:uid/.test(baza.zapytania[0].sql),
+    'PATCH juniora: SELECT zawiera filtr własności user_id = :uid (scopeWhere/ownOnly)');
+  ok(/deleted_at IS NULL/.test(baza.zapytania[0].sql),
+    'PATCH juniora: SELECT pomija wpisy z Kosza (deleted_at IS NULL)');
 
   // ---------- 8) PATCH: poprawna zmiana kwoty → 200 ok:true ----------
   resetModuly();

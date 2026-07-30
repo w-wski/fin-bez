@@ -54,17 +54,24 @@ router.delete('/:id', async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      // TYLKO wpisy, które import STWORZYŁ (/book ustawia source='CSV'). Wpis ręczny, jedynie
+      // DOPASOWANY do wiersza wyciągu (/match), nie jest dzieckiem importu — wycofanie
+      // importu nie ma prawa go chować (weryfikacja Z19, K4: decyzja Szymona mówi o wpisach,
+      // które import „zaksięgował", nie „dotknął").
       const [tx] = await conn.query(
         `SELECT t.id, t.tx_date, t.ledger_id FROM transactions t
            JOIN bank_transactions bt ON bt.id = t.bank_tx_id
-          WHERE bt.import_id = ? AND t.deleted_at IS NULL`, [imp.id]);
+          WHERE bt.import_id = ? AND t.source = 'CSV' AND t.deleted_at IS NULL`, [imp.id]);
+      // Jeden JAWNY znacznik czasu dla importu i wpisów: restore przywraca wyłącznie wpisy
+      // z tym samym deleted_at, więc nie wskrzesi wpisu skasowanego ręcznie kiedy indziej.
+      const ts = new Date(Math.floor(Date.now() / 1000) * 1000);
       if (tx.length) {
         await conn.query(
-          `UPDATE transactions SET deleted_at = NOW(), deleted_by = ? WHERE id IN (${tx.map(() => '?').join(',')})`,
-          [req.user.uid, ...tx.map((t) => t.id)]);
+          `UPDATE transactions SET deleted_at = ?, deleted_by = ? WHERE id IN (${tx.map(() => '?').join(',')})`,
+          [ts, req.user.uid, ...tx.map((t) => t.id)]);
         await oznaczAnalizyNieaktualne(conn, tx);
       }
-      await conn.execute('UPDATE bank_imports SET deleted_at = NOW(), deleted_by = ? WHERE id = ?', [req.user.uid, imp.id]);
+      await conn.execute('UPDATE bank_imports SET deleted_at = ?, deleted_by = ? WHERE id = ?', [ts, req.user.uid, imp.id]);
       await conn.commit();
       res.json({ ok: true, wycofane_wpisy: tx.length });
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
@@ -79,9 +86,10 @@ router.post('/:id/restore', async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      // Symetria wobec DELETE: tylko wpisy skasowane TĄ operacją (ten sam deleted_at co import).
       const [tx] = await conn.query(
         `SELECT t.id FROM transactions t JOIN bank_transactions bt ON bt.id = t.bank_tx_id
-          WHERE bt.import_id = ? AND t.deleted_at IS NOT NULL`, [imp.id]);
+          WHERE bt.import_id = ? AND t.source = 'CSV' AND t.deleted_at = ?`, [imp.id, imp.deleted_at]);
       if (tx.length) {
         await conn.query(
           `UPDATE transactions SET deleted_at = NULL, deleted_by = NULL WHERE id IN (${tx.map(() => '?').join(',')})`,

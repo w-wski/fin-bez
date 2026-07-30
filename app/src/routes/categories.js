@@ -135,7 +135,6 @@ function ledgeryZadania(scope, zapytana) {
   if (zapytana != null && !scope.ledgers.includes(zapytana)) return { error: 'ledger_forbidden' };
   return { ledgery: zapytana != null ? [zapytana] : scope.ledgers };
 }
-
 // ---------- trasy ----------
 
 // GET /api/v1/categories?ledger=1[&all=1][&counts=1] — drzewo (parent + dzieci); all=1 dokłada
@@ -237,7 +236,7 @@ async function zapiszPatch(id, ledger, plan, zrodlo = pool) {
       return { status: 404, body: { error: 'not_found' } };
     }
     if (plan.parent !== undefined) {
-      const blad = bladRodzica(rows, id, plan.parent);   // powtórna walidacja na ZABLOKOWANYCH danych
+      const blad = bladRodzica(rows, id, plan.parent); // walidacja na ZABLOKOWANYCH danych
       if (blad) { await conn.rollback(); return { status: 400, body: { error: blad } }; }
     }
     // Archiwizacja korzenia chowała po cichu jego AKTYWNE podkategorie (z setkami wpisów).
@@ -248,12 +247,7 @@ async function zapiszPatch(id, ledger, plan, zrodlo = pool) {
       await conn.rollback();
       return { status: 409, body: { error: 'has_active_children', children: dzieci.length } };
     }
-    // K3: wpisy ZOSTAJĄ z kwotami, tracą tylko kategorię i czekają w Przydział — archiwizacja
-    // NULL-uje category_id w TEJ SAMEJ instrukcji (LEFT JOIN: kategoria bez wpisów też się zapisze).
-    // Wpisy w Koszu (deleted_at) ZACHOWUJĄ kategorię (weryfikacja Z16): NULL-owanie ich byłoby
-    // nieodwracalnym ubytkiem — restore z Kosza nie umie odzyskać kategorii, a wpis z Kosza
-    // i tak nie trafia do kolejki Przydziału. Po restore wpis wskazuje kategorię zarchiwizowaną,
-    // co jest widoczne i odwracalne ręcznie — w przeciwieństwie do cichej utraty.
+    // K3: wpisy zostają z kwotami, tracą kategorię; Kosz ZACHOWUJE ją (Z16: restore nie umie jej odzyskać).
     if (plan.active === 0) {
       await conn.execute(
         `UPDATE categories LEFT JOIN transactions

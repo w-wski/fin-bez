@@ -19,13 +19,16 @@ router.delete('/:id', async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
-      await conn.execute('UPDATE receipts SET deleted_at = NOW(), deleted_by = ? WHERE id = ?', [req.user.uid, rc.id]);
-      // Paragon zaksięgowany ma wpis w księdze (transaction_id) — ten wpis idzie do kosza
-      // RAZEM z paragonem, tym samym mechanizmem co DELETE /api/v1/transactions/:id.
+      // Jeden JAWNY znacznik czasu dla paragonu i wpisu (sekundowa precyzja, jak TIMESTAMP):
+      // restore przywraca wpis TYLKO gdy jego deleted_at równa się paragonowemu — czyli gdy
+      // skasowała go TA archiwizacja. Wpis skasowany ręcznie wcześniej ma inny znacznik
+      // i restore go nie wskrzesi (weryfikacja Z19, K1).
+      const ts = new Date(Math.floor(Date.now() / 1000) * 1000);
+      await conn.execute('UPDATE receipts SET deleted_at = ?, deleted_by = ? WHERE id = ?', [ts, req.user.uid, rc.id]);
       if (rc.transaction_id) {
         await conn.execute(
-          'UPDATE transactions SET deleted_at = NOW(), deleted_by = ? WHERE id = ? AND deleted_at IS NULL',
-          [req.user.uid, rc.transaction_id]);
+          'UPDATE transactions SET deleted_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL',
+          [ts, req.user.uid, rc.transaction_id]);
       }
       await conn.commit();
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
@@ -41,12 +44,13 @@ router.post('/:id/restore', async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
-      await conn.execute('UPDATE receipts SET deleted_at = NULL, deleted_by = NULL WHERE id = ?', [rc.id]);
       if (rc.transaction_id) {
+        // Wskrzeszamy wpis wyłącznie skasowany RAZEM z paragonem (ten sam deleted_at) — patrz DELETE.
         await conn.execute(
-          'UPDATE transactions SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND deleted_at IS NOT NULL',
-          [rc.transaction_id]);
+          'UPDATE transactions SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND deleted_at = ?',
+          [rc.transaction_id, rc.deleted_at]);
       }
+      await conn.execute('UPDATE receipts SET deleted_at = NULL, deleted_by = NULL WHERE id = ?', [rc.id]);
       await conn.commit();
     } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
     res.json({ ok: true });

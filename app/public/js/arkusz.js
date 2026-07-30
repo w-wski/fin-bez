@@ -28,10 +28,18 @@ function pokazToastTeraz(text, action) {
   toastTimer = setTimeout(() => { box.hidden = true; }, action ? 12000 : 4000);
 }
 
+// Opróżnianie SEKWENCYJNE (weryfikacja Z17, K4): toast z akcją „Cofnij" musi być realnie
+// widoczny i klikalny — pętla renderująca wszystkie naraz nadpisywałaby je w jednej klatce
+// i użytkownik straciłby możliwość cofnięcia wszystkich poza ostatnim. Każdy komunikat
+// dostaje pełny czas ekranowy; kolejny wjeżdża po zniknięciu poprzedniego.
 function oproznijKolejkeToastow() {
-  const q = kolejkaToastow;
-  kolejkaToastow = oproznijKolejke();
-  for (const { text, action } of q) pokazToastTeraz(text, action);
+  if (otwarty) return; // arkusz otwarto ponownie w trakcie opróżniania — wznowi kolejne zamknięcie
+  const nastepny = kolejkaToastow.shift();
+  if (!nastepny) return;
+  pokazToastTeraz(nastepny.text, nastepny.action);
+  if (kolejkaToastow.length) {
+    setTimeout(oproznijKolejkeToastow, nastepny.action ? 12100 : 4100);
+  }
 }
 
 // Krótki komunikat u dołu ekranu, opcjonalnie z akcją (np. „Cofnij"). Jeden toast naraz —
