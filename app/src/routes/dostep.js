@@ -3,7 +3,7 @@
 // src/ro/auth.js (Z10) — ten plik go tylko woła, samych tokenów/haszy nie dotyka.
 const express = require('express');
 const { q } = require('../db');
-const { stanWszystkich, ustaw } = require('../wylaczniki');
+const { stanWszystkich, ustaw, KLUCZE } = require('../wylaczniki');
 const { wydajToken, uniewaznij } = require('../ro/auth');
 const { ostatnieDostepy, ostatnieWyjscia } = require('../rejestr');
 
@@ -13,8 +13,6 @@ router.use((req, res, next) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'admin_only' });
   next();
 });
-
-const KLUCZE = ['ro_api', 'eksport_csv', 'model_zewnetrzny'];
 
 // GET /api/v1/dostep/modalnosci — pełny stan, zawsze świeży z bazy (ekran decyzji).
 router.get('/modalnosci', async (req, res, next) => {
@@ -28,7 +26,14 @@ router.patch('/modalnosci', async (req, res, next) => {
   try {
     const klucz = String(req.body?.klucz || '');
     if (!KLUCZE.includes(klucz)) return res.status(400).json({ error: 'bad_klucz' });
-    await ustaw(klucz, !!req.body?.wlaczona, req.user.uid);
+    // Ścisła flaga jak w categories.js: `!!"0"` to true, więc napis "0" WŁĄCZAŁBY modalność —
+    // dokładnie odwrotnie niż prosił wywołujący. Śmieć = 400, nie zgadywanie.
+    const v = req.body?.wlaczona;
+    let wlaczona;
+    if (v === true || v === 1 || v === '1' || v === 'true') wlaczona = true;
+    else if (v === false || v === 0 || v === '0' || v === 'false') wlaczona = false;
+    else return res.status(400).json({ error: 'bad_wlaczona' });
+    await ustaw(klucz, wlaczona, req.user.uid);
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -37,7 +42,9 @@ router.patch('/modalnosci', async (req, res, next) => {
 // Właściciel tokenu = admin, który go wydał (uniewaznij niżej pilnuje tego samego user_id).
 router.post('/tokeny', async (req, res, next) => {
   try {
-    const wydany = await wydajToken(req.user.uid, req.body?.name, req.body?.scope_ledgers);
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 48) : '';
+    if (!name) return res.status(400).json({ error: 'bad_name' });
+    const wydany = await wydajToken(req.user.uid, name, req.body?.scope_ledgers);
     res.json({ id: wydany.id, token: wydany.token });
   } catch (e) { next(e); }
 });
