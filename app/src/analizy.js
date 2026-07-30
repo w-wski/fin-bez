@@ -181,7 +181,9 @@ async function wykonajAnalize(okresTyp, okres, ledgerId) {
   const dane = await policzOkres(okresTyp, okres, ledgerId);
   let wynikModelu = null;
   try {
-    wynikModelu = await narracja(zbudujPrompt(dane), { maxTokens: 700 });
+    // Bez jawnego limitu — dostawca bierze DOMYSLNY_LIMIT (env MODEL_MAX_TOKENS).
+    // Twarde 700 ucinało omówienie w połowie zdania.
+    wynikModelu = await narracja(zbudujPrompt(dane));
   } catch (e) {
     console.error('analizy.wykonajAnalize: narracja pominięta —', e.message);
   }

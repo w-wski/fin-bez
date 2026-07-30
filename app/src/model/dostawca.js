@@ -11,6 +11,9 @@ const { czyWlaczona } = require('../wylaczniki');
 const { zapiszWyjscie } = require('../rejestr');
 
 const TIMEOUT_MS = 30000;
+// Limit tokenów odpowiedzi. 700 było za mało (omówienie urywało się w połowie zdania),
+// więc domyślnie 1600 z możliwością podniesienia przez env bez zmiany kodu.
+const DOMYSLNY_LIMIT = parseInt(process.env.MODEL_MAX_TOKENS || '1600', 10);
 
 // Czyty fetch (bez SDK — zero nowych zależności w package.json). `fetch` jest globalne
 // od Node 18 (patrz src/auth.js — używa go do wymiany kodu OAuth tym samym wzorcem).
@@ -30,7 +33,7 @@ async function anthropicNarracja(prompt, maxTokens) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: maxTokens || 700,
+        max_tokens: maxTokens || DOMYSLNY_LIMIT,
         messages: [{ role: 'user', content: prompt }],
       }),
       signal: ctrl.signal,
@@ -39,6 +42,9 @@ async function anthropicNarracja(prompt, maxTokens) {
     const body = await res.json();
     const tekst = (body.content || []).map((c) => c.text || '').join('').trim();
     if (!tekst) return null;
+    if (body.stop_reason === 'max_tokens') {
+      console.error('model/dostawca: narracja ucięta na max_tokens — podnieś MODEL_MAX_TOKENS');
+    }
     // #26: telemetria wychodząca — liczby i cel, NIGDY treść (patrz src/rejestr.js).
     zapiszWyjscie('anthropic', 'analiza', 1, prompt.length);
     return { tekst, model };
@@ -67,7 +73,10 @@ async function openrouterNarracja(prompt, maxTokens) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: maxTokens || 700,
+        max_tokens: maxTokens || DOMYSLNY_LIMIT,
+        // 'openrouter/auto' może trafić na model rozumujący, a jego tokeny rozumowania
+        // liczą się do max_tokens — bez tego omówienie urywało się w połowie zdania.
+        reasoning: { exclude: true },
         messages: [{ role: 'user', content: prompt }],
       }),
       signal: ctrl.signal,
@@ -76,6 +85,10 @@ async function openrouterNarracja(prompt, maxTokens) {
     const body = await res.json();
     const tekst = (body.choices?.[0]?.message?.content || '').trim();
     if (!tekst) return null;
+    // Ucięcie na limicie: lepiej mieć w logu ślad niż cicho zapisać połowę zdania.
+    if (body.choices?.[0]?.finish_reason === 'length') {
+      console.error('model/dostawca: narracja ucięta na max_tokens — podnieś MODEL_MAX_TOKENS');
+    }
     // Przy 'openrouter/auto' realnie użyty model wraca w odpowiedzi — zapisujemy TEN,
     // żeby w tabeli `analizy` było widać, kto naprawdę pisał narrację.
     const uzyty = body.model || model;
