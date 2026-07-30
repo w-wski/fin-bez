@@ -32,12 +32,29 @@ function podstawDb() {
   require.cache[require.resolve('../src/db')].loaded = true;
 }
 function resetModuly() {
-  for (const m of ['../src/db', '../src/wylaczniki', '../src/rejestr', '../src/model/dostawca', '../src/analizy']) {
+  for (const m of ['../src/db', '../src/wylaczniki', '../src/rejestr', '../src/model/dostawca', '../src/analizy',
+    '../src/ro/auth', '../src/routes/dostep', '../src/routes/analizy']) {
     delete require.cache[require.resolve(m)];
   }
   podstawDb();
 }
 const zeruj = (...odp) => { baza.zapytania = []; baza.odpowiedzi = odp; };
+
+// --- fake req/res do wywołania trasy bez serwera HTTP — wzorzec z scripts/test-rejestry.js ---
+function fakeRes() {
+  const res = {
+    statusCode: 200, body: null,
+    status(c) { res.statusCode = c; return res; },
+    json(b) { res.body = b; return res; },
+  };
+  return res;
+}
+function wywolajTrase(router, req, res) {
+  return new Promise((resolve) => {
+    res.json = (b) => { res.body = b; resolve(); return res; };
+    router(req, res, resolve);
+  });
+}
 
 // --- podstawiony fetch: żeby dowieść trybu offline, MUSI zostać nietknięty ---
 let fetchWolane = 0;
@@ -158,6 +175,50 @@ function podstawFetch(odpowiedz) {
     'migracja 020 deklaruje UNIQUE (okres_typ, okres, ledger_id) — bez tego UPSERT nie miałby w co trafić');
   ok(/ledger_id TINYINT UNSIGNED NOT NULL DEFAULT 0/.test(sqlMigracji),
     'ledger_id NOT NULL z sentinelem 0 (nie NULL) — MySQL dopuszcza wiele NULL-i w UNIQUE, popsułoby UPSERT (patrz komentarz w migracji, wzorzec z 012)');
+
+  // ---------- 11) Z14 #7: testy NEGATYWNE przez CAŁĄ TRASĘ — łapią sabotaż admin-only ----------
+  // Wzorzec z scripts/test-rejestry.js (sekcja 9). Sam middleware `router.use` admin-only
+  // siedzi PRZED każdym handlerem, więc junior nie ma prawa dotrzeć nawet do zapytań SQL —
+  // usunięcie tej strażniczej linii ma wywalić TEN test (patrz artefakt oddania, sabotaż ręczny).
+  resetModuly();
+  podstawDb();
+  const routerDostep = require('../src/routes/dostep');
+  const reqDostepJunior = { method: 'GET', url: '/modalnosci', query: {}, body: {}, params: {},
+    baseUrl: '/api/v1/dostep', path: '/modalnosci', user: { role: 'junior', uid: 9 } };
+  const resDostepJunior = fakeRes();
+  await wywolajTrase(routerDostep, reqDostepJunior, resDostepJunior);
+  rowne(resDostepJunior.statusCode, 403, 'NEGATYWNY: routes/dostep.js, role=junior przez CAŁĄ trasę → 403');
+  rowne(resDostepJunior.body && resDostepJunior.body.error, 'admin_only', 'kod błędu admin_only (dostep.js)');
+
+  resetModuly();
+  podstawDb();
+  const routerAnalizy = require('../src/routes/analizy');
+  const reqAnalizyJunior = { method: 'POST', url: '/', query: {},
+    body: { okres_typ: 'miesiac', okres: '2026-07' }, params: {},
+    baseUrl: '/api/v1/analizy', path: '/', user: { role: 'junior', uid: 9 } };
+  const resAnalizyJunior = fakeRes();
+  await wywolajTrase(routerAnalizy, reqAnalizyJunior, resAnalizyJunior);
+  rowne(resAnalizyJunior.statusCode, 403, 'NEGATYWNY: routes/analizy.js, role=junior przez CAŁĄ trasę → 403');
+  rowne(resAnalizyJunior.body && resAnalizyJunior.body.error, 'admin_only', 'kod błędu admin_only (analizy.js)');
+
+  // ---------- 12) Z14 #8: migracje muszą aplikować się bez „średnika w komentarzu” ----------
+  // Ta sama reguła co scripts/db-migrate.js: usuń komentarze `--` do końca linii, tnij po `;`.
+  // Zamyka klasę błędu z bloków Z8/Z9: `;` w komentarzu wewnątrz CREATE TABLE rozcinał statement.
+  const migDir = path.join(__dirname, '../migrations');
+  const pliki = fs.readdirSync(migDir).filter((f) => f.endsWith('.sql'));
+  ok(pliki.length > 0, `znaleziono pliki migracji do sprawdzenia (${pliki.length})`);
+  for (const plik of pliki) {
+    const tresc = fs.readFileSync(path.join(migDir, plik), 'utf8');
+    const bezKomentarzy = tresc.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+    const statements = bezKomentarzy.split(';').map((s) => s.trim()).filter(Boolean);
+    for (let i = 0; i < statements.length; i++) {
+      const s = statements[i];
+      const otwarte = (s.match(/\(/g) || []).length;
+      const zamkniete = (s.match(/\)/g) || []).length;
+      ok(otwarte === zamkniete,
+        `${plik} — statement #${i + 1}: nawiasy zbilansowane (${otwarte} otw. / ${zamkniete} zam.)`);
+    }
+  }
 
   console.log(`\n${bledy === 0 ? 'OK' : 'BŁĄD'}: test-analizy — ${bledy} błędów`);
   process.exit(bledy === 0 ? 0 : 1);

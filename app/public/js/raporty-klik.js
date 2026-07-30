@@ -2,7 +2,7 @@
 // wpisów, które się na niego składają, zawężonej do OKRESU raportu. Wydzielone z raporty.js
 // (limit 300 linii, konwencja repo) — ten moduł zna tylko DOM raportu i indeks kategorii;
 // samą nawigację i wypełnienie filtrów w Historii robią core.js/historia.js.
-import { show, api } from './core.js';
+import { show, api, toast } from './core.js';
 import { pokazHistorie } from './historia.js';
 import { trybUkladania } from './raporty-uklad.js';
 
@@ -56,8 +56,17 @@ export function klikKategoria(row, ledger, okres, id, label, idx) {
 export function initUkladBtn(box, btn) {
   if (!btn) return;
   const tryb = trybUkladania(box, (layout) => api('/api/v1/uklad', { method: 'PUT', body: JSON.stringify({ layout }) }));
-  btn.onclick = () => {
-    if (btn.dataset.aktywny) { tryb.wylacz(); btn.textContent = 'Ułóż'; delete btn.dataset.aktywny; }
-    else { tryb.wlacz(); btn.textContent = 'Gotowe'; btn.dataset.aktywny = '1'; }
+  btn.onclick = async () => {
+    if (btn.dataset.aktywny) {
+      // Zapis leci przez PUT /uklad — offline/błąd rzuca, i wtedy przycisk MUSI zostać w trybie
+      // edycji (nie udawać sukcesu), inaczej układ ginie po cichu bez śladu (Z14 #4).
+      try {
+        await tryb.wylacz();
+        btn.textContent = 'Ułóż';
+        delete btn.dataset.aktywny;
+      } catch {
+        toast('Nie zapisałem układu — spróbuj ponownie z siecią.');
+      }
+    } else { tryb.wlacz(); btn.textContent = 'Gotowe'; btn.dataset.aktywny = '1'; }
   };
 }

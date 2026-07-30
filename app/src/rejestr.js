@@ -42,8 +42,12 @@ function zapiszWyjscie(narzedzie, cel, zapytan, znakow) {
 // Dla panelu Admin (Z12) — ostatnie wpisy obu rejestrów, do wglądu „kto/co czytał/wysyłał".
 async function ostatnieDostepy(limit) {
   const n = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500);
-  return q(`SELECT id, token_id, kanal, endpoint, okres, wierszy, created_at
-              FROM access_log ORDER BY id DESC LIMIT ${n}`, {});
+  // LEFT JOIN, nie JOIN: dostęp bez tokenu (widget/wewnętrzne) ma zostać na liście, tylko
+  // bez nazwy — to jest właśnie „KTO czytał", cel #17 (Z14 #6).
+  return q(`SELECT a.id, a.token_id, t.name AS token_name, a.kanal, a.endpoint, a.okres, a.wierszy, a.created_at
+              FROM access_log a
+              LEFT JOIN api_tokens t ON t.id = a.token_id
+              ORDER BY a.id DESC LIMIT ${n}`, {});
 }
 
 async function ostatnieWyjscia(limit) {

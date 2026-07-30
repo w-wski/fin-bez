@@ -11,6 +11,7 @@ const OPISY_MODALNOSCI = {
   ro_api: 'API tylko do odczytu (Claude, dashboard)',
   eksport_csv: 'Eksport CSV',
   model_zewnetrzny: 'Model zewnętrzny (narracja w Analizach)',
+  widget: 'Dashboard (widget /summary)',
 };
 
 const opisBledu = (err) => (err instanceof TypeError || !navigator.onLine)
@@ -138,8 +139,9 @@ async function rysujRejestr(box) {
   try {
     const { items } = await api('/api/v1/dostep/rejestr');
     if (!items.length) { box.append(el('p', { class: 'msg' }, 'Rejestr jest pusty.')); return; }
-    box.append(tabelaProsta(['Kanał', 'Endpoint', 'Okres', 'Wierszy', 'Kiedy'],
-      items.map((r) => [r.kanal, r.endpoint, r.okres, r.wierszy, r.created_at])));
+    // token_name puste (widget/wewnętrzne) → tabelaProsta() sama zamienia null/undefined na „—”.
+    box.append(tabelaProsta(['Token', 'Kanał', 'Endpoint', 'Okres', 'Wierszy', 'Kiedy'],
+      items.map((r) => [r.token_name, r.kanal, r.endpoint, r.okres, r.wierszy, r.created_at])));
   } catch (err) { box.append(el('p', { class: 'msg err' }, 'Nie udało się wczytać: ' + opisBledu(err))); }
 }
 

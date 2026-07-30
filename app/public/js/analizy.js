@@ -159,7 +159,8 @@ function rysuj() {
   glowny.append(pasekOkresu());
   const przycisk = el('button', { class: 'btn primary', type: 'button' }, 'Przygotuj analizę');
   const wynikBox = el('div', { class: 'stack an-wynik' });
-  przycisk.onclick = () => przygotujAnalize(wynikBox);
+  // disabled na czas POST — podwójny klik to dwa płatne wywołania modelu (Z14 #9).
+  przycisk.onclick = async () => { przycisk.disabled = true; await przygotujAnalize(wynikBox); przycisk.disabled = false; };
   glowny.append(przycisk, wynikBox);
   wczytajZapisana(wynikBox);
 }

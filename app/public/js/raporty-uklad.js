@@ -64,10 +64,15 @@ export function trybUkladania(box, onZapisz) {
     const dol = bud('button', { type: 'button', class: 'btn-min', title: 'Przenieś niżej' }, '↓');
     const etykieta = bud('label', { class: 'kafel-widocznosc' });
     const widocz = bud('input', { type: 'checkbox' });
-    widocz.checked = !n.hidden;
+    // Kafel realnie ukryty (bylUkryty='1' z wlacz()) ma być odznaczony, mimo że w trybie
+    // edycji jest chwilowo pokazany (n.hidden===false) — patrz komentarz w wylacz().
+    widocz.checked = !(n.dataset.bylUkryty === '1' || n.hidden);
     gora.onclick = () => przesun(n.dataset.kafel, -1);
     dol.onclick = () => przesun(n.dataset.kafel, 1);
-    widocz.onchange = () => { n.hidden = !widocz.checked; };
+    // Ręczne przełączenie w edycji ma naprawdę zmienić stan — czyścimy/ustawiamy bylUkryty
+    // razem z hidden, inaczej odznaczenie „widoczny" u kafla, który wszedł do trybu jako
+    // ukryty, nie skasowałoby starej flagi i wylacz() dalej uznałby go za ukryty.
+    widocz.onchange = () => { n.hidden = !widocz.checked; n.dataset.bylUkryty = widocz.checked ? '0' : '1'; };
     etykieta.append(widocz, ' widoczny');
     p.append(gora, dol, etykieta);
     return p;
@@ -92,9 +97,11 @@ export function trybUkladania(box, onZapisz) {
     const w = [...box.querySelectorAll(':scope > [data-kafel]')];
     // Widoczność czytamy z `hidden`, które ustawia checkbox.onchange — usuwamy paski PO
     // odczycie stanu, żeby nic po drodze nie zniknęło z DOM-u przed policzeniem layoutu.
+    // n.hidden jest zawsze false w trybie edycji dla kafli, które WESZŁY do niego ukryte
+    // (wlacz() je chwilowo odkrywa) — bez sprawdzenia bylUkryty ta ukrycie ginie przy Gotowe.
     const layout = {
       kolejnosc: w.map((n) => n.dataset.kafel),
-      ukryte: w.filter((n) => n.hidden).map((n) => n.dataset.kafel),
+      ukryte: w.filter((n) => n.dataset.bylUkryty === '1' || n.hidden).map((n) => n.dataset.kafel),
     };
     box.querySelectorAll('.kafel-pasek').forEach((p) => p.remove());
     for (const n of w) delete n.dataset.bylUkryty;

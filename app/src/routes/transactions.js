@@ -52,7 +52,9 @@ router.get('/', async (req, res, next) => {
     // Same liczby (nie napisy) wklejone do SQL-a — bez ryzyka wstrzyknięcia (patrz idyKategorii).
     if (category) {
       const ids = idyKategorii(category);
-      if (ids.length) where += ` AND t.category_id IN (${ids.join(',')})`;
+      // category PODANE, ale śmieciowe (nic się nie sparsowało) → pusta lista, nie cała
+      // (IN (0) nie trafia w żadne realne id — category_id jest AUTO_INCREMENT od 1).
+      where += ids.length ? ` AND t.category_id IN (${ids.join(',')})` : ' AND t.category_id IN (0)';
     }
     if (user) { where += ' AND u.name = :uname'; params.uname = user; }
     if (type) { where += ' AND t.type = :type'; params.type = type; }

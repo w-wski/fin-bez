@@ -111,14 +111,16 @@ async function topKategorie(ledgers, zakres, zakresPoprz) {
 async function danePragony(ledgers, od, doD) {
   const inC = ledgers.map((_, i) => `:l${i}`).join(',');
   const p = Object.fromEntries(ledgers.map((l, i) => [`l${i}`, l]));
+  // ODRZUCONY = paragon uznany za błędny/nieaktualny (np. duplikat, zły skan) — nie ma wpływu
+  // na wydatki, więc analiza nie ma go liczyć (Z14 #9).
   const [naglowek] = await q(
     `SELECT ROUND(SUM(total),2) AS suma, ROUND(SUM(discount_total),2) AS rabaty
-       FROM receipts WHERE ledger_id IN (${inC}) AND receipt_date BETWEEN :od AND :do`,
+       FROM receipts WHERE ledger_id IN (${inC}) AND receipt_date BETWEEN :od AND :do AND status <> 'ODRZUCONY'`,
     { ...p, od, do: doD });
   const koszyk = await q(
     `SELECT pr.name, ROUND(SUM(i.value),2) AS wydano
        FROM receipt_items i JOIN receipts r ON r.id=i.receipt_id JOIN products pr ON pr.id=i.product_id
-      WHERE r.ledger_id IN (${inC}) AND r.receipt_date BETWEEN :od AND :do
+      WHERE r.ledger_id IN (${inC}) AND r.receipt_date BETWEEN :od AND :do AND r.status <> 'ODRZUCONY'
       GROUP BY pr.id ORDER BY wydano DESC LIMIT 5`, { ...p, od, do: doD });
   return {
     suma_paragonowa: Number(naglowek?.suma) || 0,

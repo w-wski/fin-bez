@@ -2,7 +2,7 @@
 import { $, el, zl, api, track, toast, refreshers, KSIEGI } from './core.js';
 import { parseKwota } from './kwota.js';   // jedyne miejsce, gdzie napis staje się kwotą
 import { selectPlatnosci, zmienionaPlatnosc } from './historia-platnosc.js';
-import { initFiltrKategorii, pokazHistorie as _pokazHistorie } from './historia-filtr.js';
+import { initFiltrKategorii, pokazHistorie as _pokazHistorie, ukryjZwezenie } from './historia-filtr.js';
 
 const TYPY = ['WYDATEK', 'PRZYCHÓD', 'TRANSFER'];
 const ZNAK = { WYDATEK: '−', PRZYCHÓD: '+', TRANSFER: '⇄' };
@@ -280,9 +280,8 @@ function initTools() {
   const chk = el('input', { type: 'checkbox', id: 'fKosz' });
   chk.onchange = () => {
     const chce = chk.checked;
-    // Widok przełącza się dopiero po udanym pobraniu; przy błędzie sieci checkbox wraca do
-    // stanu, który naprawdę widać w tabeli — inaczej „Kosz" kłamie nad listą żywych wpisów.
-    pobierzHist(true, chce)
+    ukryjZwezenie();          // ręczny przełącznik Kosza kończy zawężenie z raportu (#1)
+    pobierzHist(true, chce)  // widok przełącza się dopiero po udanym pobraniu
       .then(() => track(chce ? 'Otwarcie kosza' : 'Powrót z kosza', 'historia'))
       .catch((err) => { chk.checked = kosz; blad('Nie udało się pobrać listy', err); });
   };
@@ -293,7 +292,8 @@ function initTools() {
 export const pokazHistorie = (filtry) => _pokazHistorie(filtry, loadHist); // #25: nawigację robi raporty-klik.js
 export function initHistoria() {
   initTools();
-  $('#fGo').onclick = () => { track('Filtrowanie', 'historia'); loadHist(true); };
+  $('#fGo').onclick = () => { ukryjZwezenie(); track('Filtrowanie', 'historia'); loadHist(true); };
+  $('#fLedger')?.addEventListener('change', () => ukryjZwezenie()); // ręczna zmiana księgi (#1)
   $('#more').onclick = () => loadHist(false);
   refreshers.historia = () => loadHist(true);
 }
