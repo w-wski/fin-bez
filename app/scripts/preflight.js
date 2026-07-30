@@ -86,3 +86,49 @@ if (improved) {
 } else {
   console.log('PREFLIGHT OK', now);
 }
+
+// ---------- Z23/K5: strażnik SHELL — public/js/*.js i public/css/*.css muszą się zgadzać
+// z tablicą SHELL w public/sw.js. Rozjazd = offline nie zadziała (plik brakujący w cache)
+// albo addAll() wywali instalację service workera (plik w SHELL, którego nie ma na dysku —
+// dokładnie tak zepsuł się debiut karty „Produkty" 2026-07-28, patrz komentarz w sw.js).
+//
+// Wyjątki: pliki poza public/js i public/css (main.js, glass*.js, theme.js, typografia.js,
+// witaj*.js, styles.css) NIE wchodzą do tego porównania — kryterium Z23/K5 dotyczy WYŁĄCZNIE
+// dwóch podkatalogów, reszta SHELL-a (fonty, index.html, manifest, ikony) nie ma odpowiednika
+// w postaci "plik na dysku o tej samej nazwie w tym katalogu", więc nie da się jej porównać
+// tą samą metodą bez fałszywych trafień.
+const SW_FILE = path.join(ROOT, 'public', 'sw.js');
+if (fs.existsSync(SW_FILE)) {
+  const swSrc = fs.readFileSync(SW_FILE, 'utf8');
+  const shellMatch = swSrc.match(/const SHELL = \[([\s\S]*?)\];/);
+  if (!shellMatch) {
+    console.error('PREFLIGHT: nie znaleziono tablicy SHELL w public/sw.js — sprawdź format pliku');
+    process.exit(1);
+  }
+  const shellEntries = [...shellMatch[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const shellJs = new Set(shellEntries.filter((u) => u.startsWith('/js/')).map((u) => u.slice('/js/'.length)));
+  const shellCss = new Set(shellEntries.filter((u) => u.startsWith('/css/')).map((u) => u.slice('/css/'.length)));
+  const diskList = (dir, ext) => {
+    const p = path.join(ROOT, 'public', dir);
+    return fs.existsSync(p) ? fs.readdirSync(p).filter((f) => f.endsWith(ext)) : [];
+  };
+  const diskJs = diskList('js', '.js');
+  const diskCss = diskList('css', '.css');
+
+  const brakujaceWShell = [
+    ...diskJs.filter((f) => !shellJs.has(f)).map((f) => `public/js/${f}`),
+    ...diskCss.filter((f) => !shellCss.has(f)).map((f) => `public/css/${f}`),
+  ];
+  const brakujaceNaDysku = [
+    ...[...shellJs].filter((f) => !diskJs.includes(f)).map((f) => `SHELL: /js/${f}`),
+    ...[...shellCss].filter((f) => !diskCss.includes(f)).map((f) => `SHELL: /css/${f}`),
+  ];
+
+  if (brakujaceWShell.length || brakujaceNaDysku.length) {
+    console.error('PREFLIGHT: SHELL w public/sw.js NIE ZGADZA SIĘ z plikami na dysku:');
+    brakujaceWShell.forEach((f) => console.error(`  na dysku, ale NIE w SHELL: ${f}`));
+    brakujaceNaDysku.forEach((f) => console.error(`  w SHELL, ale NIE MA na dysku: ${f}`));
+    process.exit(1);
+  }
+  console.log('PREFLIGHT: SHELL zgodny z public/js i public/css OK');
+}

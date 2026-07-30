@@ -116,10 +116,30 @@ function budujDrzewo(rows) {
   return korzenie;
 }
 
+// K2: liczby wpisów per kategoria z JEDNEGO zapytania GROUP BY, bez N+1 (klucz = dokładny id, bez potomków).
+function mapaLicznikow(rows) {
+  const m = new Map();
+  for (const r of rows) if (r.category_id != null) m.set(Number(r.category_id), Number(r.n));
+  return m;
+}
+function dolaczLiczniki(korzenie, mapa) {
+  for (const k of korzenie) {
+    k.n = mapa.get(Number(k.id)) || 0;
+    for (const p of k.children || []) p.n = mapa.get(Number(p.id)) || 0;
+  }
+  return korzenie;
+}
+
+// Które księgi obejmuje żądanie: zasięg roli, zawężony do jednej ?ledger=, jeśli podana.
+function ledgeryZadania(scope, zapytana) {
+  if (zapytana != null && !scope.ledgers.includes(zapytana)) return { error: 'ledger_forbidden' };
+  return { ledgery: zapytana != null ? [zapytana] : scope.ledgers };
+}
+
 // ---------- trasy ----------
 
-// GET /api/v1/categories?ledger=1[&all=1] — drzewo (parent + dzieci).
-// all=1 dokłada archiwalne (active=0) i jest wyłącznie dla roli admin.
+// GET /api/v1/categories?ledger=1[&all=1][&counts=1] — drzewo (parent + dzieci); all=1 dokłada
+// archiwalne, counts=1 dokłada liczbę wpisów (K2) — oba wyłącznie dla admina.
 router.get('/', async (req, res, next) => {
   try {
     const scope = ledgerScope(req.user);
@@ -129,13 +149,36 @@ router.get('/', async (req, res, next) => {
     const ledger = zapytana || scope.ledgers[0] || 1;
     if (!scope.ledgers.includes(ledger)) return res.status(403).json({ error: 'ledger_forbidden' });
     const wszystkie = req.query.all === '1';
-    if (wszystkie && req.user.role !== 'admin') return res.status(403).json({ error: 'admin_only' });
+    const liczby = req.query.counts === '1';
+    if ((wszystkie || liczby) && req.user.role !== 'admin') return res.status(403).json({ error: 'admin_only' });
     const rows = await q(
       `SELECT id, parent_id, name, color, sort_order, active FROM categories
         WHERE ledger_id = :l ${wszystkie ? '' : 'AND active = 1'}
         ORDER BY sort_order, name`,
       { l: ledger });
-    res.json({ categories: budujDrzewo(rows) });
+    let drzewo = budujDrzewo(rows);
+    if (liczby) {
+      const licznikRows = await q('SELECT category_id, COUNT(*) n FROM transactions'
+        + ' WHERE ledger_id = :l AND deleted_at IS NULL GROUP BY category_id', { l: ledger });
+      drzewo = dolaczLiczniki(drzewo, mapaLicznikow(licznikRows));
+    }
+    res.json({ categories: drzewo });
+  } catch (e) { next(e); }
+});
+
+// GET /api/v1/categories/unassigned?ledger= — wpisy bez kategorii (K4), tylko admin.
+router.get('/unassigned', async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'admin_only' });
+    const zapytana = req.query.ledger ? idCalkowite(req.query.ledger) : null;
+    if (req.query.ledger && zapytana === null) return res.status(400).json({ error: 'bad_ledger' });
+    const w = ledgeryZadania(ledgerScope(req.user), zapytana);
+    if (w.error) return res.status(403).json({ error: w.error });
+    if (!w.ledgery.length) return res.json({ items: [] });
+    const rows = await q('SELECT id, ledger_id, tx_date, amount, description FROM transactions'
+      + ` WHERE category_id IS NULL AND deleted_at IS NULL AND ledger_id IN (${w.ledgery.join(',')})`
+      + ' ORDER BY tx_date DESC, id DESC LIMIT 500', {});
+    res.json({ items: rows });
   } catch (e) { next(e); }
 });
 
@@ -205,8 +248,21 @@ async function zapiszPatch(id, ledger, plan, zrodlo = pool) {
       await conn.rollback();
       return { status: 409, body: { error: 'has_active_children', children: dzieci.length } };
     }
-    await conn.execute(`UPDATE categories SET ${plan.sets.join(', ')} WHERE id = ?`, [...plan.values, id]);
-    if (dzieci.length) await conn.execute('UPDATE categories SET active = 0 WHERE parent_id = ? AND active = 1', [id]);
+    // K3: wpisy ZOSTAJĄ z kwotami, tracą tylko kategorię i czekają w Przydział — archiwizacja
+    // NULL-uje category_id w TEJ SAMEJ instrukcji (LEFT JOIN: kategoria bez wpisów też się zapisze).
+    if (plan.active === 0) {
+      await conn.execute(
+        `UPDATE categories LEFT JOIN transactions ON transactions.category_id = categories.id
+           SET ${plan.sets.join(', ')}, transactions.category_id = NULL WHERE categories.id = ?`,
+        [...plan.values, id]);
+    } else {
+      await conn.execute(`UPDATE categories SET ${plan.sets.join(', ')} WHERE id = ?`, [...plan.values, id]);
+    }
+    if (dzieci.length) {
+      await conn.execute(
+        `UPDATE categories LEFT JOIN transactions ON transactions.category_id = categories.id
+           SET active = 0, transactions.category_id = NULL WHERE parent_id = ? AND active = 1`, [id]);
+    }
     await conn.commit();
     return { status: 200, body: { ok: true, id, archived_children: dzieci.length } };
   } catch (e) {
@@ -238,10 +294,6 @@ router.patch('/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-module.exports = router;
-module.exports.bladRodzica = bladRodzica;   // eksport dla scripts/test-kategorie.js
-module.exports.isHex = isHex;
-module.exports.budujDrzewo = budujDrzewo;
-module.exports.polaPatcha = polaPatcha;
-module.exports.idCalkowite = idCalkowite;
-module.exports.zapiszPatch = zapiszPatch;
+// eksport dla scripts/test-kategorie.js i scripts/test-kategorie-archiwum.js
+module.exports = Object.assign(router, { bladRodzica, isHex, budujDrzewo, polaPatcha, idCalkowite,
+  zapiszPatch, mapaLicznikow, dolaczLiczniki, ledgeryZadania });

@@ -55,6 +55,7 @@ app.use('/api/v1/receipts', auth.requireAuth, require('./src/routes/receipts'));
 app.use('/api/v1/proposals', auth.requireAuth, require('./src/routes/proposals'));
 app.use('/api/v1/products', auth.requireAuth, require('./src/routes/products'));
 app.use('/api/v1/uklad', auth.requireAuth, require('./src/routes/uklad'));
+app.use('/api/v1/ui', auth.requireAuth, require('./src/routes/ui'));
 app.use('/api/v1/eksport', auth.requireAuth, require('./src/routes/eksport'));
 app.use('/api/v1/analizy', auth.requireAuth, require('./src/routes/analizy'));
 app.use('/api/v1/dostep', auth.requireAuth, require('./src/routes/dostep'));

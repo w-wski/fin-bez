@@ -191,3 +191,22 @@
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
 }
+
+/* ---------- K3 (Z15): nagłówek-przycisk zwijania sekcji `data-kafel" ----------
+   Przycisk zastępuje wizualnie h2 (ten dostaje `hidden` z JS) — jeden spójny wygląd
+   nagłówka, klikalny na całej szerokości (wygodny cel dotyku na telefonie). */
+.kafel-naglowek {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: 600 var(--fs-body) var(--font);
+  color: var(--ink);
+  cursor: pointer;
+}
+.kafel-naglowek:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* #kpi jest samo w sobie siatką (`.kpi`) — przycisk zwijania musi zająć CAŁY rząd,
+   inaczej wciśnie się między kafle jako kolejna, krzywa kratka. */
+.kpi > .kafel-naglowek { grid-column: 1 / -1; }

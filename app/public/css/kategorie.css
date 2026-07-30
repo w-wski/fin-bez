@@ -94,6 +94,19 @@
 .cat-row .catparent:disabled { opacity: .5; cursor: not-allowed; }
 .cat-row .btn.small { flex: 0 0 auto; min-width: 0; }
 
+/* K1: strzałka rozwijania — tylko przy korzeniach z podkategoriami, drzewo domyślnie złożone. */
+.cat-row .cat-toggle { min-width: 2rem; padding: 0 var(--space-2); }
+
+/* K2: liczba wpisów TEJ kategorii (bez potomków), obok reszty kontrolek wiersza. */
+.cat-row .catn {
+  flex: 0 0 auto;
+  min-width: 1.6rem;
+  text-align: right;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-cap);
+}
+
 /* Telefon: nazwa dostaje własną linię (jest najważniejsza i bywa długa), a kolor,
    rodzic i archiwizacja mieszczą się pod nią w JEDNYM rzędzie — wiersz ma dwie linie,
    nie trzy, więc drzewo 41 pozycji da się przewinąć bez zmęczenia. */

@@ -150,19 +150,13 @@ const TYTULY = {
 };
 const W_ARKUSZU = ['import', 'przydzial', 'admin', 'produkty', 'analizy'];    // widoki spod zakładki „Więcej"
 
-export function otworzArkusz() {
-  const a = document.getElementById('sheet');
-  if (!a) return;
-  a.hidden = false;
-  document.getElementById('navMore')?.setAttribute('aria-expanded', 'true');
-  a.querySelector('.sheet-item:not([hidden])')?.focus();
-}
-
-export function zamknijArkusz() {
-  const a = document.getElementById('sheet');
-  if (a) a.hidden = true;
-  document.getElementById('navMore')?.setAttribute('aria-expanded', 'false');
-}
+// Arkusz „Więcej" (otwieranie/zamykanie/klik-poza) i toast (kolejkowany, gdy arkusz otwarty —
+// Z17 K4) mieszkają w arkusz.js: limit 300 linii tutaj już był wyczerpany, a oba tematy są
+// ściśle sprzężone. main.js i moduły widoków importują je z core.js — re-eksport, bez zmiany
+// cudzych importów. Import + export (nie `export ... from`): show() niżej woła zamknijArkusz()
+// sama, więc potrzebuje lokalnego wiązania, nie tylko przekazania dalej.
+import { otworzArkusz, zamknijArkusz, toast } from './arkusz.js';
+export { otworzArkusz, zamknijArkusz, toast };
 
 export function show(view) {
   // telemetria czasu na karcie (odpowiednik LOGI ze starej aplikacji, ale poza księgą)
@@ -200,24 +194,6 @@ export function fillLedgerSelects() {
 
 export function cacheMe(me) { try { localStorage.setItem(ME_CACHE_KEY, JSON.stringify(me)); } catch { } }
 export function cachedMe() { try { return JSON.parse(localStorage.getItem(ME_CACHE_KEY)); } catch { return null; } }
-
-// Krótki komunikat u dołu ekranu, opcjonalnie z akcją (np. „Cofnij").
-// Jeden toast naraz — kolejny zastępuje poprzedni.
-let toastTimer = null;
-export function toast(text, action) {
-  let box = document.getElementById('toast');
-  if (!box) { box = el('div', { id: 'toast', class: 'toast', role: 'status' }); document.body.append(box); }
-  box.innerHTML = '';
-  box.append(el('span', {}, text));
-  if (action) {
-    const b = el('button', { class: 'btn small' }, action.label);
-    b.onclick = () => { box.hidden = true; action.onClick(); };
-    box.append(b);
-  }
-  box.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { box.hidden = true; }, action ? 12000 : 4000);
-}
 
 // ---------- WYLOGOWANIE ----------
 // Dwa scenariusze: (a) chcę wejść jako ktoś inny, (b) siedzę na cudzym telefonie i chcę po sobie

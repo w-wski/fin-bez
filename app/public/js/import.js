@@ -1,5 +1,5 @@
 // Import wyciągów CSV + uzgadnianie wierszy bankowych z księgą.
-import { $, el, zl, api, track, state } from './core.js';
+import { $, el, zl, api, track, toast, state } from './core.js';
 
 export async function submitImport(e) {
   e.preventDefault();
@@ -30,9 +30,42 @@ export async function loadImports() {
     tr.append(el('td', {}, (i.imported_at || '').toString().slice(0, 10)), el('td', {}, i.bank_name),
       el('td', {}, i.filename), el('td', { class: 'num' }, String(i.rows_ok)),
       el('td', { class: 'num' }, String(i.rows_dup)), el('td', { class: 'num' }, String(i.rows_err)),
-      el('td', {}, i.imported_by));
+      el('td', {}, i.imported_by), el('td', {}, wycofajBtn(i, tr)));
     tb.append(tr);
   }
+}
+
+// K7: „Wycofaj import" z potwierdzeniem + toast „Cofnij" (jak archiwizacja paragonu). Wycofanie
+// archiwizuje import I wszystkie wpisy księgi z niego zaksięgowane (jedna transakcja po stronie
+// serwera — src/routes/imports-archiwum.js); wiersze bankowe zostają jako ślad audytowy.
+function wycofajBtn(i, tr) {
+  const btn = el('button', { class: 'btn small', title: 'Wycofaj import' }, 'Wycofaj import');
+  btn.onclick = async () => {
+    if (!confirm(`Wycofać import „${i.filename}"? Wpisy zaksięgowane z tego pliku wrócą do kosza — da się je przywrócić.`)) return;
+    let wynik;
+    try {
+      wynik = await api(`/api/v1/imports/${i.id}`, { method: 'DELETE' });
+    } catch (err) {
+      if (err.message === 'auth') return;
+      return toast(`Nie udało się wycofać: ${err.data?.error || err.message}`);
+    }
+    track('Wycofanie importu', 'import', { detail: `wpisy: ${wynik.wycofane_wpisy}` });
+    tr.remove();
+    toast(`Import wycofany (wpisów: ${wynik.wycofane_wpisy}).`, {
+      label: 'Cofnij',
+      onClick: async () => {
+        try {
+          await api(`/api/v1/imports/${i.id}/restore`, { method: 'POST' });
+        } catch (err) {
+          return toast(`Nie udało się cofnąć: ${err.data?.error || err.message}`);
+        }
+        track('Przywrócenie importu', 'import');
+        toast('Import przywrócony.');
+        loadImports(); loadUnmatched();
+      },
+    });
+  };
+  return btn;
 }
 
 export async function loadUnmatched() {

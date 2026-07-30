@@ -2,7 +2,7 @@
 // Bez niej edytor istniał tylko tuż po uploadzie: zgaszony ekran telefonu albo przeładowana
 // karta zostawiały paragon w bazie ze statusem NOWY i bez żadnego wejścia (ponowny upload
 // odbijał się o 409 „duplikat"). To był najkrótszy sposób na utratę całej ręcznej pracy.
-import { $, el, zl, api, track, refreshers } from './core.js';
+import { $, el, zl, api, track, toast, refreshers } from './core.js';
 
 let onOpen = null;      // callback z paragon.js: pokaż edytor dla pobranego paragonu
 let box = null;
@@ -46,7 +46,10 @@ export async function odswiezListe() {
 }
 
 function wiersz(r) {
-  const b = el('button', { class: 'btn rc-wiersz', type: 'button' });
+  // Inline: sygnal.css (jedyny CSS własny tego zlecenia) to skórka warunkowa — nowa klasa
+  // układu musiałaby żyć w styles.css (nie nasz plik), więc flex robimy stylem w miejscu.
+  const w = el('div', { style: 'display:flex; align-items:center; gap:8px;' });
+  const b = el('button', { class: 'btn rc-wiersz', type: 'button', style: 'flex:1;' });
   b.append(
     el('span', { class: 'rc-w-data' }, r.receipt_date || 'bez daty'),
     el('span', { class: 'rc-w-sklep' }, r.shop_name || 'bez nazwy sklepu'),
@@ -55,7 +58,41 @@ function wiersz(r) {
       r.status === 'POTWIERDZONY' ? 'w księdze' : `do dokończenia · ${r.items_count} poz.`),
   );
   b.onclick = () => otworz(r.id);
-  return b;
+  w.append(b, archiwizujBtn(r, w));
+  return w;
+}
+
+// K7: „Archiwizuj" z potwierdzeniem (dane finansowe, jak usuwanie wpisu w Historii) + toast
+// „Cofnij" 12 s (core.js). Miękkie usuwanie: DELETE archiwizuje paragon I wpis, który z niego
+// powstał (jedna transakcja SQL po stronie serwera — src/routes/receipts-archiwum.js).
+function archiwizujBtn(r, wrap) {
+  const btn = el('button', { class: 'btn small', title: 'Archiwizuj paragon' }, 'Archiwizuj');
+  btn.onclick = async (ev) => {
+    ev.stopPropagation();
+    if (!confirm('Zarchiwizować ten paragon? Zniknie z listy, ale da się go przywrócić.')) return;
+    try {
+      await api(`/api/v1/receipts/${r.id}`, { method: 'DELETE' });
+    } catch (err) {
+      if (err.message === 'auth') return;
+      return toast(`Nie udało się zarchiwizować: ${err.data?.error || err.message}`);
+    }
+    track('Archiwizacja paragonu', 'paragon');
+    wrap.remove();
+    toast('Paragon zarchiwizowany.', {
+      label: 'Cofnij',
+      onClick: async () => {
+        try {
+          await api(`/api/v1/receipts/${r.id}/restore`, { method: 'POST' });
+        } catch (err) {
+          if (err.data?.error !== 'not_archived') return toast(`Nie udało się cofnąć: ${err.data?.error || err.message}`);
+        }
+        track('Cofnięcie archiwizacji paragonu', 'paragon');
+        toast('Paragon przywrócony.');
+        odswiezListe();
+      },
+    });
+  };
+  return btn;
 }
 
 // Otwiera zapisany paragon w edytorze (używa tego też obsługa duplikatu przy uploadzie).

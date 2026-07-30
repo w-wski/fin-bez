@@ -68,6 +68,26 @@ export function opisOkresu(from, to) {
   return from && to ? `${pl(from)}–${pl(to)}` : '';
 }
 
+// Stan filtra po „Wyczyść" (Z17 K3/K7 decyzja): jedno źródło prawdy o tym, co znaczy „bez
+// filtrów" — reset DOM (pokazHistorie niżej) i budowa URL-a (paramsFiltra) czytają z niego,
+// zamiast każdy zerować pola osobno i rozjeżdżać się przy kolejnej zmianie.
+export const FILTR_DOMYSLNY = Object.freeze({ from: '', to: '', type: '', categoryIds: null });
+
+// Czysta funkcja — bez DOM, testowalna wprost (scripts/test-historia-filtr.js).
+export function resetStanuFiltra() { return { ...FILTR_DOMYSLNY }; }
+
+// Parametry okresu/typu/kategorii jako URLSearchParams — czyste, bez DOM. Po resetStanuFiltra()
+// zwraca pusty ciąg (bez `from`/`to`/`type`/`category`) — inaczej „Wyczyść" tylko WYGLĄDAŁOBY
+// na czyszczenie, a lista i tak wracałaby przefiltrowana.
+export function paramsFiltra(stan) {
+  const p = new URLSearchParams();
+  if (stan.from) p.set('from', stan.from);
+  if (stan.to) p.set('to', stan.to);
+  if (stan.type) p.set('type', stan.type);
+  if (stan.categoryIds && stan.categoryIds.length) p.set('category', stan.categoryIds.join(','));
+  return p;
+}
+
 // Wejście z Raportu (Z8/#25): ustawia WIDOCZNE filtry i ładuje wycinek. `load` to loadHist()
 // z historia.js — ten moduł nie zna warstwy sieciowej, tylko DOM i kiedy go odświeżyć.
 // Nawigację (`show('historia')`) robi wołający z raporty-klik.js — wchodzimy już na ekranie.
@@ -76,9 +96,13 @@ export async function pokazHistorie(filtry = {}, load) {
   $('#fFrom').value = filtry.from || ''; $('#fTo').value = filtry.to || ''; $('#fType').value = '';
   ustawFiltrKategorii(filtry.categoryIds, filtry.categoryLabel);
   const opis = [filtry.categoryLabel, opisOkresu(filtry.from, filtry.to)].filter(Boolean).join(' · ');
+  // „Wyczyść" resetuje WSZYSTKIE elementy filtra naraz z jednego źródła prawdy (K3/K7): okres
+  // znika (input-y wracają do stanu początkowego, plakietka #zwezenie się chowa), a lista
+  // wraca do pełnego widoku, nie do przefiltrowanego, który tylko wygląda na czysty.
   pokazZwezenie(opis, () => {
-    $('#fFrom').value = ''; $('#fTo').value = ''; $('#fType').value = '';
-    ustawFiltrKategorii(null); ukryjZwezenie();
+    const stan = resetStanuFiltra();
+    $('#fFrom').value = stan.from; $('#fTo').value = stan.to; $('#fType').value = stan.type;
+    ustawFiltrKategorii(stan.categoryIds); ukryjZwezenie();
     track('Wyczyszczenie zawężenia', 'historia');
     load(true);
   });

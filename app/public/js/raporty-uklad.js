@@ -110,3 +110,23 @@ export function trybUkladania(box, onZapisz) {
 
   return { wlacz, wylacz };
 }
+
+// ---------- Z15: kafle KPI parzyste + zakres do filtra Historii ----------
+// Czyste funkcje, więc lądują tutaj (moduł CELOWO bez importu core.js — patrz komentarz
+// na górze pliku) — dzięki temu test-raporty-ui.js woła je bez przeglądarki i bez sieci,
+// tak samo jak `uporzadkuj` wyżej.
+
+// K1: siatka KPI ma ZAWSZE parzystą liczbę kafli — nieparzysta dostaje kafel dopełniający
+// „Suma okresu" (raporty.js). Liczymy na OSTATECZNEJ liczbie kafli (już z ew. kaflem
+// „Bankowe do uzgodnienia"), bo dopełnienie ma domykać dokładnie to, co widać na ekranie.
+export function potrzebnyKafelSumy(iloscKafli) {
+  return iloscKafli % 2 === 1;
+}
+
+// K2: filtry przekazywane do Historii przy kliku w kafel — czysta funkcja (bez DOM-u), żeby dało
+// się przetestować SAMĄ decyzję „co lecimy filtrować", niezależnie od nawigacji (raporty-klik.js).
+// `id === null` (RODZIC nieznany / brak kategorii) → bez categoryIds, tylko okres.
+export function filtryHistoriiZKategorii(ledger, okres, id, label, idx) {
+  const ids = id == null ? null : [id, ...(idx?.dzieci.get(id) || [])];
+  return { ledger, from: okres.from, to: okres.to, categoryIds: ids, categoryLabel: label };
+}

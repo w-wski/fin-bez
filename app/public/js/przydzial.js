@@ -1,16 +1,11 @@
-// Karta „Przydział" (tylko admin): propozycje reorganizacji kategorii do przyjęcia przez
-// człowieka. Decyzja Szymona z 2026-07-24: „Zaproponuj, a ja wybiorę w aplikacji, które jest
-// które" — skrypt reorganizacji NIC nie przepina, każda kwota rusza się dopiero tutaj.
-// Grupy idą po liczbie wpisów malejąco: najpierw to, co zamyka najwięcej pracy jednym
-// kliknięciem. Renderujemy do #przydzialBox (index.html trzyma tylko pusty kontener).
+// Karta „Przydział" (tylko admin): propozycje reorganizacji kategorii (Szymon: „Zaproponuj, a ja
+// wybiorę" — skrypt NIC nie przepina) oraz wpisy bez kategorii (K4). Renderuje do #przydzialBox.
 import { $, el, api, zl, state, track, toast, refreshers } from './core.js';
 
 const KSIEGI = { 1: 'RODZINA', 2: 'PERSEVERA' };
 const BLEDY = {
-  admin_only: 'przydział to decyzja administratora',
-  bad_ledger: 'nieprawidłowa księga',
-  bad_group: 'nie ma takiej grupy — odśwież widok',
-  bad_ids: 'nieprawidłowe identyfikatory propozycji',
+  admin_only: 'przydział to decyzja administratora', bad_ledger: 'nieprawidłowa księga',
+  bad_group: 'nie ma takiej grupy — odśwież widok', bad_ids: 'nieprawidłowe identyfikatory propozycji',
   bad_category: 'kategoria docelowa nie należy do księgi, w której ma wylądować wpis',
   category_not_found: 'nie ma takiej kategorii',
   category_archived: 'ta kategoria jest w archiwum — przywróć ją w panelu Admin',
@@ -23,8 +18,7 @@ const BLEDY = {
   ksiega_sie_nie_zgadza: 'PRZERWANO I WYCOFANO: ruch w kubełkach księga × typ nie zgadzał się '
     + 'z tym, co wynika z propozycji (albo zmieniła się kwota/data wpisu)',
 };
-// Serwer dopowiada, KTÓRA propozycja albo KTÓRY wpis blokuje — bez tego 400/409 na całą grupę
-// nie dawał się rozplątać: Szymon widział „kategoria z innej księgi" i nie wiedział, dla którego wpisu.
+// Serwer dopowiada, KTÓRA propozycja/wpis blokuje — bez tego 400/409 nie dawał się rozplątać.
 function szczegol(d) {
   const cz = [];
   if (d?.proposal) cz.push('propozycja #' + d.proposal);
@@ -46,12 +40,12 @@ let wpisy = [], wpisowWGrupie = 0;   // wpisy rozwiniętej grupy i ILE ICH JEST 
 let celujemy = null;     // key grupy, dla której wybieramy inny cel
 let kategorie = null;    // spłaszczona lista kategorii księgi (do „Zmień cel…")
 let zajete = false;      // trwa zapis — jedna decyzja naraz
+let bezKategorii = [];   // K4: wpisy z tej księgi, którym archiwizacja odpięła kategorię
 
 async function pobierz() {
   const r = await api(`/api/v1/proposals?ledger=${ksiega}`);
-  grupy = r.groups || [];
-  razem = r.total || 0;
-  limit = Number(r.limit) || limit;
+  grupy = r.groups || []; razem = r.total || 0; limit = Number(r.limit) || limit;
+  bezKategorii = (await api(`/api/v1/categories/unassigned?ledger=${ksiega}`)).items || [];
 }
 
 async function odswiez() {
@@ -59,16 +53,16 @@ async function odswiez() {
     await pobierz();
     if (otwarta && !grupy.some((g) => g.key === otwarta)) { otwarta = null; wpisy = []; wpisowWGrupie = 0; }
     if (celujemy && !grupy.some((g) => g.key === celujemy)) celujemy = null;
+    if (bezKategorii.length) await wczytajKategorie(ksiega);
     rysuj();
   } catch (err) {
     if (err.message === 'auth') return;
     $('#przydzialBox').innerHTML = '';
-    $('#przydzialBox').append(el('p', { class: 'msg err' }, 'Nie udało się wczytać propozycji: ' + opisBledu(err)));
+    $('#przydzialBox').append(el('p', { class: 'msg err' }, 'Nie udało się wczytać: ' + opisBledu(err)));
   }
 }
 
-// Jedna decyzja naraz: accept przepina wpisy w transakcji SQL, a dwa równoległe przydziały
-// pracowałyby na liście, która zmienia się pod stopami.
+// Jedna decyzja naraz — dwie równoległe pracowałyby na liście, która zmienia się pod stopami.
 async function decyzja(sciezka, body, opis) {
   if (zajete) return toast('Poczekaj — poprzednia decyzja jeszcze się zapisuje.');
   zajete = true;
@@ -76,17 +70,13 @@ async function decyzja(sciezka, body, opis) {
     const w = await api(`/api/v1/proposals/${sciezka}`, { method: 'POST', body: JSON.stringify(body) });
     track('Przydział kategorii', 'przydzial', { detail: `${sciezka}; ${opis}` });
     const ile = w.przyjete ?? w.odrzucone ?? w.przestawione ?? 0;
-    // Serwer POMIJA propozycje nieaktualne (wpis przeniesiony ręcznie w Historii po ich
-    // powstaniu) i wpisy z Kosza. Milczenie o tym byłoby gorsze niż odmowa: Szymon myślałby,
-    // że przepiął całą grupę. Mówimy ile pominięto i dlaczego.
+    // Serwer POMIJA propozycje nieaktualne i wpisy z Kosza — milczenie o tym sugerowałoby
+    // przydzielenie całej grupy, więc mówimy ile pominięto i dlaczego.
     const pom = [w.nieaktualne ? `${w.nieaktualne} pominięto jako nieaktualne (wpis nie leży już `
       + 'w kategorii z propozycji — przenieśliście go ręcznie)' : '',
       w.w_koszu ? `${w.w_koszu} pominięto, bo wpis jest w Koszu (przydział go nie dotyczy)` : ''].filter(Boolean);
     toast(`${opis}: ${ile}.${pom.length ? ' ' + pom.join('. ') + '.' : ''}`);
-    otwarta = null;
-    wpisy = [];
-    wpisowWGrupie = 0;
-    celujemy = null;
+    otwarta = null; wpisy = []; wpisowWGrupie = 0; celujemy = null;
     await odswiez();
   } catch (err) {
     if (err.message === 'auth') return;
@@ -112,8 +102,7 @@ async function rozwin(g) {
   }
 }
 
-// Lista kategorii księgi, w której wpis wyląduje — do wskazania INNEGO celu niż proponowany.
-// Trasa /categories zwraca wyłącznie aktywne, a serwer i tak odmawia celu z archiwum (K8).
+// Kategorie księgi (do wskazania INNEGO celu niż proponowany) — /categories zwraca tylko aktywne.
 async function wczytajKategorie(led) {
   if (kategorie && kategorie.led === led) return kategorie.lista;
   const r = await api(`/api/v1/categories?ledger=${led}`);
@@ -130,18 +119,21 @@ async function pokazWyborCelu(g) {
   celujemy = celujemy === g.key ? null : g.key;
   if (celujemy) {
     try { await wczytajKategorie(g.to_ledger_id || ksiega); }
-    catch (err) {
-      celujemy = null;
-      if (err.message !== 'auth') toast('Nie udało się wczytać kategorii: ' + opisBledu(err));
-    }
+    catch (err) { celujemy = null; if (err.message !== 'auth') toast('Nie udało się wczytać kategorii: ' + opisBledu(err)); }
   }
   rysuj();
 }
 
+// Lista kategorii księgi jako <option>, wspólna dla „Zmień cel" i „Wpisy bez kategorii".
+const selectKategorii = (attrs) => {
+  const s = el('select', attrs);
+  for (const k of (kategorie && kategorie.lista) || []) s.append(el('option', { value: String(k.id) }, k.path));
+  return s;
+};
+
 function wyborCelu(g) {
   const box = el('div', { class: 'row wrap prz-cel' });
-  const s = el('select', { title: 'Nowa kategoria docelowa' });
-  for (const k of (kategorie && kategorie.lista) || []) s.append(el('option', { value: String(k.id) }, k.path));
+  const s = selectKategorii({ title: 'Nowa kategoria docelowa' });
   s.value = String(g.to_id);
   const ok = el('button', { class: 'btn primary small', type: 'button' }, 'Ustaw cel');
   ok.onclick = () => decyzja('retarget', { ...cialo(g), to_category_id: Number(s.value) }, 'Zmieniono cel');
@@ -149,8 +141,7 @@ function wyborCelu(g) {
   nie.onclick = () => { celujemy = null; rysuj(); };
   box.append(el('span', { class: 'msg' }, 'Zamiast propozycji przydziel do:'), s, ok, nie,
     el('span', { class: 'msg' }, 'Zmiana celu nic nie przepina — wpisy ruszą się dopiero po „Przyjmij".'));
-  // Grupa mieszana: część wpisów ląduje w innej księdze niż reszta, więc JEDEN cel nie może być
-  // poprawny dla wszystkich. Serwer odmówi i wskaże winną propozycję — mówimy to zawczasu.
+  // Grupa mieszana: JEDEN cel nie zadziała dla wszystkich wpisów naraz.
   if (g.ksiag > 1) {
     box.append(el('span', { class: 'msg err' }, 'Ta grupa jest mieszana (propozycje o różnych księgach '
       + 'docelowych) — jeden cel nie zadziała dla całej grupy. Rozwiń ją i zmieniaj cel po wpisie.'));
@@ -165,9 +156,7 @@ function naglowekGrupy(g) {
     `${otwarta === g.key ? '▾' : '▸'} ${g.from} → ${g.to}`);
   przelacz.onclick = () => rozwin(g);
   const ile = g.n === 1 ? '1 wpis' : `${g.n} wpisy`;
-  // Grupa MIESZANA: różne reguły, księgi, typy albo tagi. Pigułki pokazujemy tylko wtedy, gdy
-  // wartość jest jedna dla całej grupy — inaczej nagłówek obiecywał „→ księga PERSEVERA" dla
-  // wpisów, które zostają w RODZINIE (MIN pomija NULL-e i pokazywał wartość mniejszości).
+  // Pigułka tylko przy WSPÓLNEJ wartości całej grupy (MIN pomija NULL-e i myliłby mniejszość).
   w.append(przelacz, el('span', { class: 'prz-meta' },
     `· ${ile} · ${zl(g.kwota)} · ${g.rule_id || `${g.regul} różne reguły`}`));
   if (g.to_ledger_id) w.append(el('span', { class: 'pill' }, '→ księga ' + (KSIEGI[g.to_ledger_id] || g.to_ledger_id)));
@@ -177,9 +166,7 @@ function naglowekGrupy(g) {
   return w;
 }
 
-// Grupa większa niż `limit`: lista wpisów jest OBCIĘTA, a decyzja grupowa dotyczy wszystkich.
-// Bez tego ostrzeżenia Szymon przewijał 500 z 700 wpisów, uznawał że przejrzał całość i przyjmował
-// też 200 niewidzianych — wśród nich propozycje słabo umocowane, złapane po opisie.
+// Grupa większa niż `limit`: lista jest OBCIĘTA, ale decyzja grupowa dotyczy WSZYSTKICH wpisów.
 const potwierdzGrupe = (g, co) => g.n <= limit || confirm(`${co} dla CAŁEJ grupy: ${g.n} wpis(ów).\n\n`
   + `Lista pokazuje najwyżej ${limit} wpisów, więc ${g.n - limit} z nich NIE WIDZIAŁEŚ.\n`
   + 'Chcesz objąć decyzją wszystkie?');
@@ -203,16 +190,21 @@ function przyciskiGrupy(g) {
   return w;
 }
 
-function wierszWpisu(it) {
+// Wiersz „data · kwota · opis" wspólny dla wpisów propozycji i wpisów bez kategorii (K4).
+const wierszBazowy = (it, ...ogon) => {
   const w = el('div', { class: 'row wrap prz-wpis' });
   w.append(el('span', { class: 'prz-data' }, it.tx_date), el('strong', {}, zl(it.amount)),
-    el('span', { class: 'prz-opis' }, it.description || '—'),
-    el('span', { class: 'msg' }, `${it.type} · ${it.user_name}`));   // wpisów z Kosza tu nie ma
-  // W grupie mieszanej nagłówek nie może pokazać jednej księgi docelowej — pokazujemy ją
-  // przy wpisie, bo to tu Szymon podejmuje decyzję.
-  if (it.to_ledger_id) w.append(el('span', { class: 'pill' }, '→ księga ' + (KSIEGI[it.to_ledger_id] || it.to_ledger_id)));
-  if (it.to_type) w.append(el('span', { class: 'pill' }, '→ ' + it.to_type));
-  if (it.tag) w.append(el('span', { class: 'pill' }, '# ' + it.tag));
+    el('span', { class: 'prz-opis' }, it.description || '—'), ...ogon);
+  return w;
+};
+
+// wpisów z Kosza tu nie ma; grupa mieszana pokazuje księgę/typ/tag PRZY wpisie, nie w nagłówku.
+function wierszWpisu(it) {
+  const ogon = [el('span', { class: 'msg' }, `${it.type} · ${it.user_name}`)];
+  if (it.to_ledger_id) ogon.push(el('span', { class: 'pill' }, '→ księga ' + (KSIEGI[it.to_ledger_id] || it.to_ledger_id)));
+  if (it.to_type) ogon.push(el('span', { class: 'pill' }, '→ ' + it.to_type));
+  if (it.tag) ogon.push(el('span', { class: 'pill' }, '# ' + it.tag));
+  const w = wierszBazowy(it, ...ogon);
   const przyjmij = el('button', { class: 'btn small', type: 'button', title: 'Przydziel ten jeden wpis' }, 'Przyjmij');
   przyjmij.onclick = () => decyzja('accept', { ids: [it.id] }, 'Przydzielono wpis');
   const odrzuc = el('button', { class: 'btn small', type: 'button', title: 'Zostaw ten wpis tam, gdzie jest' }, 'Odrzuć');
@@ -221,12 +213,29 @@ function wierszWpisu(it) {
   return w;
 }
 
+// K4: wybór z listy przydziela kategorię TEMU JEDNEMU wpisowi (PATCH transactions) i zdejmuje go z listy.
+function wierszBezKategorii(it) {
+  const w = wierszBazowy(it, el('span', { class: 'pill' }, KSIEGI[it.ledger_id] || it.ledger_id));
+  const s = selectKategorii({ title: 'Przydziel kategorię temu wpisowi' });
+  s.prepend(el('option', { value: '' }, 'Wybierz kategorię…'));
+  s.onchange = async () => {
+    if (!s.value) return;
+    try {
+      await api(`/api/v1/transactions/${it.id}`, { method: 'PATCH', body: JSON.stringify({ category_id: Number(s.value) }) });
+      track('Przydział bez propozycji', 'przydzial', { detail: `wpis #${it.id} -> kategoria ${s.value}` });
+      bezKategorii = bezKategorii.filter((x) => x.id !== it.id);
+      toast('Przydzielono kategorię.');
+      rysuj();
+    } catch (err) { if (err.message !== 'auth') toast('Nie zapisano: ' + opisBledu(err)); }
+  };
+  w.append(s);
+  return w;
+}
+
 function pasekNarzedzi() {
   const pasek = el('div', { class: 'row wrap prz-tools' });
   const wybor = el('select', { title: 'Księga' });
-  for (const id of state.me?.scope.ledgers || [1]) {
-    wybor.append(el('option', { value: String(id) }, KSIEGI[id] || `Księga ${id}`));
-  }
+  for (const id of state.me?.scope.ledgers || [1]) wybor.append(el('option', { value: String(id) }, KSIEGI[id] || `Księga ${id}`));
   wybor.value = String(ksiega);
   wybor.onchange = () => {
     ksiega = parseInt(wybor.value, 10);
@@ -237,10 +246,17 @@ function pasekNarzedzi() {
   return pasek;
 }
 
+// K4: sekcja „Wpisy bez kategorii" jest niezależna od propozycji — pokazuje się zawsze, gdy jest wpis.
 function rysuj() {
   const box = $('#przydzialBox');
   box.innerHTML = '';
   box.append(el('h2', {}, 'Przydział kategorii'), pasekNarzedzi());
+  if (bezKategorii.length) {
+    const bk = el('div', { class: 'prz-grupa prz-bezkat' });
+    bk.append(el('h3', {}, `Wpisy bez kategorii (${bezKategorii.length})`));
+    bezKategorii.forEach((it) => bk.append(wierszBezKategorii(it)));
+    box.append(bk);
+  }
   if (!grupy.length) {
     box.append(el('p', { class: 'msg' }, 'Nic do przydziału w tej księdze. Propozycje pojawiają się tutaj '
       + 'po uruchomieniu skryptu reorganizacji taksonomii (scripts/reorganize-categories.js).'));
@@ -255,8 +271,7 @@ function rysuj() {
     if (celujemy === g.key) karta.append(wyborCelu(g));
     if (otwarta === g.key) {
       const w = el('div', { class: 'prz-wpisy' });
-      // Obcięcie listy MUSI być widoczne — inaczej „przewinąłem wszystko" znaczyło co innego
-      // dla Szymona i co innego dla serwera.
+      // Obcięcie listy MUSI być widoczne — „przewinąłem wszystko" znaczy co innego dla serwera.
       if (wpisowWGrupie > wpisy.length) {
         w.append(el('p', { class: 'msg err prz-obciete' }, `Pokazano ${wpisy.length} z ${wpisowWGrupie} wpisów `
           + '— resztę zobaczysz dopiero po przydzieleniu tych. Decyzja grupowa obejmuje WSZYSTKIE.'));

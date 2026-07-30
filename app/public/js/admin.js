@@ -39,9 +39,12 @@ let ksiega = 0;              // wybrana księga
 let zArchiwalnymi = false;   // czy pokazywać kategorie active=0
 let drzewo = [];
 let zajete = false;          // trwa zapis — patrz `zapisz()`
+// K1: drzewo renderuje się DOMYŚLNIE złożone do korzeni; klik rozwija wyłącznie jej dzieci.
+// Stan nie musi przeżyć wejścia do aplikacji (K1) — zwykła zmienna modułu, zerowana zmianą księgi.
+let rozwiniete = new Set();
 
 async function pobierz() {
-  const r = await api(`/api/v1/categories?ledger=${ksiega}${zArchiwalnymi ? '&all=1' : ''}`);
+  const r = await api(`/api/v1/categories?ledger=${ksiega}${zArchiwalnymi ? '&all=1' : ''}&counts=1`);
   drzewo = r.categories;
 }
 
@@ -109,7 +112,7 @@ function pasekNarzedzi() {
     wybor.append(el('option', { value: String(id) }, KSIEGI[id] || `Księga ${id}`));
   }
   wybor.value = String(ksiega);
-  wybor.onchange = () => { ksiega = parseInt(wybor.value, 10); odswiez(); };
+  wybor.onchange = () => { ksiega = parseInt(wybor.value, 10); rozwiniete = new Set(); odswiez(); };
 
   const arch = el('input', { type: 'checkbox' });
   arch.checked = zArchiwalnymi;
@@ -166,7 +169,11 @@ function wiersz(c, pod) {
     c.active === 0 ? 'Przywróć' : 'Archiwizuj');
   arch.onclick = () => (c.active === 0 ? zapisz(c.id, { active: 1 }) : archiwizuj(c));
 
-  w.append(kropka(c.color), kolor, nazwa, wyborRodzica(c, pod), arch);
+  // K2: liczba wpisów TEJ kategorii (bez potomków) — przychodzi gotowa z serwera (GROUP BY).
+  const licznik = el('span', { class: 'catn', title: 'Liczba wpisów w tej kategorii' },
+    typeof c.n === 'number' ? String(c.n) : '');
+
+  w.append(kropka(c.color), kolor, nazwa, wyborRodzica(c, pod), licznik, arch);
   // Kategoria z zepsutym rodzicem (w archiwum / skasowanym / zapętlonym) wraca z serwera jako
   // główna z flagą `orphan` — nie znika z księgi, ale admin ma widzieć, że jest do naprawy.
   if (c.orphan) {
@@ -200,8 +207,21 @@ function rysuj() {
   box.append(el('h2', {}, 'Kategorie'), pasekNarzedzi());
   const lista = el('div', { class: 'cat-tree' });
   for (const k of drzewo) {
-    lista.append(wiersz(k, false));
-    for (const p of k.children || []) lista.append(wiersz(p, true));
+    const wRodzica = wiersz(k, false);
+    const maDzieci = (k.children || []).length > 0;
+    if (maDzieci) {
+      // K1: domyślnie złożone — klik pokazuje/chowa WYŁĄCZNIE dzieci TEJ kategorii.
+      const otwarte = rozwiniete.has(k.id);
+      const strzalka = el('button', { class: 'btn small cat-toggle', type: 'button',
+        title: otwarte ? 'Zwiń podkategorie' : 'Rozwiń podkategorie' }, otwarte ? '▾' : '▸');
+      strzalka.onclick = () => {
+        if (rozwiniete.has(k.id)) rozwiniete.delete(k.id); else rozwiniete.add(k.id);
+        rysuj();
+      };
+      wRodzica.prepend(strzalka);
+    }
+    lista.append(wRodzica);
+    if (maDzieci && rozwiniete.has(k.id)) for (const p of k.children) lista.append(wiersz(p, true));
   }
   if (!drzewo.length) lista.append(el('p', { class: 'msg' }, 'Ta księga nie ma jeszcze kategorii.'));
   box.append(lista);

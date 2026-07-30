@@ -23,6 +23,14 @@ const przyjmij = require('../ocr/przyjmij');
 const { getWorker } = require('../ocr/worker');
 const { ksiega, wlasnyParagon, dataISO } = require('../ocr/dostep');
 const { czytaj: czytajEparagon } = require('../eparagon');
+const { zywyParagon } = require('../zywe');
+const archiwum = require('./receipts-archiwum');
+
+// K2: paragon zarchiwizowany = 404, jak cudzy/nieznany — jedna reakcja dla obu przypadków.
+function tylkoZywy(rc, res) {
+  if (rc.deleted_at) { res.status(404).json({ error: 'not_found' }); return false; }
+  return true;
+}
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
@@ -116,7 +124,7 @@ router.get('/', async (req, res, next) => {
     const rows = await q(
       `SELECT r.id, r.ledger_id, r.shop_name, r.receipt_date, r.total, r.status, r.ocr_confidence, r.created_at,
               (SELECT COUNT(*) FROM receipt_items i WHERE i.receipt_id = r.id) AS items_count
-       FROM receipts r WHERE r.ledger_id IN (${scope.ledgers.join(',') || 0}) ${own}
+       FROM receipts r WHERE r.ledger_id IN (${scope.ledgers.join(',') || 0}) AND ${zywyParagon('r')} ${own}
        ORDER BY r.id DESC LIMIT 50`, { u: req.user.uid });
     res.json({ receipts: rows.map((r) => ({ ...r, receipt_date: dataISO(r.receipt_date) })) });
   } catch (e) { next(e); }
@@ -125,6 +133,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const rc = await wlasnyParagon(req, res); if (!rc) return;
+    if (!tylkoZywy(rc, res)) return;
     const items = await poz.loadItems(rc.id, rc.ledger_id);
     delete rc.ocr_text;
     res.json({ ...rc, receipt_date: dataISO(rc.receipt_date), items,
@@ -135,6 +144,7 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/image', async (req, res, next) => {
   try {
     const rc = await wlasnyParagon(req, res); if (!rc) return;
+    if (!tylkoZywy(rc, res)) return;
     // E-paragon nie ma obrazu i nigdy nie będzie miał — to nie brak pliku, to inna
     // natura dokumentu. Osobny powód, żeby front nie pokazywał „plik zginął".
     if (!rc.image_path) return res.status(404).json({ error: 'no_image_eparagon' });
@@ -282,5 +292,8 @@ router.post('/:id/ai-fix', async (req, res, next) => {
       items: await poz.loadItems(rc.id, rc.ledger_id), ai_available: true });
   } catch (e) { next(e); }
 });
+
+// K1/K10: DELETE /:id + POST /:id/restore w receipts-archiwum.js (limit 300 linii tutaj).
+router.use('/', archiwum);
 
 module.exports = router;

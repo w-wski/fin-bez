@@ -288,6 +288,8 @@ router.get('/reports/telemetry', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.use(require('./reports-bez-kategorii')); // K5 (Z15): GET /reports/no-category, wydzielone (limit 300 linii)
+
 module.exports = router;
 // Czysta logika §7.5 wystawiona do testów (wzorzec z src/routes/categories.js).
 module.exports.kubelBartusia = kubelBartusia;

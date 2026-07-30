@@ -63,6 +63,10 @@
 .prz-cel > .btn { flex: 0 0 auto; }
 .prz-cel > .msg { flex: 1 1 100%; }
 
+/* K4: „Wpisy bez kategorii" — sekcja niezależna od propozycji, ta sama tafla co grupa. */
+.prz-bezkat h3 { margin: 0 0 var(--space-2); font: 600 var(--fs-body)/1.25 var(--font); }
+.prz-bezkat .prz-wpis > select { flex: 1 1 12rem; }
+
 /* Rozwinięta lista wpisów grupy: data, kwota, opis, kto + decyzja per wpis. */
 .prz-wpisy {
   display: flex;

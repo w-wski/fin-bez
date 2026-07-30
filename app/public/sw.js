@@ -2,7 +2,7 @@
 // Po każdym deployu podbij CACHE_VERSION (RUNBOOK) — stary cache zostanie usunięty.
 const CACHE_VERSION = 'finansowa-v45';
 const SHELL = [
-  '/js/pasek-okresu.js', '/js/analizy-chat.js',
+  '/js/pasek-okresu.js', '/js/analizy-chat.js', '/js/arkusz.js',
   '/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-512.png',
   '/styles.css', '/css/wpis.css', '/css/historia.css', '/css/raporty.css',
   '/css/kategorie.css', '/css/paragon.css',

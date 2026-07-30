@@ -1,12 +1,21 @@
 const express = require('express');
 const multer = require('multer');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const config = require('../config');
 const { q, pool } = require('../db');
 const { ledgerScope } = require('../auth');
 const { parseBankFile } = require('../banks');
+const { zywyImport } = require('../zywe');
+const archiwum = require('./imports-archiwum');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.maxCsvBytes } });
+
+// Plik CSV zostaje na serwerze jak obrazy paragonów (decyzja Szymona, pyt. 11) — poza public/,
+// obok RECEIPTS_DIR (routes/receipts.js), w SWOIM katalogu (inny rodzaj dokumentu).
+const IMPORTS_DIR = process.env.IMPORTS_DIR || path.join(__dirname, '..', '..', '..', 'imports');
 
 // ---------- SAMOUCZENIE KATEGORYZACJI ----------
 // System uczy się z DECYZJI Szymona: każde uzgodnienie (match/book) zapisuje wzorzec
@@ -59,17 +68,39 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
     }
     if (!req.file) return res.status(400).json({ error: 'no_file' });
 
+    // Audyt: SHA-256 CAŁEGO pliku — drugi upload TEGO SAMEGO CSV to czytelny 409, nie ciche
+    // „0 dodanych" z wyścigu per-wiersz na tx_hash (uq_imp_file_hash, migracja 022).
+    const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+    const istniejacy = await q('SELECT id, imported_at FROM bank_imports WHERE file_hash = :h', { h: fileHash });
+    if (istniejacy.length) {
+      return res.status(409).json({ error: 'duplicate_import', hint: 'Ten plik CSV był już importowany.',
+        existing_id: istniejacy[0].id, imported_at: istniejacy[0].imported_at });
+    }
+
     const { bank, rows, errors } = parseBankFile(req.file.buffer, {
       bank: req.body.bank || undefined, iban: req.body.iban || undefined,
     });
     if (!bank) return res.status(422).json({ error: 'bank_not_detected', details: errors });
 
-    const imp = await q(
-      'INSERT INTO bank_imports (bank_name, filename, imported_by) VALUES (:b, :f, :u)',
-      { b: bank, f: req.file.originalname.slice(0, 255), u: req.user.uid });
+    fs.mkdirSync(IMPORTS_DIR, { recursive: true });
+    const filePath = `${fileHash}.csv`;
+    fs.writeFileSync(path.join(IMPORTS_DIR, filePath), req.file.buffer);
+
+    let imp;
+    try {
+      imp = await q(
+        'INSERT INTO bank_imports (bank_name, filename, imported_by, file_hash, file_path) VALUES (:b, :f, :u, :h, :p)',
+        { b: bank, f: req.file.originalname.slice(0, 255), u: req.user.uid, h: fileHash, p: filePath });
+    } catch (e) {
+      // wyścig dwóch równoległych uploadów tego samego pliku — druga wygrana INSERT-a przegrywa tu
+      if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'duplicate_import' });
+      throw e;
+    }
     const importId = imp.insertId;
 
-    let ok = 0, dup = 0;
+    // K6 (audyt #4): błąd wiersza INNY niż duplikat NIE przerywa pętli w połowie pliku —
+    // liczony osobno w rows_err, podsumowanie zapisuje się ZAWSZE.
+    let ok = 0, dup = 0, err = 0;
     for (const t of rows) {
       try {
         await q(
@@ -80,22 +111,24 @@ router.post('/csv', upload.single('file'), async (req, res, next) => {
             a: t.amount, c: t.currency, cp: t.counterparty, ti: t.title, bal: t.balance, h: t.tx_hash });
         ok++;
       } catch (e) {
-        if (e.code === 'ER_DUP_ENTRY') dup++; else throw e;
+        if (e.code === 'ER_DUP_ENTRY') dup++;
+        else { err++; console.error('imports.csv: wiersz odrzucony —', e.message); }
       }
     }
     await q('UPDATE bank_imports SET rows_ok=:o, rows_dup=:d, rows_err=:e WHERE id=:id',
-      { o: ok, d: dup, e: errors.length, id: importId });
+      { o: ok, d: dup, e: errors.length + err, id: importId });
 
-    res.status(201).json({ import_id: importId, bank, added: ok, duplicates: dup, rejected: errors.length });
+    res.status(201).json({ import_id: importId, bank, added: ok, duplicates: dup, rejected: errors.length + err });
   } catch (e) { next(e); }
 });
 
-// GET /api/v1/imports — historia importów
+// GET /api/v1/imports — historia importów (K2-analog: wycofane znikają, patrz zywyImport)
 router.get('/', async (req, res, next) => {
   try {
     const rows = await q(
       `SELECT bi.id, bi.bank_name, bi.filename, bi.imported_at, bi.rows_ok, bi.rows_dup, bi.rows_err, u.name AS imported_by
        FROM bank_imports bi JOIN users u ON u.id = bi.imported_by
+       WHERE ${zywyImport('bi')}
        ORDER BY bi.id DESC LIMIT 50`);
     res.json({ imports: rows });
   } catch (e) { next(e); }
@@ -225,5 +258,9 @@ router.post('/book', async (req, res, next) => {
     finally { conn.release(); }
   } catch (e) { next(e); }
 });
+
+// K4/K5/K10: DELETE /:id (wycofanie) i POST /:id/restore żyją w imports-archiwum.js — tu
+// tylko podpięcie, żeby ten plik nie rósł ponad limit 300 linii.
+router.use('/', archiwum);
 
 module.exports = router;

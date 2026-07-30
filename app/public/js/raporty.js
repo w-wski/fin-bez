@@ -1,7 +1,10 @@
 // Raporty: KPI miesiąca, wydatki wg kategorii, trend 6 miesięcy, widoki admina.
 import { $, el, zl, api, state, refreshers } from './core.js';
-import { zastosujUklad } from './raporty-uklad.js';
-import { indeksKategorii, klikKategoria, opisOkres, initUkladBtn } from './raporty-klik.js';
+import { zastosujUklad, potrzebnyKafelSumy } from './raporty-uklad.js';
+import {
+  indeksKategorii, klikKategoria, klikKpi, uklikalnij, opisOkres, initUkladBtn,
+  wypelnijBezKategorii, odswiezZwijanie, tabela, loadTelemetry,
+} from './raporty-klik.js';
 
 // Okres z kontrolek: miesiąc (parametr month) albo zakres dat (from/to) wyliczony
 // z pola miesiąca (kwartał/rok, w którym ten miesiąc leży) lub wpisany ręcznie.
@@ -56,19 +59,35 @@ export async function loadReport() {
   const s = await api(`/api/v1/summary?ledger=${ledger}&${o.qs}`);
   $('#kpi').innerHTML = '';
   const d = s.delta || {};
+  // Okres od–do dla kliku w kafel/kategorię: przy trybie „miesiąc" `o` nie ma from/to.
+  // Liczony PRZED kaflami (K2/K5) — kafle KPI i wiersz „(bez kategorii)" go potrzebują.
+  const [rM, mM] = month.split('-').map(Number);
+  const okresOd = o.from || `${month}-01`, okresDo = o.to || `${month}-${String(new Date(rM, mM, 0).getDate()).padStart(2, '0')}`;
+  const okres = { from: okresOd, to: okresDo, opis: opisOkres(okresOd, okresDo) };
   const tiles = [
-    kafel('Wydatki okresu', zl(s.expenses), zmiana(d.expenses_pct, tryb), 'minus'),
-    kafel('Przychody okresu', zl(s.income), zmiana(d.income_pct, tryb), 'plus'),
+    [kafel('Wydatki okresu', zl(s.expenses), zmiana(d.expenses_pct, tryb), 'minus'), 'Wydatki okresu'],
+    [kafel('Przychody okresu', zl(s.income), zmiana(d.income_pct, tryb), 'plus'), 'Przychody okresu'],
     // Przy bilansie druga linia mówi coś WIĘCEJ niż procent: saldo od zawsze do końca
     // okresu. Procent bilansu bywa bez sensu (baza blisko zera), narastające nie.
-    kafel('Bilans', zl(s.balance), 'narast. ' + zl(s.cumulative_balance), Number(s.balance) < 0 ? 'minus' : null),
-    kafel('Wpisy', String(s.tx_count), null),
+    [kafel('Bilans', zl(s.balance), 'narast. ' + zl(s.cumulative_balance), Number(s.balance) < 0 ? 'minus' : null), 'Bilans'],
+    [kafel('Wpisy', String(s.tx_count), null), 'Wpisy'],
   ];
   if (s.unmatched_bank_rows !== null) {
-    tiles.push(kafel('Bankowe do uzgodnienia', String(s.unmatched_bank_rows), null,
-      Number(s.unmatched_bank_rows) ? 'warn' : null));
+    // „Bankowe do uzgodnienia" celowo BEZ kliku (raporty-klik.js): to zestawienie z wyciągu
+    // bankowego, nie z księgi wpisów — nie ma czym zawęzić Historii.
+    tiles.push([kafel('Bankowe do uzgodnienia', String(s.unmatched_bank_rows), null,
+      Number(s.unmatched_bank_rows) ? 'warn' : null), null]);
   }
-  for (const t of tiles) $('#kpi').append(t);
+  // K1: siatka KPI ma zawsze parzystą liczbę kafli — nieparzysta dostaje dopełniający
+  // „Suma okresu" (bilans przychody−wydatki, ta sama wartość co kafel „Bilans" wyżej,
+  // ale bez narastającego — decyzja Szymona 2026-07-30 pkt 1a).
+  if (potrzebnyKafelSumy(tiles.length)) {
+    tiles.push([kafel('Suma okresu', zl(s.balance), null, Number(s.balance) < 0 ? 'minus' : null), 'Suma okresu']);
+  }
+  for (const [t, label] of tiles) {
+    $('#kpi').append(t);
+    if (label) klikKpi(t, ledger, okres, label);
+  }
   // Kolory (dziedziczone z rodzica) barwią słupki; `categories` służy TAKŻE do kliku (Z8).
   const kolory = {}; let categories = [];
   try {
@@ -78,10 +97,7 @@ export async function loadReport() {
       for (const k of c.children) if (k.color || c.color) kolory[k.id] = k.color || c.color;
     }
   } catch { /* raport ważniejszy niż barwy i klik */ }
-  // Okres od–do dla kliku w kategorię: przy trybie „miesiąc" `o` nie ma from/to.
-  const [rM, mM] = month.split('-').map(Number);
-  const okresOd = o.from || `${month}-01`, okresDo = o.to || `${month}-${String(new Date(rM, mM, 0).getDate()).padStart(2, '0')}`;
-  const okres = { from: okresOd, to: okresDo, opis: opisOkres(okresOd, okresDo) };
+  sekcja('bez-kategorii');                         // K5: reset przy zmianie okresu/księgi
   const idxKat = indeksKategorii(categories);
   // Słupek skalujemy do NAJWIĘKSZEJ pozycji (widać proporcje), a udział liczymy
   // od sumy okresu (mówi, ile procent wydatków to ta kategoria).
@@ -101,7 +117,11 @@ export async function loadReport() {
     const pct = (100 * Number(c.total) / suma).toFixed(1).replace('.', ',') + ' %';
     r.append(nazwa, el('span', { class: 'bval' }, zl(c.total)), tor, el('span', { class: 'bpct' }, pct));
     box.append(r);
-    klikKategoria(r, ledger, okres, c.category_id, c.category, idxKat);
+    // K5: „(bez kategorii)" dostaje INNY klik niż reszta — otwiera listę do nadania
+    // kategorii wpisom, nie pełną Historię (klikKategoria je pomija, id === null).
+    if (c.category_id == null) uklikalnij(r, `Pokaż wpisy bez kategorii · ${okres.opis}`,
+      () => wypelnijBezKategorii(sekcja('bez-kategorii'), ledger, okres, categories));
+    else klikKategoria(r, ledger, okres, c.category_id, c.category, idxKat);
   }
   const months = [...new Set(s.trend.map((t) => t.month))];
   const tb = $('#trend tbody'); tb.innerHTML = '';
@@ -138,9 +158,10 @@ export async function loadReport() {
     t.append(tb2);
     const w = el('div', { class: 'overflow' }); w.append(t); f.append(w);
   } else $('#fvp').innerHTML = '';
-  if (state.me.role === 'admin') loadTelemetry();
+  if (state.me.role === 'admin') loadTelemetry($('#telemetria'));
   else $('#telemetria').innerHTML = '';
   zastosujUklad($('#view-raporty .stack'), (await api('/api/v1/uklad')).layout); // Z9: układ per użytkownik, null = bez zmian
+  await odswiezZwijanie($('#view-raporty .stack'));   // K3: nagłówki-przyciski zwijania, po KAŻDYM przerysowaniu
 }
 
 // Sekcje z JS przed #fvp: transfery → Bartuś → najem. `data-kafel` (Z9): jak kafle statyczne.
@@ -154,29 +175,6 @@ function sekcja(id) {
   }
   n.innerHTML = '';
   return n;
-}
-
-// Tabela z nagłówkami, ZAWSZE w kontenerze `.overflow` — na 390 px sześć kolumn
-// liczb w kroju o stałej szerokości znaku nie mieści się w żaden sposób, a wtedy
-// alternatywą dla przewijania w poziomie jest łamanie „zł" do drugiej linii.
-// `rows` to tablice komórek [{v, num}] lub gołych wartości.
-function tabela(headers, rows) {
-  const w = el('div', { class: 'overflow' });
-  w.append(goleTabela(headers, rows));
-  return w;
-}
-
-function goleTabela(headers, rows) {
-  const t = el('table');
-  t.innerHTML = '<thead><tr>' + headers.map((h, i) => `<th${i ? ' class="num"' : ''}>${h}</th>`).join('') + '</tr></thead>';
-  const tb = el('tbody');
-  for (const r of rows) {
-    const tr = el('tr');
-    r.forEach((v, i) => tr.append(el('td', { class: i ? 'num' : '' }, String(v))));
-    tb.append(tr);
-  }
-  t.append(tb);
-  return t;
 }
 
 // K7/E4: „Zobowiązania i cele" — TRANSFER poza konsumpcją (nie wchodzi w wydatki ani bilans).
@@ -232,34 +230,6 @@ async function loadNajem(month) {
     ['Różnica', zl(n.roznica), ''],
   ]));
   box.append(el('p', { class: 'msg' }, 'To przepływ (pass-through), nie dochód — liczy się różnica.'));
-}
-
-async function loadTelemetry() {
-  const box = $('#telemetria');
-  try {
-    const t = await api('/api/v1/reports/telemetry?days=30');
-    box.innerHTML = '';
-    const mk = (headers, rows) => {
-      const tb = el('table');
-      tb.innerHTML = '<thead><tr>' + headers.map((h, i) =>
-        `<th${i > 0 && typeof rows[0]?.[i] === 'number' ? ' class="num"' : ''}>${h}</th>`).join('') + '</tr></thead>';
-      const body = el('tbody');
-      for (const r of rows) {
-        const tr = el('tr');
-        r.forEach((v) => tr.append(el('td', { class: typeof v === 'number' ? 'num' : '' },
-          typeof v === 'number' ? String(v) : (v ?? '—'))));
-        body.append(tr);
-      }
-      tb.append(body);
-      const w = el('div', { class: 'overflow' }); w.append(tb); return w;
-    };
-    box.append(el('h2', {}, 'Czas na kartach [min] wg osoby'));
-    box.append(mk(['Karta', 'Kto', 'Minuty', 'Zdarzenia'],
-      t.by_view.map((r) => [r.view_name, r.user_name, Number(r.minutes), Number(r.events)])));
-    box.append(el('h2', {}, 'Akcje (w tym offline)'));
-    box.append(mk(['Akcja', 'Kto', 'Razem', 'Offline'],
-      t.by_action.map((r) => [r.action, r.user_name, Number(r.n), Number(r.offline_n) || 0])));
-  } catch { box.innerHTML = ''; }
 }
 
 // „Zakres" podmienia pole miesiąca na parę dat od–do. Puste daty przy wejściu w ten
