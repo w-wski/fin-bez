@@ -8,7 +8,12 @@
 // cokolwiek). Błąd dostawcy (sieć, limit, zły klucz) → null + console.error: analiza ma
 // powstać MIMO padu modelu, nigdy na odwrót.
 const { czyWlaczona } = require('../wylaczniki');
-const { zapiszWyjscie } = require('../rejestr');
+const { zapiszWyjscie, zapiszKosztApi } = require('../rejestr');
+
+// Estymata kosztu, gdy OpenRouter NIE zwraca `usage.cost` w odpowiedzi (nie każdy klucz/model
+// ma włączone rozliczanie generacji) — grube $/1k tokenów łącznie (in+out), env-owalne bez
+// zmiany kodu. To tylko ESTYMATA: prawdziwy koszt jest w `usage.cost`, gdy dostępny.
+const KOSZT_EST_USD_1K = parseFloat(process.env.OPENROUTER_EST_USD_1K || '0.002');
 
 const TIMEOUT_MS = 30000;
 // Limit tokenów odpowiedzi. 700 było za mało (omówienie urywało się w połowie zdania),
@@ -120,4 +125,55 @@ async function narracja(prompt, { maxTokens } = {}) {
   return null;
 }
 
-module.exports = { narracja };
+// Czat (Z20, pyt. 5-6): ZAWSZE przez OpenRouter, niezależnie od MODEL_DOSTAWCA (który rządzi
+// tylko narracją Analiz) — decyzja Szymona 2026-07-30. Bramkowane tym samym wyłącznikiem
+// 'model_zewnetrzny', bo to ta sama droga wyjścia danych na zewnątrz. `messages` = tablica
+// {role, content} jak w OpenAI chat/completions (system + user) — WOŁAJĄCY (src/chat.js)
+// odpowiada za to, żeby żadna wiadomość nie niosła imion userów (Z12 zakaz danych osobowych).
+async function czat(messages, { maxTokens, userId } = {}) {
+  if (!(await czyWlaczona('model_zewnetrzny'))) return null;
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) return null; // brak klucza — front pokazuje „model niedostępny — sprawdź saldo"
+  const model = process.env.OPENROUTER_MODEL || 'openrouter/auto';
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens || DOMYSLNY_LIMIT,
+        reasoning: { exclude: true }, // patrz komentarz przy openrouterNarracja
+        messages,
+      }),
+      signal: ctrl.signal,
+    });
+    // Błąd klucza/salda (401/402/429...) → rzuca niżej, catch zwraca null: front dostaje
+    // czytelny komunikat „model niedostępny — sprawdź saldo OpenRouter" (Z20 zasady bezpieczeństwa).
+    if (!res.ok) throw new Error(`openrouter http ${res.status}`);
+    const body = await res.json();
+    const tekst = (body.choices?.[0]?.message?.content || '').trim();
+    if (!tekst) return null;
+    const uzyty = body.model || model;
+    const tokensIn = Number.isFinite(body.usage?.prompt_tokens) ? body.usage.prompt_tokens : null;
+    const tokensOut = Number.isFinite(body.usage?.completion_tokens) ? body.usage.completion_tokens : null;
+    // Koszt: `usage.cost` gdy OpenRouter je liczy, inaczej estymata z tokenów — NIGDY brak liczby
+    // wcale (twardy limit $5/mies. w src/chat.js musi mieć CZYM sumować, patrz K4).
+    const koszt = typeof body.usage?.cost === 'number' ? body.usage.cost
+      : (tokensIn !== null && tokensOut !== null
+        ? Math.round(((tokensIn + tokensOut) / 1000) * KOSZT_EST_USD_1K * 1e6) / 1e6
+        : null);
+    const znakow = messages.reduce((s, m) => s + String(m.content || '').length, 0);
+    zapiszWyjscie('openrouter', 'czat', 1, znakow);
+    zapiszKosztApi(userId, 'czat', uzyty, tokensIn, tokensOut, koszt);
+    return { tekst, model: uzyty, tokens: { in: tokensIn, out: tokensOut }, koszt };
+  } catch (e) {
+    console.error('model/dostawca: czat openrouter nieudany —', e.message);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+module.exports = { narracja, czat };

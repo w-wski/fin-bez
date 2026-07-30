@@ -1,6 +1,6 @@
 // Wpis: rdzeń aplikacji — transakcja w ≤3 kliknięcia, działa offline (kolejka localStorage).
 import { $, el, zl, api, track, getQueue, setQueue, QUEUE_LIMIT, KSIEGI } from './core.js';
-import { loadCats } from './kategorie.js';
+import { loadCats, onCatMain, getCats } from './kategorie.js';
 import { parseKwota } from './kwota.js';
 
 export async function submitTx(e) {
@@ -83,6 +83,7 @@ export function initKsiegi(ids) {
   pole.value = String(ids[0]);
   box.className = `seg seg-${Math.min(ids.length, 3)}`;
   box.hidden = ids.length < 2;             // jedna księga w zasięgu — segment nic nie wnosi
+  renderSkroty();                          // initKsiegi biegnie DOPIERO po zalogowaniu (main.js)
 }
 
 // Opis bywa długi (0–120 znaków, §7 briefu) — licznik siedzi w linii etykiety,
@@ -110,6 +111,42 @@ export function odswiezPrzyciskZapisu() {
 }
 window.addEventListener('online', odswiezPrzyciskZapisu);
 window.addEventListener('offline', odswiezPrzyciskZapisu);
+
+// Z22: rząd max 5 przycisków „kategoria · kwota" nad formularzem — najczęstsza czynność
+// (ostatnie 90 dni żywych wydatków) ma kosztować jedno kliknięcie zamiast wypełniania od zera.
+// Klik TYLKO wypełnia — zatwierdza i tak człowiek (zakaz auto-zapisu z brief-u).
+async function renderSkroty() {
+  const form = $('#txForm');
+  if (!form) return;
+  $('#skrotyWpis')?.remove();                // odświeżenie nie ma duplikować rzędu
+  if (!navigator.onLine) return;              // offline nie ma z czego liczyć — cisza, nie błąd
+  let dane;
+  try { dane = await api('/api/v1/transactions/skroty'); } catch { return; }
+  const wiersze = (dane.rows || []).filter((r) => r.category_id);
+  if (!wiersze.length) return;                // K3: brak historii = brak sekcji, nie pusta ramka
+  const box = el('div', { class: 'skroty-wpis', id: 'skrotyWpis' });
+  for (const w of wiersze) {
+    const b = el('button', { type: 'button', class: 'chip' }, `${w.category_name || '—'} · ${zl(w.kwota)}`);
+    b.onclick = () => wypelnijZeSkrotu(w);
+    box.append(b);
+  }
+  form.parentNode.insertBefore(box, form);
+}
+
+function wypelnijZeSkrotu(w) {
+  $('#segType .active')?.classList.remove('active');
+  $('#segType [data-type="WYDATEK"]')?.classList.add('active');
+  notaTransferu('WYDATEK'); odswiezSegPlatnosci('WYDATEK');
+  $('#amount').value = String(w.kwota).replace('.', ',');
+  const cats = getCats();
+  const main = cats.find((c) => c.id === w.category_id);
+  if (main) { $('#catMain').value = String(w.category_id); onCatMain(); } else {
+    const rodzic = cats.find((c) => (c.children || []).some((k) => k.id === w.category_id));
+    if (rodzic) { $('#catMain').value = String(rodzic.id); onCatMain(); $('#catSub').value = String(w.category_id); }
+  }
+  track('Skrót Wpisu', 'wpis', { detail: `kategoria=${w.category_id}` });
+  $('#amount').focus();
+}
 
 export function initWpis() {
   $('#txDate').value = new Date().toISOString().slice(0, 10);

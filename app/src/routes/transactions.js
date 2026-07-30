@@ -77,6 +77,27 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// GET /api/v1/transactions/skroty — Z22: 5 najczęstszych par (kategoria, zaokrąglona kwota)
+// z własnych żywych wydatków ostatnich 90 dni. Jeden klik nad formularzem Nowego Wpisu ma
+// wypełnić najczęściej powtarzaną czynność — więc liczy się WYDATEK, nie każdy typ wpisu.
+router.get('/skroty', async (req, res, next) => {
+  try {
+    const params = {};
+    let where = scopeWhere(req.user, params);
+    if (!where) return res.json({ rows: [] });
+    where += " AND t.type = 'WYDATEK' AND t.tx_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)";
+    const rows = await q(
+      `SELECT t.category_id, c.name AS category_name, ROUND(t.amount) AS kwota, COUNT(*) AS n
+       FROM transactions t
+       LEFT JOIN categories c ON c.id = t.category_id AND c.ledger_id = t.ledger_id
+       WHERE ${where}
+       GROUP BY t.category_id, ROUND(t.amount)
+       ORDER BY n DESC
+       LIMIT 5`, params);
+    res.json({ rows });
+  } catch (e) { next(e); }
+});
+
 // POST /api/v1/transactions  {ledger_id, tx_date, type, amount, category_id?, category_name?, description?}
 router.post('/', async (req, res, next) => {
   try {
@@ -118,12 +139,25 @@ router.post('/', async (req, res, next) => {
         { l: ledgerId, n: name, p: parentId });
       categoryId = found[0]?.id || null;
     }
-    const r = await q(
-      `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, currency, payment_method, category_id, description, source, legacy_id)
-       VALUES (:l, :u, :d, :t, :a, :c, :pm, :cat, :desc, 'MANUAL', :ref)`,
-      { l: ledgerId, u: req.user.uid, d: b.tx_date, t: b.type, a: amount,
-        c: (b.currency || 'PLN').slice(0, 3), pm: paymentMethod, cat: categoryId,
-        desc: (b.description || '').slice(0, 512) || null, ref: clientRef });
+    let r;
+    try {
+      r = await q(
+        `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, currency, payment_method, category_id, description, source, legacy_id)
+         VALUES (:l, :u, :d, :t, :a, :c, :pm, :cat, :desc, 'MANUAL', :ref)`,
+        { l: ledgerId, u: req.user.uid, d: b.tx_date, t: b.type, a: amount,
+          c: (b.currency || 'PLN').slice(0, 3), pm: paymentMethod, cat: categoryId,
+          desc: (b.description || '').slice(0, 512) || null, ref: clientRef });
+    } catch (e) {
+      // Z22: migracja 021 dodała UNIQUE (user_id, off_ref) — dwa równoległe retry tego samego
+      // client_ref mijają się w oknie między SELECT-dedupe wyżej a tym INSERT-em. Zamiast 500
+      // dociągamy wpis, który wygrał wyścig, i mówimy klientowi to samo co przy zwykłym dedupe.
+      if (e.code === 'ER_DUP_ENTRY' && clientRef) {
+        const wygrany = await q('SELECT id FROM transactions WHERE legacy_id = :r AND user_id = :u LIMIT 1',
+          { r: clientRef, u: req.user.uid });
+        if (wygrany.length) return res.status(200).json({ id: wygrany[0].id, deduped: true });
+      }
+      throw e;
+    }
     res.status(201).json({ id: r.insertId });
   } catch (e) { next(e); }
 });

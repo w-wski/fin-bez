@@ -1,23 +1,9 @@
 /* Styl widoku „Analizy" (21d, Z12) — kierunek „Tafla", tokeny wyłącznie ze styles.css.
    Reużywa .kpi/.bary/.barrow z raporty.css (te same wzorce wizualne — liczby okresu,
-   niezależnie czy z raportu, czy z analizy, mają wyglądać tak samo). Tu tylko to, czego
-   raporty.css nie ma: pasek okresu ze strzałkami i pole narracji modelu. */
-
-.an-pasek { gap: var(--space-2); }
-
-.an-strzalki {
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-}
-.an-strzalki > .btn { flex: none; }
-
-.an-okres-label {
-  min-width: 6.5rem;
-  text-align: center;
-  font: 600 var(--fs-cap)/1.2 var(--mono);
-  font-variant-numeric: tabular-nums;
-}
+   niezależnie czy z raportu, czy z analizy, mają wyglądać tak samo). Pasek okresu (chipsy
+   + strzałki) jest teraz WSPÓLNYM komponentem pasek-okresu.js (Z20, pkt 14) — klasy po-*
+   stylowane raz w styles.css, tu zostaje tylko to, czego wspólne pliki nie mają: pole
+   narracji modelu i sekcja czatu. */
 
 .an-wynik { gap: var(--space-4); }
 
@@ -30,3 +16,18 @@
   background: var(--glass-fill);
   white-space: pre-line;
 }
+
+/* Czat o okresie (Z20, pkt 13) — pod omówieniem, w #analizyChatBox. Wiersze rozmowy
+   naprzemiennie pytanie/odpowiedź, ten sam kontener graficzny co narracja modelu. */
+.chat-historia { gap: var(--space-2); }
+.chat-wiersz {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-md);
+  background: var(--glass-fill);
+}
+.chat-pytanie { font-weight: 600; margin: 0 0 var(--space-1); }
+.chat-odpowiedz { white-space: pre-line; }
+.chat-podpowiedzi { margin-bottom: var(--space-2); }
+.chat-pole input[type="text"] { flex: 1; }
+.chat-szeroki { align-items: center; gap: var(--space-2); }

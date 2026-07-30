@@ -145,6 +145,22 @@ async function rysujRejestr(box) {
   } catch (err) { box.append(el('p', { class: 'msg err' }, 'Nie udało się wczytać: ' + opisBledu(err))); }
 }
 
+// Koszty API (Z20, K8): suma miesięczna per user per źródło (chat/analiza) + stan limitu
+// $5/mies. ŁĄCZNIE na czat. Dane z GET /api/v1/chat/koszty (api_costs + chat_rozmowy).
+async function rysujKoszty(box) {
+  box.innerHTML = '';
+  let dane;
+  try { dane = await api('/api/v1/chat/koszty'); }
+  catch (err) { box.append(el('p', { class: 'msg err' }, 'Nie udało się wczytać: ' + opisBledu(err))); return; }
+  const stan = el('p', { class: dane.limit_osiagniety ? 'msg err' : 'msg' },
+    `Czat w tym miesiącu: ${dane.wydano_czat_usd.toFixed(4)} USD z limitu ${dane.limit_usd.toFixed(2)} USD`
+    + (dane.limit_osiagniety ? ' — LIMIT OSIĄGNIĘTY, model niedostępny do kolejnego miesiąca.' : '.'));
+  box.append(stan);
+  if (!dane.pozycje.length) { box.append(el('p', { class: 'msg' }, 'Brak zarejestrowanych kosztów API w tym miesiącu.')); return; }
+  box.append(tabelaProsta(['Użytkownik', 'Źródło', 'Koszt (USD)'],
+    dane.pozycje.map((p) => [p.user_name, p.zrodlo, Number(p.koszt).toFixed(4)])));
+}
+
 async function rysujWyjscia(box) {
   box.innerHTML = '';
   try {
@@ -160,17 +176,19 @@ async function rysujWyjscia(box) {
  *  ten moduł się o to sam nie stara (żadnego fetchu przy samym imporcie/wywołaniu). */
 export function initAdminDostep(kontener) {
   kontener.innerHTML = '';
-  const sWylaczniki = el('div'), sTokeny = el('div'), sRejestr = el('div'), sWyjscia = el('div');
+  const sWylaczniki = el('div'), sTokeny = el('div'), sRejestr = el('div'), sWyjscia = el('div'), sKoszty = el('div');
   kontener.append(
     el('h2', {}, 'Wyłączniki modalności'), sWylaczniki,
     el('h2', {}, 'Tokeny dostępu'), sTokeny,
     el('h2', {}, 'Rejestr dostępu'), sRejestr,
     el('h2', {}, 'Telemetria wychodząca'), sWyjscia,
+    el('h2', {}, 'Koszty API'), sKoszty,
   );
   return async () => {
     await rysujWylaczniki(sWylaczniki);
     await rysujTokeny(sTokeny);
     await rysujRejestr(sRejestr);
     await rysujWyjscia(sWyjscia);
+    await rysujKoszty(sKoszty);
   };
 }

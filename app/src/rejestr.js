@@ -39,6 +39,25 @@ function zapiszWyjscie(narzedzie, cel, zapytan, znakow) {
   ).catch((e) => console.error('rejestr.zapiszWyjscie: INSERT nieudany —', e.message));
 }
 
+// Koszty API per user (Z20, migracja 023 dokańcza szkielet api_costs z 001) — telemetria
+// Admina (K8) potrzebuje wiedzieć KTO ile kosztuje, nie tylko ile łącznie. Fire-and-forget
+// jak zapiszWyjscie: koszt zapisany tu jest informacyjny (audyt), nigdy nie ma wywrócić
+// odpowiedzi modelu, gdyby akurat baza była niedostępna.
+function zapiszKosztApi(userId, action, model, tokensIn, tokensOut, kosztUsd) {
+  q(
+    `INSERT INTO api_costs (user_id, action, model, tokens_in, tokens_out, koszt_usd)
+     VALUES (:userId, :action, :model, :tin, :tout, :koszt)`,
+    {
+      userId: userId ?? null,
+      action: String(action || '').slice(0, 64),
+      model: model ? String(model).slice(0, 64) : null,
+      tin: Number.isInteger(tokensIn) ? tokensIn : null,
+      tout: Number.isInteger(tokensOut) ? tokensOut : null,
+      koszt: kosztUsd ?? null,
+    },
+  ).catch((e) => console.error('rejestr.zapiszKosztApi: INSERT nieudany —', e.message));
+}
+
 // Dla panelu Admin (Z12) — ostatnie wpisy obu rejestrów, do wglądu „kto/co czytał/wysyłał".
 async function ostatnieDostepy(limit) {
   const n = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500);
@@ -56,4 +75,16 @@ async function ostatnieWyjscia(limit) {
               FROM outbound_log ORDER BY id DESC LIMIT ${n}`, {});
 }
 
-module.exports = { zapiszDostep, zapiszWyjscie, ostatnieDostepy, ostatnieWyjscia };
+// Suma miesięczna kosztów per user per źródło (chat/analiza) — telemetria Admina (K8).
+// LEFT JOIN users: user_id bywa NULL (np. narracja Analiz woła dostawcę bez kontekstu usera —
+// narracja() celowo NIE ZMIENIONA sygnaturą tego zlecenia), taki wiersz ma zostać widoczny
+// jako „—", nie zniknąć z sumy.
+async function kosztyMiesieczne() {
+  return q(
+    `SELECT u.name AS user_name, a.action AS zrodlo, ROUND(SUM(COALESCE(a.koszt_usd, 0)), 4) AS koszt
+       FROM api_costs a LEFT JOIN users u ON u.id = a.user_id
+      WHERE DATE_FORMAT(a.ts, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+      GROUP BY a.user_id, a.action ORDER BY koszt DESC`, {});
+}
+
+module.exports = { zapiszDostep, zapiszWyjscie, zapiszKosztApi, ostatnieDostepy, ostatnieWyjscia, kosztyMiesieczne };

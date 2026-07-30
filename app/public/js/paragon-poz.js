@@ -123,8 +123,12 @@ function kategorie(it, listaKat) {
 }
 
 // ctx: { rcId, kategorie(), poZmianie(), onUsun(it) }
+// K3 (Z18): pozycja bez product_id jest oznaczona SUBTELNIE — to nie błąd, to normalny stan
+// „jeszcze nienauczone" (produkt zakłada człowiek, nigdy OCR — produkt-baza.js).
+const bezProduktu = (it) => (it.product_id ? '' : ' bez-produkt');
+
 export function pozycja(it, ctx) {
-  const box = el('div', { class: 'rc-poz' + (Number(it.low_confidence) ? ' lowconf' : '') });
+  const box = el('div', { class: 'rc-poz' + (Number(it.low_confidence) ? ' lowconf' : '') + bezProduktu(it) });
   const kod = inp('rc-kod', it.code ?? it.ocr_name ?? '', { placeholder: 'kod z paragonu (np. CHL TOST 500G)', maxlength: '255', 'aria-label': 'Kod z paragonu' });
   const opis = inp('rc-opis', it.name ?? '', { placeholder: 'opis po ludzku (np. chleb tostowy)', maxlength: '255', 'aria-label': 'Opis pozycji' });
   const hint = el('div', { class: 'rc-hint' });
@@ -152,6 +156,7 @@ export function pozycja(it, ctx) {
       }
       bladPola(node, '');
       mrugnij(node);
+      box.classList.toggle('bez-produkt', !it.product_id);   // K3: znak nadąża za scaleniem/odłączeniem
     } catch (err) { return blad('Nie zapisałem poprawki', err, node); }
     odswiezHint(it, hint, { kod, opis, jedn, kat, zapisz });
     odswiezOstrzezenie(it, box, ostrz, wart);

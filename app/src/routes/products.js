@@ -20,17 +20,21 @@ const { ledgerScope } = require('../auth');
 const { propozycje } = require('../ocr/produkt-baza');
 const { dataISO } = require('../ocr/dostep');
 const { czyData } = require('../ocr/pola');
+const { zywyParagon } = require('../zywe');
 
 const router = express.Router();
 
-/** Warunek WHERE ograniczający paragony do tych, które pytający ma prawo widzieć. */
+/** Warunek WHERE ograniczający paragony do tych, które pytający ma prawo widzieć.
+ *  Dokleja zywyParagon('r') do KAŻDEGO zapytania idącego przez ten helper (Z18/K4) —
+ *  po archiwizacji (Z19) skasowany paragon nie ma prawa wchodzić do koszyka, wykresu
+ *  drożenia ani licznika czekających pozycji. Jedno miejsce, zero rozjazdów filtrów. */
 function zasieg(user) {
   const scope = ledgerScope(user);
   if (!scope.ledgers.length) return null;
   const p = { uid: user.uid };
   scope.ledgers.forEach((l, i) => { p[`l${i}`] = l; });
   const sql = `r.ledger_id IN (${scope.ledgers.map((_, i) => `:l${i}`).join(',')})`
-    + (scope.ownOnly ? ' AND r.user_id = :uid' : '');
+    + (scope.ownOnly ? ' AND r.user_id = :uid' : '') + ` AND ${zywyParagon('r')}`;
   return { sql, p };
 }
 
@@ -178,6 +182,22 @@ router.get('/drozeje', async (req, res, next) => {
         ORDER BY (teraz - poprzednio) / poprzednio DESC LIMIT 100`, { ...z.p, od, doD });
     res.json({ items: rows.map((x) => ({ ...x, teraz: liczba(x.teraz), poprzednio: liczba(x.poprzednio),
       zmiana_proc: Math.round(((Number(x.teraz) - Number(x.poprzednio)) / Number(x.poprzednio)) * 1000) / 10 })) });
+  } catch (e) { next(e); }
+});
+
+// GET /api/v1/products/nieprzypisane-licznik — Z18: ile pozycji CZEKA na ręczne przypisanie
+// produktu (product_id IS NULL), z ŻYWYCH paragonów w zasięgu ksiąg pytającego. Karta Produkty
+// pokazuje to jako plakietkę zamiast pustego katalogu — zasada „produkt zakłada człowiek"
+// (produkt-baza.js) zostaje, więc pusta karta jest normalnym stanem, dopóki ktoś nie poprawi
+// opisu pozycji w paragonie; licznik ma to komunikować, nie wyglądać na awarię.
+router.get('/nieprzypisane-licznik', async (req, res, next) => {
+  try {
+    const z = zasieg(req.user);
+    if (!z) return res.json({ n: 0 });
+    const [row] = await q(
+      `SELECT COUNT(*) AS n FROM receipt_items i JOIN receipts r ON r.id = i.receipt_id
+        WHERE ${z.sql} AND i.product_id IS NULL`, z.p);
+    res.json({ n: Number(row.n) });
   } catch (e) { next(e); }
 });
 

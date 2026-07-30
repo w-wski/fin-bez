@@ -11,6 +11,17 @@
 .pr-naglowek { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
 .pr-nazwa { flex: 1 1 14rem; min-height: 44px; font-size: 1.05rem; font-weight: 600; }
 
+/* Plakietka „N pozycji czeka" (Z18) — informacyjna, NIE alarmowa: OCR celowo nigdy sam
+   nie zakłada produktów, więc czekające pozycje są normalnym stanem, nie błędem. */
+.pr-czekaja { display: flex; flex-direction: column; align-items: flex-start; gap: .375rem;
+  margin-bottom: .75rem; padding: .625rem; border: 1px solid var(--line); border-radius: .625rem;
+  background: var(--card, var(--panel)); }
+.pr-czekaja .pill { background: var(--tint, var(--panel)); }
+
+/* Pozycja paragonu bez produktu (K3) — subtelne oznaczenie, nie alarmowe (to nie błąd,
+   tylko „jeszcze nienauczone"); odróżnione od .lowconf (czerwień) kropkowaną ramką. */
+.rc-poz.bez-produkt { border-left: 3px dotted var(--ink-faint, var(--muted)); }
+
 /* Wykres: kolory z tokenów — czerwień/zieleń są zajęte przez minus/plus księgi,
    więc półkowa idzie w tuszu wyciszonym, zapłacona w akcencie (to na nią patrzymy). */
 .pr-wykres svg { width: 100%; height: auto; display: block; }

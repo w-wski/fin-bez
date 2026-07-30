@@ -89,9 +89,30 @@ async function szczegol(prod) {
   }
 }
 
+// Plakietka „N pozycji czeka" (Z18): pusta karta Produkty przestaje wyglądać jak awaria —
+// OCR celowo NIGDY nie zakłada produktów (patrz produkt-baza.js), więc czekające pozycje
+// są normalnym stanem. Plakietka mówi, ile ich jest i GDZIE podjąć decyzję (poprawka opisu
+// pozycji w paragonie), zamiast milczeć.
+async function plakietkaCzekajace() {
+  let n = 0;
+  try { ({ n } = await api('/api/v1/products/nieprzypisane-licznik')); } catch (e) { return null; }
+  if (!n) return null;
+  const przejdz = el('button', { class: 'btn small', type: 'button' }, 'Przejdź do Paragonów');
+  przejdz.onclick = () => document.querySelector('[data-view="paragon"]')?.click();
+  const box2 = el('div', { class: 'pr-czekaja' });
+  box2.append(
+    el('span', { class: 'pill' }, `${n} ${n === 1 ? 'pozycja czeka' : 'pozycji czeka'} na przypisanie`),
+    el('p', { class: 'msg' }, 'Popraw opis pozycji w paragonie i wskaż jej produkt —'
+      + ' katalog uzupełnia się wyłącznie tak, ręcznie.'),
+    przejdz);
+  return box2;
+}
+
 // ---------- KATALOG ----------
 async function lista() {
   box.innerHTML = '';
+  const czekajace = await plakietkaCzekajace();
+  if (czekajace) box.append(czekajace);
   const szukaj = el('input', { type: 'search', class: 'pr-szukaj',
     placeholder: 'szukaj produktu…', 'aria-label': 'Szukaj produktu' });
   const wyniki = el('div', { class: 'pr-lista' });

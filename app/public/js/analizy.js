@@ -1,60 +1,20 @@
 // Analizy: karta „Analizy" (21d, Z12) — miesiąc/kwartał/rok, liczby zawsze, narracja
 // modelu gdy dostępna. Cała treść budowana z JS do #analizyBox (wzorzec z admin.js/produkty.js
 // — index.html trzyma tylko pusty kontener). Widoczne wyłącznie dla admina (routes/analizy.js).
-import { $, el, api, zl, state, refreshers, track } from './core.js';
+// Góra karty (Z20, pkt 14): WSPÓLNY komponent pasekOkresu() z pasek-okresu.js, zero
+// własnego markupu paska — trzy niezależne implementacje (Raporty/Analizy/Historia)
+// scalone w jedno źródło prawdy.
+import { $, el, api, zl, refreshers, track } from './core.js';
+import { pasekOkresu, domyslnyOkres } from './pasek-okresu.js';
+import { renderChat } from './analizy-chat.js';
 
 const KSIEGI = { 1: 'RODZINA', 2: 'PERSEVERA' };
-const NAZWY_TYPU = { miesiac: 'Miesiąc', kwartal: 'Kwartał', rok: 'Rok' };
 
 let typ = 'miesiac';
 let okres = domyslnyOkres(typ);
 
-function domyslnyOkres(t) {
-  const dzis = new Date();
-  const r = dzis.getFullYear(), m = dzis.getMonth() + 1;
-  if (t === 'rok') return String(r);
-  if (t === 'kwartal') return `${r}-Q${Math.ceil(m / 3)}`;
-  return `${r}-${String(m).padStart(2, '0')}`;
-}
-
-// Krok o jeden okres wprzód/wstecz (kierunek ±1) — kalendarzowy sąsiad, ten sam
-// wzorzec co poprzedniOkres w src/analizy.js (kwartał sąsiaduje z kwartałem, nie z 91 dniami).
-function przesunOkres(t, o, kier) {
-  if (t === 'rok') return String(Number(o) + kier);
-  if (t === 'kwartal') {
-    const r = Number(o.slice(0, 4)), kw = Number(o.slice(6)) + kier;
-    if (kw < 1) return `${r - 1}-Q4`;
-    if (kw > 4) return `${r + 1}-Q1`;
-    return `${r}-Q${kw}`;
-  }
-  const [r, m] = o.split('-').map(Number);
-  const mm = m + kier;
-  if (mm < 1) return `${r - 1}-12`;
-  if (mm > 12) return `${r + 1}-01`;
-  return `${r}-${String(mm).padStart(2, '0')}`;
-}
-
 function opisBledu(err) {
   return (err instanceof TypeError) ? 'brak połączenia z internetem' : (err?.data?.error || err?.message || 'błąd');
-}
-
-function pasekOkresu() {
-  const pasek = el('div', { class: 'stack an-pasek' });
-  const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'Typ okresu' });
-  for (const t of ['miesiac', 'kwartal', 'rok']) {
-    const b = el('button', { type: 'button', class: t === typ ? 'active' : '' }, NAZWY_TYPU[t]);
-    b.onclick = () => { typ = t; okres = domyslnyOkres(typ); rysuj(); };
-    chips.append(b);
-  }
-  const strzalki = el('div', { class: 'row an-strzalki' });
-  const wstecz = el('button', { class: 'btn small', type: 'button', 'aria-label': 'Poprzedni okres' }, '◀');
-  const etykieta = el('span', { class: 'an-okres-label' }, okres);
-  const wprzod = el('button', { class: 'btn small', type: 'button', 'aria-label': 'Następny okres' }, '▶');
-  wstecz.onclick = () => { okres = przesunOkres(typ, okres, -1); rysuj(); };
-  wprzod.onclick = () => { okres = przesunOkres(typ, okres, 1); rysuj(); };
-  strzalki.append(wstecz, etykieta, wprzod);
-  pasek.append(chips, strzalki);
-  return pasek;
 }
 
 function kafel(label, wartosc) {
@@ -134,12 +94,21 @@ async function przygotujAnalize(box) {
   }
 }
 
+// Czat (Z20, pkt 13) renderuje się POD omówieniem, w OSOBNYM kontenerze (#analizyChatBox) —
+// ta karta czyści #analizyBox przy każdej zmianie okresu i skasowałaby rozmowę, gdyby czat
+// mieszkał w tym samym drzewie (patrz komentarz w index.html).
+function odswiezCzat() {
+  const box = $('#analizyChatBox');
+  if (box) renderChat(box, { okresTyp: typ, okres });
+}
+
 function wyswietl(box, dane, narracja) {
   box.innerHTML = '';
   box.append(kpiKsiegi(dane));
   box.append(el('h3', {}, 'Top 5 kategorii wydatków'), topKategorie(dane));
   box.append(el('h3', {}, 'Paragony'), paragonySekcja(dane));
   box.append(el('h3', {}, 'Omówienie'), narracjaSekcja(narracja));
+  odswiezCzat();
 }
 
 async function wczytajZapisana(box) {
@@ -147,7 +116,10 @@ async function wczytajZapisana(box) {
   try {
     const r = await api(`/api/v1/analizy?okres_typ=${typ}&okres=${encodeURIComponent(okres)}`);
     if (r.znaleziono) wyswietl(box, r.analiza.dane, r.analiza.narracja);
-    else box.append(el('p', { class: 'msg' }, 'Dla tego okresu nie ma jeszcze zapisanej analizy — kliknij „Przygotuj analizę".'));
+    else {
+      box.append(el('p', { class: 'msg' }, 'Dla tego okresu nie ma jeszcze zapisanej analizy — kliknij „Przygotuj analizę".'));
+      odswiezCzat(); // czat pyta o okres niezależnie od tego, czy migawka już istnieje
+    }
   } catch (err) {
     box.append(el('p', { class: 'msg err' }, 'Nie udało się wczytać: ' + opisBledu(err)));
   }
@@ -156,12 +128,15 @@ async function wczytajZapisana(box) {
 function rysuj() {
   const glowny = $('#analizyBox');
   glowny.innerHTML = '';
-  glowny.append(pasekOkresu());
+  const pasek = pasekOkresu({
+    typ, okres,
+    onChange: (t, o) => { typ = t; okres = o; rysuj(); },
+  });
   const przycisk = el('button', { class: 'btn primary', type: 'button' }, 'Przygotuj analizę');
   const wynikBox = el('div', { class: 'stack an-wynik' });
   // disabled na czas POST — podwójny klik to dwa płatne wywołania modelu (Z14 #9).
   przycisk.onclick = async () => { przycisk.disabled = true; await przygotujAnalize(wynikBox); przycisk.disabled = false; };
-  glowny.append(przycisk, wynikBox);
+  glowny.append(pasek.element, przycisk, wynikBox);
   wczytajZapisana(wynikBox);
 }
 

@@ -69,6 +69,24 @@ input#amount::placeholder { color: var(--ink-faint); font-weight: 400; font-size
   box-shadow: inset 0 1px 0 var(--glass-rim);
 }
 
+/* ---------- Skróty (Z22): rząd max 5 przycisków nad formularzem ---------- */
+.skroty-wpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.skroty-wpis .chip {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-pill);
+  background: var(--glass-fill);
+  color: var(--ink);
+  font: 500 var(--fs-cap)/1.2 var(--font);
+  white-space: nowrap;
+}
+.skroty-wpis .chip:active { background: var(--glass-fill-strong); }
+
 @media (min-width: 641px) {
   /* Data i kategoria obok siebie — na szerokim ekranie formularz nie musi być kolumną. */
   #view-wpis .card { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
