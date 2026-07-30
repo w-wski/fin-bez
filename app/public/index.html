@@ -303,6 +303,9 @@
   <section id="view-analizy" hidden>
     <h1 class="page-title">Analizy</h1>
     <div id="analizyBox"></div>
+    <!-- Czat analiz w OSOBNYM kontenerze (ten sam powód co #adminDostepBox niżej):
+         analizy.js czyści #analizyBox przy każdej zmianie okresu i skasowałby rozmowę. -->
+    <div id="analizyChatBox"></div>
   </section>
 
   <!-- ADMIN (tylko rola admin; treść renderowana z js/admin.js) -->
