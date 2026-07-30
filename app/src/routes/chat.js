@@ -16,6 +16,11 @@ const router = express.Router();
 // pokazywać WYDANE dotąd pieniądze także wtedy, gdy Szymon świadomie wyłączył modalność.
 router.use(async (req, res, next) => {
   try {
+    // Czat TYLKO dla admina (weryfikacja Z20, K3): karta Analizy i tak jest admin-only,
+    // a podsumowania okresów to agregaty CAŁEJ księgi — rola ownOnly (junior) dostawałaby
+    // przez czat sumy wydatków rodziców. Czat dla reszty rodziny = osobne zlecenie
+    // z filtrowaniem kontekstu per ownOnly (jak routes/reports.js), nie zdjęcie tej bramki.
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'forbidden' });
     if (req.path === '/koszty') return next();
     if (!(await czyWlaczona('model_zewnetrzny'))) return res.status(403).json({ error: 'model_wylaczony' });
     next();
@@ -51,13 +56,18 @@ router.post('/', async (req, res, next) => {
       });
     }
 
+    // Rezerwacja PRZED fetch (weryfikacja Z20, K4a): wiersz z kosztem minimalnym wchodzi do
+    // sumy limitu od razu, więc równoległe żądania nie prześlizgną się razem pod progiem.
+    const rozmowaId = await chat.rezerwujRozmowe({
+      userId: req.user.uid, okresTyp: w.okresTyp, okres: w.okres, szeroki, pytanie,
+    });
     const { kontekst, uzytoSzczegolow } = await chat.budujKontekst({
       user: req.user, okresTyp: w.okresTyp, okres: w.okres, pytanie, szeroki,
     });
     const wiadomosci = chat.zbudujWiadomosci(kontekst, pytanie);
     const wynik = await czat(wiadomosci, { userId: req.user.uid });
 
-    await chat.zapiszRozmowe({ userId: req.user.uid, okresTyp: w.okresTyp, okres: w.okres, szeroki, pytanie, wynik });
+    await chat.zapiszRozmowe({ rozmowaId, wynik });
     // Kanał 'analiza' (jak POST /api/v1/analizy): user ŚWIADOMIE odpytuje dane okresu.
     zapiszDostep('analiza', req.baseUrl + req.path, `${w.okresTyp}:${w.okres}`, 1, null);
 

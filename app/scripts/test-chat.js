@@ -141,15 +141,21 @@ const ADMIN = { role: 'admin', uid: 1 };
   resetModuly();
   podstawDb();
   const chat6 = require('../src/chat');
-  zeruj({ affectedRows: 1 });
+  zeruj({ affectedRows: 1, insertId: 77 }, { affectedRows: 1 });
   let rzucilo = false;
+  let idRez = null;
   try {
-    await chat6.zapiszRozmowe({ userId: 9, okresTyp: 'miesiac', okres: '2026-07', szeroki: false, pytanie: 'x', wynik: null });
+    idRez = await chat6.rezerwujRozmowe({ userId: 9, okresTyp: 'miesiac', okres: '2026-07', szeroki: false, pytanie: 'x' });
+    await chat6.zapiszRozmowe({ rozmowaId: idRez, wynik: null });
   } catch { rzucilo = true; }
-  ok(!rzucilo, 'zapiszRozmowe z wynik=null (koszt/model/tokeny NULL) nie rzuca');
+  ok(!rzucilo, 'rezerwacja + zapiszRozmowe z wynik=null nie rzuca');
+  const zapytanieRez = baza.zapytania[baza.zapytania.length - 2];
   const zapytanieIns = baza.zapytania[baza.zapytania.length - 1];
-  ok(zapytanieIns.sql.includes('INSERT INTO chat_rozmowy'), 'zapiszRozmowe: INSERT INTO chat_rozmowy');
-  ok(zapytanieIns.par.koszt === null && zapytanieIns.par.m === null, 'zapiszRozmowe: koszt/model NULL, nie wyjątek');
+  ok(zapytanieRez.sql.includes('INSERT INTO chat_rozmowy') && zapytanieRez.par.koszt > 0,
+    'rezerwacja: INSERT z kosztem minimalnym (>0) PRZED wywołaniem modelu — wyścig nie omija limitu');
+  ok(idRez === 77 && zapytanieIns.sql.includes('UPDATE chat_rozmowy')
+    && /COALESCE\(:koszt, koszt_usd\)/.test(zapytanieIns.sql),
+    'zapiszRozmowe: UPDATE rezerwacji; koszt NULL ZOSTAWIA stawkę minimalną (nigdy NULL w sumie limitu)');
 
   // ---------- 7) popularnePytania: GROUP BY pytanie TEGO usera ----------
   zeruj([{ pytanie: 'Ile wydaliśmy na jedzenie?', n: 4 }]);
@@ -189,9 +195,10 @@ const ADMIN = { role: 'admin', uid: 1 };
   zeruj(
     [{ wlaczona: 1 }],                                                     // router.use: modalnosci ON
     [{ suma: '0.000000' }],                                                // wydanoWTymMiesiacu (limit)
+    { affectedRows: 1, insertId: 5 },                                      // rezerwujRozmowe (PRZED fetch)
     [{ dane: JSON.stringify({ ksiegi: [{ ledger_id: 0, przychody: 100, wydatki: 50, transfery: 0 }], top_kategorie: [], suma_paragonowa: 0, rabaty_lacznie: 0 }), narracja: null }], // zapisanaAnaliza
     { affectedRows: 1 }, { affectedRows: 1 },                              // zapiszWyjscie + zapiszKosztApi (wewnątrz czat())
-    { affectedRows: 1 },                                                   // zapiszRozmowe (INSERT chat_rozmowy)
+    { affectedRows: 1 },                                                   // zapiszRozmowe (UPDATE rezerwacji)
   );
   const routerChat11 = require('../src/routes/chat');
   const res11 = fakeRes();
@@ -209,8 +216,9 @@ const ADMIN = { role: 'admin', uid: 1 };
   zeruj(
     [{ wlaczona: 1 }],
     [{ suma: '0.000000' }],
+    { affectedRows: 1, insertId: 6 }, // rezerwujRozmowe (PRZED fetch)
     [{ dane: JSON.stringify({ ksiegi: [], top_kategorie: [], suma_paragonowa: 0, rabaty_lacznie: 0 }), narracja: null }],
-    { affectedRows: 1 }, // zapiszRozmowe (koszt/model NULL — wynik null)
+    { affectedRows: 1 }, // zapiszRozmowe (UPDATE — koszt zostaje minimalny z rezerwacji)
   );
   const routerChat12 = require('../src/routes/chat');
   const res12 = fakeRes();

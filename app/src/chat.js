@@ -11,10 +11,14 @@ const LIMIT_USD = 5.00;
 // Suma kosztu czatu w BIEŻĄCYM miesiącu kalendarzowym, ŁĄCZNIE (nie per user — decyzja
 // Szymona pyt. 2). Odcięcie liczy się z chat_rozmowy, nie z api_costs (chat_rozmowy jest
 // jedynym miejscem, gdzie koszt czatu jest ZAWSZE zapisany, nawet gdy api_costs padnie).
+// Rozmowa bez znanego kosztu (OpenRouter bywa bez `usage` przy openrouter/auto) liczy się
+// do limitu po MINIMALNEJ stawce — inaczej seria odpowiedzi bez usage nigdy nie ruszyłaby
+// sumy i „twardy" limit byłby fikcją (weryfikacja Z20, K4b).
+const MIN_KOSZT_USD = parseFloat(process.env.CHAT_MIN_KOSZT_USD || '0.01');
 async function wydanoWTymMiesiacu() {
   const [row] = await q(
-    `SELECT COALESCE(SUM(koszt_usd), 0) AS suma FROM chat_rozmowy
-      WHERE DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')`, {});
+    `SELECT COALESCE(SUM(COALESCE(koszt_usd, :min)), 0) AS suma FROM chat_rozmowy
+      WHERE DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')`, { min: MIN_KOSZT_USD });
   return Number(row?.suma) || 0;
 }
 
@@ -147,14 +151,27 @@ function zbudujWiadomosci(kontekst, pytanie) {
   ];
 }
 
-// koszt NULL nie wywala zapisu (K9) — DECIMAL NULL w migracji 023 przyjmuje NULL wprost.
-async function zapiszRozmowe({ userId, okresTyp, okres, szeroki, pytanie, wynik }) {
+// REZERWACJA przed wywołaniem modelu (weryfikacja Z20, K4a): wiersz z kosztem minimalnym
+// wchodzi do bazy ZANIM poleci fetch, więc równoległe żądania widzą nawzajem swoje
+// rezerwacje w sumie limitu — wyścig „obaj czytają starą sumę" przestaje otwierać portfel.
+async function rezerwujRozmowe({ userId, okresTyp, okres, szeroki, pytanie }) {
+  const wynik = await q(
+    `INSERT INTO chat_rozmowy (user_id, okres_typ, okres, szeroki, pytanie, koszt_usd)
+     VALUES (:u, :t, :o, :sz, :p, :koszt)`,
+    { u: userId, t: okresTyp, o: okres, sz: szeroki ? 1 : 0, p: String(pytanie).slice(0, 512), koszt: MIN_KOSZT_USD });
+  return wynik?.insertId ?? null;
+}
+
+// Uzupełnienie rezerwacji odpowiedzią. Koszt: realny z usage, inaczej ZOSTAJE minimalny
+// z rezerwacji (nigdy NULL — patrz wydanoWTymMiesiacu). DECIMAL NULL z 023 wciąż legalny
+// dla starych wierszy.
+async function zapiszRozmowe({ rozmowaId, wynik }) {
   return q(
-    `INSERT INTO chat_rozmowy (user_id, okres_typ, okres, szeroki, pytanie, odpowiedz, model, tokens_in, tokens_out, koszt_usd)
-     VALUES (:u, :t, :o, :sz, :p, :odp, :m, :tin, :tout, :koszt)`,
+    `UPDATE chat_rozmowy SET odpowiedz = :odp, model = :m, tokens_in = :tin, tokens_out = :tout,
+            koszt_usd = COALESCE(:koszt, koszt_usd)
+      WHERE id = :id`,
     {
-      u: userId, t: okresTyp, o: okres, sz: szeroki ? 1 : 0,
-      p: String(pytanie).slice(0, 512), odp: wynik?.tekst ?? null, m: wynik?.model ?? null,
+      id: rozmowaId, odp: wynik?.tekst ?? null, m: wynik?.model ?? null,
       tin: wynik?.tokens?.in ?? null, tout: wynik?.tokens?.out ?? null, koszt: wynik?.koszt ?? null,
     });
 }
@@ -171,6 +188,6 @@ async function popularnePytania(userId, limit = 3) {
 
 module.exports = {
   LIMIT_USD, wydanoWTymMiesiacu, limitOsiagniety, pytanieOSzczegoly, ledgerColDlaScope,
-  budujKontekst, zbudujWiadomosci, zapiszRozmowe, popularnePytania, lataDoPoszerzenia,
+  budujKontekst, zbudujWiadomosci, rezerwujRozmowe, zapiszRozmowe, popularnePytania, lataDoPoszerzenia,
   opisPodsumowania, transakcjeOkresu,
 };

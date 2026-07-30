@@ -158,7 +158,7 @@ async function rysujKoszty(box) {
   box.append(stan);
   if (!dane.pozycje.length) { box.append(el('p', { class: 'msg' }, 'Brak zarejestrowanych kosztów API w tym miesiącu.')); return; }
   box.append(tabelaProsta(['Użytkownik', 'Źródło', 'Koszt (USD)'],
-    dane.pozycje.map((p) => [p.user_name, p.zrodlo, Number(p.koszt).toFixed(4)])));
+    dane.pozycje.map((p) => [p.user_name || '—', p.zrodlo, Number(p.koszt).toFixed(4)])));
 }
 
 async function rysujWyjscia(box) {
