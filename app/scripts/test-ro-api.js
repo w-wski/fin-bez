@@ -293,6 +293,17 @@ const zerujDlaTrasy = (wiersz, ...reszta) => zeruj([wiersz], AKTUALIZACJA, MODAL
   ok(!!wpisDoLogu, 'zapiszDostep faktycznie wywołuje INSERT do access_log (Z11)');
   rowne(wpisDoLogu.par.endpoint, 'ro:/podsumowanie', 'endpoint w rejestrze to "ro:/podsumowanie", konwencja spójna z eksportem');
 
+  // ---------- 21) inspekcja sprintu 2026-07-30: koszyk/drozeje pomijają zarchiwizowane paragony ----------
+  // Regresja, którą to łapie: RO-API liczyło soft-deleted paragony do sum, rozjeżdżając się
+  // z products.js/UI. Grep na źródle — każdy JOIN z receipts w tym pliku musi filtrować żywość.
+  {
+    const zrodlo = require('fs').readFileSync(require('path').join(__dirname, '../src/ro/api.js'), 'utf8');
+    const joinyZReceipts = (zrodlo.match(/JOIN receipts r/g) || []).length;
+    const filtryZywosci = (zrodlo.match(/r\.deleted_at IS NULL|zywyParagon\('r'\)/g) || []).length;
+    ok(joinyZReceipts > 0 && filtryZywosci >= joinyZReceipts,
+      `każdy JOIN receipts w ro/api.js ma filtr żywości (${filtryZywosci}/${joinyZReceipts})`);
+  }
+
   console.log(`\n${bledy === 0 ? 'OK' : 'BŁĄD'}: test-ro-api — ${bledy} błędów`);
   process.exit(bledy === 0 ? 0 : 1);
 })();

@@ -8,6 +8,7 @@ const express = require('express');
 const { q } = require('../db');
 const { requireToken } = require('./auth');
 const { czyData } = require('../ocr/pola');
+const { zywyParagon } = require('../zywe');
 const { wymagajModalnosci } = require('../wylaczniki'); // Z11 (21a): domyślnie WYŁĄCZONE
 
 // zapiszDostep dostarcza Z11 (src/rejestr.js): zapiszDostep(kanal, endpoint, okres, wierszy,
@@ -137,7 +138,9 @@ router.get('/produkty/koszyk', async (req, res, next) => {
     if (!ledgers.length) return res.json({ items: [], bez_produktu: { pozycji: 0, wydano: 0 } });
     const od = czyData(req.query.od), doD = czyData(req.query.do);
     if (!od || !doD) return res.status(400).json({ error: 'bad_period' });
-    const zasieg = `r.ledger_id IN (${inClause(ledgers)}) AND r.receipt_date BETWEEN :od AND :doD`;
+    // zywyParagon (inspekcja sprintu 2026-07-30): zarchiwizowany paragon (Z19) NIE wchodzi
+    // do koszyka RO-API — inaczej token widziałby inne sumy niż products.js/UI.
+    const zasieg = `r.ledger_id IN (${inClause(ledgers)}) AND ${zywyParagon('r')} AND r.receipt_date BETWEEN :od AND :doD`;
     const p = { ...paramy(ledgers), od, doD };
     const rows = await q(
       `SELECT p.name, p.unit, pc.name AS kategoria, COUNT(*) AS zakupow,
@@ -181,7 +184,7 @@ router.get('/produkty/drozeje', async (req, res, next) => {
          FROM receipt_items i
          JOIN receipts r ON r.id = i.receipt_id
          JOIN products p ON p.id = i.product_id
-        WHERE r.ledger_id IN (${inClause(ledgers)}) AND i.quantity > 0
+        WHERE r.ledger_id IN (${inClause(ledgers)}) AND ${zywyParagon('r')} AND i.quantity > 0
         GROUP BY p.id
        HAVING teraz IS NOT NULL AND poprzednio IS NOT NULL AND poprzednio > 0
         ORDER BY (teraz - poprzednio) / poprzednio DESC LIMIT 100`, { ...paramy(ledgers), od, doD });
