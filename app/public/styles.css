@@ -56,6 +56,28 @@
   --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
 
+  /* Z21 (pkt 3): oddech — odstęp MIĘDZY sekcjami tematycznymi musi być wyraźnie większy
+     niż odstęp WEWNĄTRZ jednej sekcji, w każdej karcie/widoku. `--oddech-element` to
+     alias czytelny w miejscach, gdzie dotąd stał literał --space-2/3 (pola, wiersze
+     jednej listy); `--oddech-sekcja` zastępuje --space-4/5 tam, gdzie dwie różne treści
+     stykały się bez odstępu (nagłówek sekcji, grupa propozycji, blok karty). Wpis
+     (#view-wpis) NIE używa `--oddech-sekcja` — zostaje na dotychczasowej gęstości
+     (decyzja Szymona 07-30: „bez zmian zagęszczenia w Nowym Wpisie"). */
+  --oddech-element: var(--space-2);
+  --oddech-sekcja:  var(--space-6);
+
+  /* Z21 (pkt 15): skala z-index NAZWANA, jedno miejsce prawdy — komponenty czytają
+     token, nie literał. Kolejność (rosnąco): tło tafli (-1) < treść (auto) < nagłówek
+     < nawigacja < arkusz „Więcej" < toast. Toast leży NAD arkuszem, ale mieszka w innej
+     strefie pionowej ekranu (patrz `.toast`, sekcja 14) — stąd zestawienie wyższego
+     z-index z niekolidującą pozycją, zamiast konkurowania w tym samym pasie (audyt Z21:
+     „toast koliduje strefą z arkuszem"). Kolejka toastów podczas otwartego arkusza żyje
+     w JS (public/js/arkusz.js) — CSS tu tylko odzwierciedla ustaloną hierarchię. */
+  --z-header: 20;
+  --z-nav:    30;
+  --z-sheet:  40;
+  --z-toast:  60;
+
   /* Promienie tafli: 10/16/24/32 zamiast 6/10/16 z wersji papierowej. */
   --r-sm: 10px; --r-md: 16px; --r-lg: 24px; --r-xl: 32px; --r-pill: 999px;
 
@@ -341,7 +363,7 @@ p { text-wrap: pretty; max-width: 65ch; }
 header {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-header);
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -374,7 +396,7 @@ header {
 nav {
   position: fixed;
   left: 0; right: 0; bottom: 0;
-  z-index: 30;
+  z-index: var(--z-nav);
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: var(--space-1);
@@ -418,7 +440,7 @@ nav button.active {
 .sheet-wrap {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-sheet);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -476,6 +498,17 @@ main > section { animation: view-in var(--t-base) var(--ease-glass) backwards; }
 @keyframes view-in { from { opacity: 0; transform: translateY(8px); } }
 
 .stack { display: flex; flex-direction: column; gap: var(--space-4); }
+/* Z21 K1: bloki na poziomie widoku (filtry/tabela/przycisk w Historii, formularz/lista w
+   Imporcie, kafle/wykresy/tabele w Raportach) SĄ sekcjami tematycznymi — dostają
+   --oddech-sekcja zamiast --space-4. #view-wpis wyłączony wprost (decyzja Szymona:
+   gęstość Nowego Wpisu zostaje bez zmian). Selektor celuje tylko w BEZPOŚREDNIE dziecko
+   sekcji, więc `.stack` zagnieżdżony głębiej (np. .an-wynik) nie jest tym ruszany. */
+main > section:not(#view-wpis) > .stack { gap: var(--oddech-sekcja); }
+/* Odstęp między-sekcjami niesie już `gap` kontenera powyżej — margines górny nagłówka,
+   który jest PIERWSZYM dzieckiem takiego bloku, zdublowałby ten sam oddech. Header
+   zachowuje tylko margines DO swojej treści (margin-bottom), nie NAD sobą. */
+main > section:not(#view-wpis) > .stack > * > h2:first-child,
+main > section:not(#view-wpis) > .stack > * > h3:first-child { margin-top: 0; }
 
 /* ---------- 11. Przełącznik motywu — jedna kropka ----------
    To nie jest funkcja do eksponowania: kropka pokazuje stan wypełnieniem
@@ -754,6 +787,22 @@ input[type="month"]::-webkit-date-and-time-value {
   box-shadow: inset 0 1px 0 var(--glass-rim);
 }
 
+/* Z21 K3: pasek okresu (public/js/pasek-okresu.js) — jeden wygląd wszędzie, gdzie
+   Raporty/Analizy/Historia wybierają miesiąc/kwartał/rok. `.po-typy` DZIEDZICZY już
+   pełen wygląd `.chips` (w tym wariant skóry „Sygnał", patrz css/sygnal.css) — tu tylko
+   dokładamy pasek strzałek i etykietę okresu, których `.chips` nie ma. */
+.po-pasek { display: flex; flex-direction: column; gap: var(--oddech-element); }
+.po-strzalki { align-items: center; justify-content: space-between; gap: var(--space-2); }
+.po-strzalki > .btn { flex: 0 0 auto; }
+.po-okres-label {
+  flex: 1;
+  text-align: center;
+  font: 600 var(--fs-body)/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
 /* Komunikat pod formularzem. Kolor nie jest jedynym nośnikiem — jest też rant i tło. */
 .msg { margin: 0; font: 400 var(--fs-cap)/1.45 var(--font); color: var(--ink-muted); }
 .msg.ok, .msg.err {
@@ -776,12 +825,24 @@ input[type="month"]::-webkit-date-and-time-value {
 }
 
 /* ---------- 13. Dane: tabele, KPI, słupki, pigułki ---------- */
+/* Z21 K1: nagłówek sekcji dostaje ODDECH — odstęp od TEGO, co jest nad nim (poprzedni
+   temat), wyraźnie większy niż odstęp do treści POD nim (--space-2, ta sama sekcja).
+   Wspólne dla wszystkich kart poza Wpisem (tam h2 się nie pojawia — .page-title jest
+   ukryty, patrz sekcja 7), więc reguła nie musi wykluczać #view-wpis wprost. */
 h2 {
   font: 600 var(--fs-body-lg)/1.2 var(--font);
   color: var(--ink);
-  margin: var(--space-5) 0 var(--space-2);
+  margin: var(--oddech-sekcja) 0 var(--space-2);
   text-transform: none;
   letter-spacing: -0.01em;
+}
+
+/* Sub-nagłówek WEWNĄTRZ karty (np. „Top 5 kategorii", „Paragony", „Omówienie" w Analizach)
+   — sam temat, ta sama logika oddechu co h2, w skali o oczko mniejszej. */
+h3 {
+  font: 600 var(--fs-body)/1.2 var(--font);
+  color: var(--ink);
+  margin: var(--oddech-sekcja) 0 var(--space-2);
 }
 
 table { width: 100%; border-collapse: collapse; font-size: var(--fs-cap); }
@@ -849,7 +910,7 @@ td.exp { color: var(--minus); } td.inc { color: var(--plus); } td.trf { color: v
   left: var(--space-3);
   right: var(--space-3);
   bottom: calc(100px + env(safe-area-inset-bottom, 0px));
-  z-index: 60;
+  z-index: var(--z-toast);
   margin: 0 auto;
   max-width: 34rem;
   display: flex;

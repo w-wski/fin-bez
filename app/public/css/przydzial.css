@@ -4,13 +4,16 @@
    `.row > *` z styles.css rozciąga dzieci na równo — tu prawie wszystko ma być
    szerokości treści, dlatego jawne `flex: 0 1 auto`. */
 
-#przydzialBox { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Z21 K1: sekcje tematyczne widoku (pasek narzędzi, lista grup, „bez kategorii") dostają
+   --oddech-sekcja; WEWNĄTRZ jednej grupy zostaje gęściej (--space-2/3, patrz niżej). */
+#przydzialBox { display: flex; flex-direction: column; gap: var(--oddech-sekcja); }
 
 .prz-tools { align-items: center; }
 .prz-tools > select { flex: 0 1 12rem; }
 .prz-licznik { flex: 0 1 auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.prz-lista { display: flex; flex-direction: column; gap: var(--space-2); }
+/* Grupy propozycji — każda jest osobną decyzją/tematem, więc też dostają oddech. */
+.prz-lista { display: flex; flex-direction: column; gap: var(--oddech-sekcja); }
 
 /* Jedna grupa = jedna decyzja jednym kliknięciem. Grupy przychodzą z serwera
    posortowane po liczbie wpisów malejąco, więc na górze jest to, co zamyka

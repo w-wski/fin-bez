@@ -36,7 +36,8 @@
 
 /* ---------- Administracja: drzewo kategorii ---------- */
 
-#adminBox { display: flex; flex-direction: column; gap: var(--space-3); }
+/* Z21 K1: pasek narzędzi / drzewo / wyjaśnienie to trzy tematy osobne — oddech. */
+#adminBox { display: flex; flex-direction: column; gap: var(--oddech-sekcja); }
 
 .admin-tools { align-items: center; }
 .admin-tools > label { flex: 0 1 auto; min-width: 0; white-space: nowrap; min-height: 44px; }

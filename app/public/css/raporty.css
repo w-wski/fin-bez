@@ -210,3 +210,15 @@
 /* #kpi jest samo w sobie siatką (`.kpi`) — przycisk zwijania musi zająć CAŁY rząd,
    inaczej wciśnie się między kafle jako kolejna, krzywa kratka. */
 .kpi > .kafel-naglowek { grid-column: 1 / -1; }
+
+/* Z21 K4: treść wracająca po rozwinięciu dostaje wejście WYŁĄCZNIE transform/opacity
+   (§4.1 briefu), ≤200 ms. `hidden` przełącza się w JS natychmiast (display) — to nie
+   jest animacja layoutu, tylko wygląd treści, która już zajęła swoje miejsce w chwili,
+   gdy przeglądarka zaczyna ją malować. Ten sam trik co `#catAddBox .catadd`/`view-in`:
+   CSS-owa animacja odpala się sama przy przejściu z `display:none` na widoczny —
+   rozwinięcie nie wymaga żadnej zmiany w JS. */
+[data-kafel] > *:not(.kafel-naglowek) { animation: kafel-in var(--t-fast) var(--ease-glass); }
+@keyframes kafel-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  [data-kafel] > *:not(.kafel-naglowek) { animation: none; }
+}

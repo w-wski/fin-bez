@@ -4,33 +4,33 @@
    (poniżej iOS sam przybliża stronę przy wejściu w input). */
 
 /* ---------- LISTA PARAGONÓW (droga powrotu do niedokończonego odczytu) ---------- */
-#rc-start .rc-lista-tytul { margin: 1rem 0 .3rem; font-size: 1rem; }
-#rc-start .rc-lista-paragonow { display: flex; flex-direction: column; gap: .4rem; }
+#rc-start .rc-lista-tytul { margin: var(--oddech-sekcja) 0 var(--space-2); font-size: var(--fs-body-lg); }
+#rc-start .rc-lista-paragonow { display: flex; flex-direction: column; gap: var(--space-2); }
 #rc-start .rc-wiersz {
-  display: grid; grid-template-columns: auto 1fr auto; gap: .2rem var(--space-3); align-items: center;
+  display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-1) var(--space-3); align-items: center;
   min-height: 44px; text-align: left; padding: var(--space-2) var(--space-3);
   border-radius: var(--r-sm);
 }
-#rc-start .rc-w-data { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+#rc-start .rc-w-data { color: var(--ink-muted); font-size: var(--fs-cap); font-variant-numeric: tabular-nums; }
 #rc-start .rc-w-sklep { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #rc-start .rc-w-suma { font-variant-numeric: tabular-nums; }
-#rc-start .rc-w-status { grid-column: 1 / -1; justify-self: start; font-size: .75rem; }
+#rc-start .rc-w-status { grid-column: 1 / -1; justify-self: start; font-size: var(--fs-micro); }
 
 /* ---------- NAGŁÓWEK PARAGONU ---------- */
-#rcResult .rc-wroc { margin-bottom: .5rem; }
-#rcResult .rc-status { margin-bottom: .5rem; }
+#rcResult .rc-wroc { margin-bottom: var(--space-2); }
+#rcResult .rc-status { margin-bottom: var(--space-2); }
 #rcResult .rc-naglowek {
   display: grid; grid-template-columns: 1fr; gap: var(--space-2);
   border: 1px solid var(--glass-edge); border-radius: var(--r-md);
   background: var(--glass-fill); box-shadow: inset 0 1px 0 var(--glass-rim);
   padding: var(--space-3); margin-bottom: var(--space-3);
 }
-#rcResult .rc-pole { display: flex; flex-direction: column; align-items: stretch; gap: .15rem; font-size: .9rem; }
-#rcResult .rc-pole > span { color: var(--muted); font-size: .78rem; }
-#rcResult .rc-naglowek .rc-suma { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+#rcResult .rc-pole { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); font-size: var(--fs-body); }
+#rcResult .rc-pole > span { color: var(--ink-muted); font-size: var(--fs-micro); }
+#rcResult .rc-naglowek .rc-suma { font-size: var(--fs-h3); font-variant-numeric: tabular-nums; }
 
 /* ---------- POZYCJA JAKO KARTA ---------- */
-#rcResult .rc-lista { display: flex; flex-direction: column; gap: .6rem; }
+#rcResult .rc-lista { display: flex; flex-direction: column; gap: var(--space-3); }
 #rcResult .rc-poz {
   border: 1px solid var(--glass-edge); border-radius: var(--r-md);
   background: var(--glass-fill); box-shadow: inset 0 1px 0 var(--glass-rim);
@@ -40,36 +40,36 @@
 /* K6: pozycja niespójna (ilość × cena ≠ wartość) — widoczna, ale nadal w pełni edytowalna */
 #rcResult .rc-poz.lowconf { border-color: var(--danger); background: var(--tint-minus); }
 
-#rcResult .rc-l1 { display: flex; align-items: center; gap: .4rem; }
-#rcResult .rc-nr { color: var(--muted); font-size: .8rem; min-width: 1.4rem; text-align: right; }
+#rcResult .rc-l1 { display: flex; align-items: center; gap: var(--space-2); }
+#rcResult .rc-nr { color: var(--ink-muted); font-size: var(--fs-cap); min-width: 1.4rem; text-align: right; }
 #rcResult .rc-l1 .rc-kod { flex: 1; font-weight: 600; }
 #rcResult .rc-kosz { flex: 0 0 auto; min-width: 44px; min-height: 44px; color: var(--danger); }
 
-#rcResult .rc-siatka { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+#rcResult .rc-siatka { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 #rcResult .rc-siatka input { font-variant-numeric: tabular-nums; }
 
-#rcResult input, #rcResult select { min-height: 44px; font-size: 1rem; }
+#rcResult input, #rcResult select { min-height: 44px; font-size: var(--fs-body-lg); }
 #rcResult .rc-hint .btn, #rcResult .rc-blad .btn { min-height: 36px; }   /* drugoplanowe, w linii tekstu */
 
 /* ---------- PODPOWIEDŹ ZE SŁOWNIKA I ORYGINAŁ OCR (K3) ---------- */
-#rcResult .rc-hint { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; font-size: .82rem; }
+#rcResult .rc-hint { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; font-size: var(--fs-cap); }
 #rcResult .rc-hint:empty { display: none; }
-#rcResult .rc-znak { color: var(--muted); }
+#rcResult .rc-znak { color: var(--ink-muted); }
 #rcResult .rc-uzyj { background: var(--accent-quiet); border-color: var(--accent); color: var(--accent); }
-#rcResult .rc-hint .btn { font-size: .82rem; padding: .3rem .55rem; text-align: left; }
+#rcResult .rc-hint .btn { font-size: var(--fs-cap); padding: var(--space-1) var(--space-2); text-align: left; }
 
 /* ---------- OSTRZEŻENIA (K6/K7): informują, nie blokują ---------- */
 #rcResult .rc-blad {
-  display: flex; flex-wrap: wrap; gap: .4rem; align-items: center;
-  font-size: .82rem; color: var(--danger);
+  display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center;
+  font-size: var(--fs-cap); color: var(--danger);
 }
 #rcResult .rc-blad[hidden] { display: none; }
 #rcResult .rc-sumy {
-  display: flex; flex-wrap: wrap; gap: .3rem 1rem; align-items: baseline;
-  margin: .7rem 0 .3rem; font-size: .9rem; font-variant-numeric: tabular-nums;
+  display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); align-items: baseline;
+  margin: var(--space-3) 0 var(--space-1); font-size: var(--fs-body); font-variant-numeric: tabular-nums;
 }
 #rcResult .rc-roznica { color: var(--danger); font-weight: 600; }
-#rcResult .rc-akcje { gap: .5rem; }
+#rcResult .rc-akcje { gap: var(--space-2); }
 #rcResult .rc-akcje .btn { min-height: 44px; }
 
 /* ---------- WARTOŚĆ, KTÓREJ SERWER NIE PRZYJĄŁ ---------- */
@@ -101,7 +101,7 @@
    i z czytnikiem ekranu bez ani jednej linii JS, a `capture` (od razu aparat) siedzi
    TYLKO przy pierwszym z nich. Jedno wspólne pole nie dało się tak podzielić: z `capture`
    telefon nie pokazywał plików z dysku, bez `capture` nie otwierał aparatu. */
-.rc-zrodla { gap: var(--space-2); margin-bottom: var(--space-3); }
+.rc-zrodla { gap: var(--space-2); margin-bottom: var(--oddech-sekcja); }
 .rc-zrodlo {
   flex: 1 1 8rem;
   min-width: 7rem;
@@ -117,22 +117,22 @@
 /* Scalanie pozycji z katalogiem produktów (paragon-produkt.js).
    Stan jest widoczny bez klikania: kropka pełna = produkt przypisany, pusta = jeszcze nie.
    „Nieprzypisany" to normalny stan nowego towaru, nie błąd — stąd ton neutralny, nie alarmowy. */
-.rc-prod { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; }
-.rc-prod-stan { display: inline-flex; align-items: center; gap: .15rem;
-  font-size: .875rem; color: var(--ink-muted); min-width: 0; }
+.rc-prod { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+.rc-prod-stan { display: inline-flex; align-items: center; gap: var(--space-1);
+  font-size: var(--fs-cap); color: var(--ink-muted); min-width: 0; }
 .rc-prod-ok { color: var(--plus); }
 .rc-prod-brak { color: var(--ink-faint); }
-.rc-prod-panel { flex: 1 0 100%; display: flex; flex-direction: column; gap: .5rem;
-  padding: .625rem; border: 1px solid var(--line); border-radius: .625rem;
-  background: var(--panel-deep, var(--panel)); }
-.rc-prod-info, .rc-prod-czekaj { margin: 0; font-size: .8125rem; color: var(--ink-muted); }
-.rc-prod-lista { display: flex; flex-direction: column; gap: .375rem; }
+.rc-prod-panel { flex: 1 0 100%; display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--glass-fill-sunken); }
+.rc-prod-info, .rc-prod-czekaj { margin: 0; font-size: var(--fs-cap); color: var(--ink-muted); }
+.rc-prod-lista { display: flex; flex-direction: column; gap: var(--space-2); }
 .rc-prod-kand { display: flex; justify-content: space-between; align-items: center;
-  gap: .5rem; width: 100%; text-align: left; }
+  gap: var(--space-2); width: 100%; text-align: left; }
 .rc-prod-nazwa { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Pewność dopasowania zawsze na wierzchu: człowiek ma wiedzieć, czy potwierdza pewniaka,
    czy dopasowanie tuż nad progiem. Bez tej liczby „propozycja" brzmi jak „to jest to". */
-.rc-prod-pewnosc { flex: 0 0 auto; font-size: .75rem; color: var(--ink-faint);
+.rc-prod-pewnosc { flex: 0 0 auto; font-size: var(--fs-micro); color: var(--ink-faint);
   font-variant-numeric: tabular-nums; }
 .rc-prod-szukaj { width: 100%; }
 .rc-prod-odlacz { align-self: flex-start; }
