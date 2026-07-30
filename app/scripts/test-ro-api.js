@@ -1,13 +1,9 @@
-#!/usr/bin/env node
 // Testy Z10 (API tylko-do-odczytu + tokeny, pkt 16+18) na PODSTAWIONEJ bazie —
 // wzorzec z test-produkt-baza.js / test-rejestry.js.
-//
-// Czego te testy NIE dowodzą: że SQL jest poprawny dla MySQL-a (bez serwera się nie da).
-// Czego dowodzą: że sekret NIGDY nie trafia do bazy (tylko hash), że 401 nie zdradza,
-// czy token istniał ani czy droga jest administracyjnie wyłączona (kolejność: token PRZED
-// modalnością), że router jest ślepy na wszystko poza GET, że zasięg z tokenu WYŁĄCZNIE
-// zawęża (nigdy nie rozszerza, a pusty/białoznakowy scope_ledgers jest fail-closed), że
-// żaden GET nie zwraca pól osobowych, i że przycięta lista /wpisy się do tego przyznaje.
+// NIE dowodzą poprawności SQL dla MySQL-a (bez serwera się nie da). Dowodzą: sekret nigdy
+// w bazie (tylko hash); 401 nie zdradza czy token istniał (token PRZED modalnością); router
+// ślepy poza GET; zasięg tokenu tylko zawęża (pusty scope_ledgers = fail-closed); zero pól
+// osobowych w odpowiedziach; przycięta lista /wpisy się do tego przyznaje.
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
@@ -294,11 +290,9 @@ const zerujDlaTrasy = (wiersz, ...reszta) => zeruj([wiersz], AKTUALIZACJA, MODAL
   rowne(wpisDoLogu.par.endpoint, 'ro:/podsumowanie', 'endpoint w rejestrze to "ro:/podsumowanie", konwencja spójna z eksportem');
 
   // ---------- 21) inspekcja 2026-07-30: RO-API pomija zarchiwizowane paragony (Z19) ----------
-  {
-    const zrodlo = require('fs').readFileSync(require('path').join(__dirname, '../src/ro/api.js'), 'utf8');
-    ok(/const zasieg = [^;]*zywyParagon\('r'\)/.test(zrodlo), 'koszyk RO-API: żywość we wspólnym `zasieg`');
-    ok(/zywyParagon\('r'\)[^;]*AND i\.quantity > 0/.test(zrodlo), 'drozeje RO-API: żywość w WHERE');
-  }
+  const zrodloRo = fs.readFileSync(path.join(__dirname, '../src/ro/api.js'), 'utf8');
+  ok(/const zasieg = [^;]*zywyParagon\('r'\)/.test(zrodloRo), 'koszyk RO-API: żywość we wspólnym `zasieg`');
+  ok(/zywyParagon\('r'\)[^;]*AND i\.quantity > 0/.test(zrodloRo), 'drozeje RO-API: żywość w WHERE');
 
   console.log(`\n${bledy === 0 ? 'OK' : 'BŁĄD'}: test-ro-api — ${bledy} błędów`);
   process.exit(bledy === 0 ? 0 : 1);
