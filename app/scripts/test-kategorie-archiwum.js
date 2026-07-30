@@ -53,6 +53,17 @@ const DOM = [
     assert.ok(!/\bamount\b|\btx_date\b|\bdescription\b/.test(arch[0]), 'nie wolno dotykać kwoty/daty/opisu: ' + arch[0]);
   });
 
+  await ta('K3 (weryfikacja Z16): wpisy w Koszu ZACHOWUJĄ kategorię — JOIN filtruje deleted_at IS NULL', async () => {
+    // Scenariusz porażki, który to łapie: usuń wpis → zarchiwizuj jego kategorię → przywróć
+    // wpis. Bez filtra w JOIN restore odzyskiwał wpis BEZ kategorii (cichy, nieodwracalny ubytek).
+    const { pula, log } = atrapaPuli(DOM);
+    await zapiszPatch(3, 1, polaPatcha({ active: 0 }), pula);
+    for (const sql of zapisyArch(log)) {
+      assert.ok(/transactions\.deleted_at IS NULL/.test(sql),
+        'JOIN nulujący category_id musi omijać wpisy z Kosza: ' + sql);
+    }
+  });
+
   await ta('K3: archiwizacja z kaskadą NULL-uje wpisy rodzica I dzieci — po jednej instrukcji na każdy', async () => {
     const { pula, log } = atrapaPuli(DOM);
     const w = await zapiszPatch(1, 1, polaPatcha({ active: 0, cascade: true }), pula);

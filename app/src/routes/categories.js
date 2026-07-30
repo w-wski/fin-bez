@@ -250,9 +250,14 @@ async function zapiszPatch(id, ledger, plan, zrodlo = pool) {
     }
     // K3: wpisy ZOSTAJĄ z kwotami, tracą tylko kategorię i czekają w Przydział — archiwizacja
     // NULL-uje category_id w TEJ SAMEJ instrukcji (LEFT JOIN: kategoria bez wpisów też się zapisze).
+    // Wpisy w Koszu (deleted_at) ZACHOWUJĄ kategorię (weryfikacja Z16): NULL-owanie ich byłoby
+    // nieodwracalnym ubytkiem — restore z Kosza nie umie odzyskać kategorii, a wpis z Kosza
+    // i tak nie trafia do kolejki Przydziału. Po restore wpis wskazuje kategorię zarchiwizowaną,
+    // co jest widoczne i odwracalne ręcznie — w przeciwieństwie do cichej utraty.
     if (plan.active === 0) {
       await conn.execute(
-        `UPDATE categories LEFT JOIN transactions ON transactions.category_id = categories.id
+        `UPDATE categories LEFT JOIN transactions
+            ON transactions.category_id = categories.id AND transactions.deleted_at IS NULL
            SET ${plan.sets.join(', ')}, transactions.category_id = NULL WHERE categories.id = ?`,
         [...plan.values, id]);
     } else {
@@ -260,7 +265,8 @@ async function zapiszPatch(id, ledger, plan, zrodlo = pool) {
     }
     if (dzieci.length) {
       await conn.execute(
-        `UPDATE categories LEFT JOIN transactions ON transactions.category_id = categories.id
+        `UPDATE categories LEFT JOIN transactions
+            ON transactions.category_id = categories.id AND transactions.deleted_at IS NULL
            SET active = 0, transactions.category_id = NULL WHERE parent_id = ? AND active = 1`, [id]);
     }
     await conn.commit();
