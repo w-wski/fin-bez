@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS analizy (
   okres VARCHAR(10) NOT NULL,               -- '2026-07' / '2026-Q3' / '2026'
   ledger_id TINYINT UNSIGNED NOT NULL DEFAULT 0,   -- 0 = obie księgi (patrz komentarz wyżej)
   dane JSON NOT NULL,                       -- liczby — kształt patrz src/analizy.js#policzOkres
-  narracja TEXT NULL,                       -- tekst modelu; NULL gdy offline (brak dostawcy/wyłącznik)
-  model VARCHAR(48) NULL,                   -- np. 'claude-sonnet-5'; NULL gdy narracja jest NULL
+  narracja TEXT NULL,                       -- tekst modelu, NULL gdy offline (brak dostawcy albo wyłącznik)
+  model VARCHAR(48) NULL,                   -- np. claude-sonnet-5, NULL gdy narracja jest NULL
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_analiza_okres (okres_typ, okres, ledger_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_polish_ci;

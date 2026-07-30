@@ -203,13 +203,18 @@ router.post('/book', async (req, res, next) => {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
-      // Wyciąg bankowy z definicji nie jest gotówką (Z6) — forma płatności jest tu twarda,
-      // nie domyślna: nikt nie może jej zmienić przy zaksięgowaniu, bo to nie decyzja użytkownika.
+      // Wyciąg bankowy z definicji nie jest gotówką (Z6) — forma płatności jest twarda, nie
+      // domyślna: nikt nie zmienia jej przy zaksięgowaniu, bo to nie decyzja użytkownika.
+      // ALE inwariant „TRANSFER nie ma formy płatności" jest silniejszy: gdy dominujący typ
+      // kategorii to TRANSFER (spłaty, cele z CSV), wpis dostaje NULL, nie 'ELEKTRONICZNA' —
+      // inaczej wypuszczalibyśmy na zewnątrz wartość, której API potem nie da się skorygować
+      // (migracja 015 + platnosc.js#platnoscDoPatcha odmawiają zmiany płatności przy TRANSFER).
+      const platnosc = typ === 'TRANSFER' ? null : 'ELEKTRONICZNA';
       const [r] = await conn.execute(
         `INSERT INTO transactions (ledger_id, user_id, tx_date, type, amount, currency, payment_method, category_id, description, source, bank_tx_id)
-         VALUES (?, ?, ?, ?, ?, ?, 'ELEKTRONICZNA', ?, ?, 'CSV', ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'CSV', ?)`,
         [bt.ledger_id, req.user.uid, bt.transaction_date,
-         typ, Math.abs(bt.amount), bt.currency,
+         typ, Math.abs(bt.amount), bt.currency, platnosc,
          effectiveCategory,
          [bt.counterparty, bt.title].filter(Boolean).join(' — ').slice(0, 512) || null,
          bt.id]);

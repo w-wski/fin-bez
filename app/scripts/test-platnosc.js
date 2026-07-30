@@ -75,14 +75,19 @@ t('PATCH: wpis typu TRANSFER odrzuca payment_method, także przy zmianie typu NA
     { error: 'payment_method_not_applicable' });
 });
 
-// ---------- twarda ELEKTRONICZNA przy imporcie bankowym ----------
-// imports.js /book nie bierze payment_method OD NIKĄD — wpisuje literał 'ELEKTRONICZNA' wprost
-// do zapytania SQL. Sprawdzamy to na źródle, żeby literówka w SQL-u nie przeszła cicho.
+// ---------- płatność przy imporcie bankowym ----------
+// imports.js /book nie bierze payment_method z żądania: wyciąg bankowy z definicji nie jest
+// gotówką, więc wpis zwykły dostaje 'ELEKTRONICZNA'. WYJĄTEK silniejszy od tej reguły: gdy
+// dominujący typ kategorii to TRANSFER (spłaty/cele z CSV), wpis MUSI dostać NULL — inaczej
+// wypuszczamy na zewnątrz płatność transferu, której API potem nie da się skorygować.
+// Sprawdzamy oba na źródle (brak bazy w tym środowisku): jest zmienna `platnosc` zależna od typu.
 
-t('import bankowy: INSERT wpisuje twardą ELEKTRONICZNA, nie zmienną z żądania', () => {
+t('import bankowy: płatność zależy od typu — TRANSFER → NULL, reszta → ELEKTRONICZNA', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'routes', 'imports.js'), 'utf8');
-  assert.ok(/INSERT INTO transactions[\s\S]*?payment_method[\s\S]*?VALUES\s*\([\s\S]*?'ELEKTRONICZNA'/.test(src),
-    'INSERT z /book musi mieć literał ELEKTRONICZNA przy payment_method');
+  assert.ok(/typ === 'TRANSFER'\s*\?\s*null\s*:\s*'ELEKTRONICZNA'/.test(src),
+    'w /book płatność musi być: TRANSFER → null, inaczej ELEKTRONICZNA');
+  assert.ok(!/VALUES\s*\([^)]*'ELEKTRONICZNA'[^)]*\)/.test(src),
+    'INSERT nie może już mieć literału ELEKTRONICZNA w VALUES — wartość idzie parametrem');
 });
 
 // ---------- mapowanie payment z paragonu ----------

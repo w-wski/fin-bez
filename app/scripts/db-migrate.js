@@ -36,7 +36,12 @@ require('../src/config'); // ładuje .env
 
   for (const f of files) {
     if (doneSet.has(f)) { console.log('SKIP', f); continue; }
-    const sql = fs.readFileSync(path.join(dir, f), 'utf8').replace(/^\s*--.*$/gm, ''); // usuń komentarze liniowe
+    // Usuwamy komentarze `--` do końca linii — TAKŻE inline (kod, potem `--`), nie tylko
+    // pełnoliniowe. Wcześniej czyszczone było wyłącznie `^\s*--`, więc średnik w komentarzu
+    // po kodzie (`kolumna, -- np. 1; 2`) rozcinał CREATE TABLE na kawałki i migracja padała
+    // z ER_PARSE_ERROR (ubiło to 018, a potem 020). Migracje w tym repo nie zawierają `--`
+    // wewnątrz literałów, więc obcięcie do końca linii jest bezpieczne.
+    const sql = fs.readFileSync(path.join(dir, f), 'utf8').replace(/--.*$/gm, '');
     // wykonuj statement po statemencie, tolerując „już istnieje"
     const stmts = sql.split(';').map((s) => s.trim()).filter(Boolean);
     for (const stmt of stmts) {
