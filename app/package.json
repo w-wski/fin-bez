@@ -7,7 +7,7 @@
     "start": "node app.js",
     "migrate": "node scripts/db-migrate.js",
     "import-xlsx": "node scripts/migrate-xlsx.js",
-    "test": "node scripts/test-kwota.js && node scripts/test-parsers.js && node scripts/test-platnosc.js && node scripts/test-receipt-parser.js && node scripts/test-opusty.js && node scripts/test-kategorie.js && node scripts/test-okresy.js && node scripts/test-eparagon.js && node scripts/test-pdf-obraz.js && node scripts/test-ocr-worker.js && node scripts/test-produkty.js && node scripts/test-produkt-baza.js && node scripts/test-slownik-aliasy.js && node scripts/test-reorganize.js && node scripts/test-uklad.js && node scripts/test-rejestry.js && node scripts/test-ro-api.js && node scripts/preflight.js",
+    "test": "node scripts/test-kwota.js && node scripts/test-parsers.js && node scripts/test-platnosc.js && node scripts/test-receipt-parser.js && node scripts/test-opusty.js && node scripts/test-kategorie.js && node scripts/test-okresy.js && node scripts/test-eparagon.js && node scripts/test-pdf-obraz.js && node scripts/test-ocr-worker.js && node scripts/test-produkty.js && node scripts/test-produkt-baza.js && node scripts/test-slownik-aliasy.js && node scripts/test-reorganize.js && node scripts/test-uklad.js && node scripts/test-rejestry.js && node scripts/test-ro-api.js && node scripts/test-analizy.js && node scripts/test-raport-wpisy.js && node scripts/preflight.js",
     "preflight": "node scripts/preflight.js"
   },
   "engines": {

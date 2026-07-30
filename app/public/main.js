@@ -12,6 +12,7 @@ import { initParagon } from './js/paragon.js';
 import { initAdmin } from './js/admin.js';
 import { initPrzydzial } from './js/przydzial.js';
 import { initProdukty, loadProdukty } from './js/produkty.js';
+import { initAnalizy, loadAnalizy } from './js/analizy.js';
 
 const OPEN = {
   historia: () => loadHist(true),
@@ -20,6 +21,7 @@ const OPEN = {
   admin: () => refreshers.admin?.(),
   przydzial: () => refreshers.przydzial?.(),
   produkty: () => loadProdukty(),
+  analizy: () => loadAnalizy(),
   // 'paragon' celowo nie ma wpisu: js/paragon-lista.js sam nasłuchuje kliknięcia w kartę.
   // Wpis tutaj powodowałby drugie, identyczne pobranie listy przy każdym wejściu.
 };
@@ -47,6 +49,7 @@ async function init() {
   initAdmin();
   initPrzydzial();
   initProdukty();
+  initAnalizy();
   $('#catMain').onchange = onCatMain;
   initParagon();
 

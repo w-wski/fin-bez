@@ -1,7 +1,7 @@
 // ro/auth.js — tokeny API tylko-do-odczytu (Z10, pkt 16+18). NAJWYŻSZA OSTROŻNOŚĆ: to
 // jedyna droga, którą dane finansowe rodziny wychodzą poza aplikację (Claude i dashboard —
 // obaj TĄ SAMĄ drogą, ten sam token). Token NIE ma własnej tożsamości: dziedziczy zasięg
-// ksiąg z properties.owner (`user_id` → ledgerScope), a `scope_ledgers` może go wyłącznie
+// ksiąg z WŁAŚCICIELA (`user_id` → ledgerScope), a `scope_ledgers` może go wyłącznie
 // ZAWĘZIĆ, nigdy rozszerzyć — literówka w konfiguracji ma dać mniej danych, nie więcej.
 //
 // Router (ro/api.js) używa stąd WYŁĄCZNIE `requireToken` i nie pisze do bazy. Zapis w tym
@@ -27,10 +27,16 @@ function generujSekret() {
 
 // Zasięg efektywny tokenu: przecięcie ról właściciela (ledgerScope) z ewentualnym
 // zawężeniem scope_ledgers. Token NIGDY nie poszerza zasięgu właściciela.
+// NULL (brak wartości w bazie) = pełen zasięg właściciela — to jedyny przypadek pełnego
+// zasięgu. Pusty/białoznakowy napis TO NIE JEST "brak zawężenia" — to fail-closed: ktoś
+// zapisał wartość, która nie parsuje się na żadną księgę, więc token nie widzi ŻADNEJ,
+// zamiast po cichu dostać pełny dostęp właściciela.
 function zasiegTokenu(user, scopeLedgers) {
   const wlasciciela = ledgerScope(user).ledgers;
-  if (!scopeLedgers) return wlasciciela;
-  const zawezenie = String(scopeLedgers).split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
+  if (scopeLedgers === null || scopeLedgers === undefined) return wlasciciela;
+  const tekst = String(scopeLedgers).trim();
+  if (!tekst) return [];
+  const zawezenie = tekst.split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
   return wlasciciela.filter((l) => zawezenie.includes(l));
 }
 
@@ -43,24 +49,24 @@ async function requireToken(req, res, next) {
   if (!dop || !dop[1].startsWith(PREFIX)) return DENY();
   try {
     const hash = haszuj(dop[1]);
+    // Bez dodatkowego porównania hasha w JS (i bez crypto.timingSafeEqual): WHERE wymaga
+    // DOKŁADNEJ równości sha256 po stronie MySQL (indeks UNIQUE) — to lookup po nieodwracalnym
+    // 256-bitowym skrócie, nie porównanie sekretu znak-po-znaku. Atakujący nie ma jak sterować
+    // pojedynczymi bajtami hasha, żeby wykorzystać różnicę czasu odpowiedzi — nie ma tu więc
+    // klasycznego wektora ataku czasowego, a druga weryfikacja w JS dawała złudne poczucie
+    // bezpieczeństwa bez realnej ochrony.
     const rows = await q(
-      `SELECT api_tokens.id, api_tokens.token_hash, api_tokens.scope_ledgers, api_tokens.revoked_at,
-              users.id AS uid, users.name, users.role
+      `SELECT api_tokens.id, api_tokens.name AS token_name, api_tokens.scope_ledgers,
+              api_tokens.revoked_at, users.id AS uid, users.role
          FROM api_tokens JOIN users ON users.id = api_tokens.user_id
         WHERE api_tokens.token_hash = :h AND users.active = 1`, { h: hash });
     if (!rows.length) return DENY();
     const row = rows[0];
-    // Porównanie hasza stałoczasowe: nawet że WHERE już dopasował wiersz po indeksie,
-    // druga, jawna weryfikacja w JS ma identyczny koszt niezależnie od treści — to ostatnia
-    // linia obrony przed atakiem czasowym, gdyby kiedyś ktoś zmienił zapytanie na LIKE/skan.
-    const bufA = Buffer.from(hash, 'utf8');
-    const bufB = Buffer.from(row.token_hash || '', 'utf8');
-    const pasuje = bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
-    if (!pasuje || row.revoked_at) return DENY();
-    const user = { uid: row.uid, name: row.name, role: row.role };
+    if (row.revoked_at) return DENY();
+    const user = { uid: row.uid, role: row.role };
     req.roToken = {
       id: row.id,
-      name: row.name,
+      name: row.token_name,
       ledgers: zasiegTokenu(user, row.scope_ledgers),
     };
     // Fire-and-forget: odnotowanie użycia nie może opóźniać ani wywrócić odpowiedzi GET.

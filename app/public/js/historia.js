@@ -2,6 +2,7 @@
 import { $, el, zl, api, track, toast, refreshers, KSIEGI } from './core.js';
 import { parseKwota } from './kwota.js';   // jedyne miejsce, gdzie napis staje się kwotą
 import { selectPlatnosci, zmienionaPlatnosc } from './historia-platnosc.js';
+import { initFiltrKategorii, pokazHistorie as _pokazHistorie } from './historia-filtr.js';
 
 const TYPY = ['WYDATEK', 'PRZYCHÓD', 'TRANSFER'];
 const ZNAK = { WYDATEK: '−', PRZYCHÓD: '+', TRANSFER: '⇄' };
@@ -237,6 +238,7 @@ async function pobierzHist(reset, widokKosza) {
   if ($('#fFrom').value) p.set('from', $('#fFrom').value);
   if ($('#fTo').value) p.set('to', $('#fTo').value);
   if ($('#fType').value) p.set('type', $('#fType').value);
+  if ($('#fCategory')?.value) p.set('category', $('#fCategory').value); // Z8: id albo lista id,id
   if (widokKosza) p.set('deleted', '1');           // domyślnie wpisy usunięte są niewidoczne
   const { rows, total } = await api('/api/v1/transactions?' + p);
   // Cache kategorii ksiąg z listy MUSI być ciepły przed rysowaniem — fillRow czyta z niego
@@ -286,9 +288,9 @@ function initTools() {
   };
   const lab = el('label', { class: 'kosz-filtr', title: 'Pokaż wpisy usunięte' });
   lab.append(chk, el('span', {}, '🗑 Kosz'));
-  box.append(lab);
+  box.append(lab); initFiltrKategorii(catOptions); // Z8: select #fCategory, obok Typu
 }
-
+export const pokazHistorie = (filtry) => _pokazHistorie(filtry, loadHist); // #25: nawigację robi raporty-klik.js
 export function initHistoria() {
   initTools();
   $('#fGo').onclick = () => { track('Filtrowanie', 'historia'); loadHist(true); };

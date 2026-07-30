@@ -25,6 +25,13 @@ function scopeWhere(user, params, deleted = false) {
   return where;
 }
 
+// Z8/#25: klik w kategorię-RODZICA w Raportach filtruje też podkategorie — `category` przyjmuje
+// wtedy listę id po przecinku (wzorzec z reports.js: idList()). Czysta funkcja — testowalna
+// bez bazy (scripts/test-raport-wpisy.js), tak jak kategorie.js/idCalkowite().
+function idyKategorii(category) {
+  return String(category).split(',').map((s) => parseInt(s, 10)).filter(Number.isInteger);
+}
+
 // Kategoria musi należeć do TEJ SAMEJ księgi co wpis. Bez tego junior z RODZINY podpina wpisowi
 // kategorię PERSEVERY, a `LEFT JOIN categories` w Historii i w raportach pokazuje jej nazwę.
 async function kategoriaWKsiedze(catId, ledgerId) {
@@ -42,7 +49,11 @@ router.get('/', async (req, res, next) => {
     if (ledger) { where += ' AND t.ledger_id = :ledger'; params.ledger = parseInt(ledger, 10); }
     if (from) { where += ' AND t.tx_date >= :from'; params.from = from; }
     if (to) { where += ' AND t.tx_date <= :to'; params.to = to; }
-    if (category) { where += ' AND t.category_id = :cat'; params.cat = parseInt(category, 10); }
+    // Same liczby (nie napisy) wklejone do SQL-a — bez ryzyka wstrzyknięcia (patrz idyKategorii).
+    if (category) {
+      const ids = idyKategorii(category);
+      if (ids.length) where += ` AND t.category_id IN (${ids.join(',')})`;
+    }
     if (user) { where += ' AND u.name = :uname'; params.uname = user; }
     if (type) { where += ' AND t.type = :type'; params.type = type; }
     const limit = Math.min(parseInt(req.query.limit || '100', 10), 500);
@@ -198,3 +209,4 @@ router.post('/:id/restore', async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.idyKategorii = idyKategorii;   // eksport dla scripts/test-raport-wpisy.js

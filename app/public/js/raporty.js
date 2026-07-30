@@ -1,5 +1,7 @@
 // Raporty: KPI miesiąca, wydatki wg kategorii, trend 6 miesięcy, widoki admina.
 import { $, el, zl, api, state, refreshers } from './core.js';
+import { zastosujUklad } from './raporty-uklad.js';
+import { indeksKategorii, klikKategoria, opisOkres, initUkladBtn } from './raporty-klik.js';
 
 // Okres z kontrolek: miesiąc (parametr month) albo zakres dat (from/to) wyliczony
 // z pola miesiąca (kwartał/rok, w którym ten miesiąc leży) lub wpisany ręcznie.
@@ -67,16 +69,20 @@ export async function loadReport() {
       Number(s.unmatched_bank_rows) ? 'warn' : null));
   }
   for (const t of tiles) $('#kpi').append(t);
-  // Kolory kategorii (nadane w Admin) barwią słupki raportu; podkategoria bez
-  // własnego koloru dziedziczy kolor rodzica. Bez koloru — słupek w szałwii.
-  const kolory = {};
+  // Kolory (dziedziczone z rodzica) barwią słupki; `categories` służy TAKŻE do kliku (Z8).
+  const kolory = {}; let categories = [];
   try {
-    const { categories } = await api('/api/v1/categories?ledger=' + ledger);
+    ({ categories } = await api('/api/v1/categories?ledger=' + ledger));
     for (const c of categories) {
       if (c.color) kolory[c.id] = c.color;
       for (const k of c.children) if (k.color || c.color) kolory[k.id] = k.color || c.color;
     }
-  } catch { /* raport ważniejszy niż barwy */ }
+  } catch { /* raport ważniejszy niż barwy i klik */ }
+  // Okres od–do dla kliku w kategorię: przy trybie „miesiąc" `o` nie ma from/to.
+  const [rM, mM] = month.split('-').map(Number);
+  const okresOd = o.from || `${month}-01`, okresDo = o.to || `${month}-${String(new Date(rM, mM, 0).getDate()).padStart(2, '0')}`;
+  const okres = { from: okresOd, to: okresDo, opis: opisOkres(okresOd, okresDo) };
+  const idxKat = indeksKategorii(categories);
   // Słupek skalujemy do NAJWIĘKSZEJ pozycji (widać proporcje), a udział liczymy
   // od sumy okresu (mówi, ile procent wydatków to ta kategoria).
   const max = Math.max(...s.by_category.map((c) => Number(c.total)), 1);
@@ -95,6 +101,7 @@ export async function loadReport() {
     const pct = (100 * Number(c.total) / suma).toFixed(1).replace('.', ',') + ' %';
     r.append(nazwa, el('span', { class: 'bval' }, zl(c.total)), tor, el('span', { class: 'bpct' }, pct));
     box.append(r);
+    klikKategoria(r, ledger, okres, c.category_id, c.category, idxKat);
   }
   const months = [...new Set(s.trend.map((t) => t.month))];
   const tb = $('#trend tbody'); tb.innerHTML = '';
@@ -133,14 +140,14 @@ export async function loadReport() {
   } else $('#fvp').innerHTML = '';
   if (state.me.role === 'admin') loadTelemetry();
   else $('#telemetria').innerHTML = '';
+  zastosujUklad($('#view-raporty .stack'), (await api('/api/v1/uklad')).layout); // Z9: układ per użytkownik, null = bez zmian
 }
 
-// Sekcje raportu dokładane z JS (index.html trzyma tylko kotwice).
-// Wstawiane przed #fvp (blok admina), w kolejności wywołań: transfery → Bartuś → najem.
+// Sekcje z JS przed #fvp: transfery → Bartuś → najem. `data-kafel` (Z9): jak kafle statyczne.
 function sekcja(id) {
   let n = document.getElementById(id);
   if (!n) {
-    n = el('div', { id });
+    n = el('div', { id, 'data-kafel': id });
     const f = $('#fvp');                       // kotwica; gdyby zniknęła — dokładamy na koniec karty
     if (f && f.parentNode) f.parentNode.insertBefore(n, f);
     else ($('#view-raporty .stack') || document.body).append(n);
@@ -273,6 +280,7 @@ function ustawOkres(tryb) {
 
 export function initRaporty() {
   $('#rMonth').value = new Date().toISOString().slice(0, 7);
+  initUkladBtn($('#view-raporty .stack'), $('#rUklad'));
   $('#rLedger').onchange = loadReport;
   $('#rMonth').onchange = loadReport;
   const zakres = $('#rZakres');

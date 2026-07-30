@@ -56,6 +56,8 @@ app.use('/api/v1/proposals', auth.requireAuth, require('./src/routes/proposals')
 app.use('/api/v1/products', auth.requireAuth, require('./src/routes/products'));
 app.use('/api/v1/uklad', auth.requireAuth, require('./src/routes/uklad'));
 app.use('/api/v1/eksport', auth.requireAuth, require('./src/routes/eksport'));
+app.use('/api/v1/analizy', auth.requireAuth, require('./src/routes/analizy'));
+app.use('/api/v1/dostep', auth.requireAuth, require('./src/routes/dostep'));
 // RO-API: własny auth (Bearer token, requireToken) + wyłącznik modalności — celowo BEZ requireAuth sesji.
 app.use('/api/ro/v1', require('./src/ro/api'));
 

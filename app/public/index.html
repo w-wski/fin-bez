@@ -268,18 +268,20 @@
         <select id="rLedger"></select>
         <input id="rMonth" type="month">
         <input id="rFrom" type="date" hidden title="Od"><input id="rTo" type="date" hidden title="Do">
+        <!-- Z9: tryb ręcznego układania kafli (js/raporty-uklad.js) -->
+        <button type="button" id="rUklad" class="btn">Ułóż</button>
       </div>
-      <div id="kpi" class="kpi"></div>
-      <div>
+      <div id="kpi" class="kpi" data-kafel="kpi"></div>
+      <div data-kafel="by-cat">
         <h2>Wydatki wg kategorii</h2>
         <div id="byCat" class="bary"></div>
       </div>
-      <div>
+      <div data-kafel="trend">
         <h2>Trend 6 miesięcy</h2>
         <div class="overflow"><table id="trend"><thead><tr><th>Miesiąc</th><th class="num">Przychody</th><th class="num">Wydatki</th><th class="num">Bilans</th></tr></thead><tbody></tbody></table></div>
       </div>
-      <div id="fvp"></div>
-      <div id="telemetria"></div>
+      <div id="fvp" data-kafel="fvp"></div>
+      <div id="telemetria" data-kafel="telemetria"></div>
     </div>
   </section>
 
@@ -296,10 +298,19 @@
     <div id="produktyBox"></div>
   </section>
 
+  <!-- ANALIZY (Z12, tylko admin): liczby zawsze, narracja modelu gdy podłączony. -->
+  <section id="view-analizy" hidden>
+    <h1 class="page-title">Analizy</h1>
+    <div id="analizyBox"></div>
+  </section>
+
   <!-- ADMIN (tylko rola admin; treść renderowana z js/admin.js) -->
   <section id="view-admin" hidden>
     <h1 class="page-title">Administracja</h1>
     <div id="adminBox"></div>
+    <!-- Panel dostępu (Z12) w OSOBNYM kontenerze: admin.js czyści #adminBox przy każdym
+         odświeżeniu drzewa kategorii i skasowałby panel razem z wpisanym raz sekretem tokenu. -->
+    <div id="adminDostepBox"></div>
   </section>
 </main>
 
@@ -319,6 +330,7 @@
     <span class="sheet-grip" aria-hidden="true"></span>
     <button class="sheet-item" data-view="import">Import z banku</button>
     <button class="sheet-item" data-view="produkty">Produkty</button>
+    <button class="sheet-item" data-view="analizy" data-admin hidden>Analizy</button>
     <button class="sheet-item" data-view="przydzial" data-admin hidden>Przydział</button>
     <button class="sheet-item" data-view="admin" data-admin hidden>Administracja</button>
     <div class="sheet-sep" aria-hidden="true"></div>

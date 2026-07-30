@@ -4,6 +4,8 @@ const config = require('../config');
 const { q } = require('../db');
 const { readSession, ledgerScope, requireAuth } = require('../auth');
 const { okres, poprzedniOkres, koniecOkresu, delta } = require('../okresy');
+const { wymagajModalnosci } = require('../wylaczniki');
+const { zapiszDostep } = require('../rejestr');
 
 const router = express.Router();
 
@@ -22,10 +24,20 @@ function summaryAuth(req, res, next) {
   return res.status(401).json({ error: 'auth_required' });
 }
 
+// Druga droga, którą dane księgi wychodzą z aplikacji (obok eksportu CSV): dashboard
+// czytający przez X-Widget-Token. Zasada Szymona „każda modalność wychodząca ma wyłącznik"
+// nie robiła wyjątku dla tej trasy — miała włączony X-Widget-Token, ale żadnego 21a/#17.
+// Sesja człowieka (Admin patrzący we własny dashboard) NIE jest „wyjściem" w tym sensie,
+// więc gate dotyczy WYŁĄCZNIE żądań z tokenem widgetu.
+function widgetGate(req, res, next) {
+  if (!req.user || !req.user.widget) return next();
+  return wymagajModalnosci('widget')(req, res, next);
+}
+
 // Arytmetyka okresów (bieżący, poprzedni do porównań, koniec okresu) siedzi w
 // src/okresy.js — czysta funkcja z własnymi testami (scripts/test-okresy.js).
 // GET /api/v1/summary?ledger=1&month=2026-07 albo ?ledger=1&from=2026-01-01&to=2026-06-30
-router.get('/summary', summaryAuth, async (req, res, next) => {
+router.get('/summary', summaryAuth, widgetGate, async (req, res, next) => {
   try {
     const scope = ledgerScope(req.user);
     const ledger = parseInt(req.query.ledger || 1, 10);
@@ -97,6 +109,12 @@ router.get('/summary', summaryAuth, async (req, res, next) => {
     const przy = Number(get('PRZYCHÓD').total) || 0;
     const pWyd = Number(getPrev('WYDATEK').total) || 0;
     const pPrzy = Number(getPrev('PRZYCHÓD').total) || 0;
+    const txCount = totals.reduce((s, x) => s + (Number(x.n) || 0), 0);
+    // Rejestr #17 (kto czyta) obejmuje TYLKO odczyt przez token widgetu — sesja człowieka
+    // patrzącego we własny dashboard to nie jest „dostęp zewnętrzny", którego dotyczy audyt.
+    if (req.user.widget) {
+      zapiszDostep('ro_api', 'widget:/summary', o.month || `${o.from}..${o.to}`, txCount, null);
+    }
     res.json({
       ledger, month: o.month || o.m, from: o.from, to: o.to,
       expenses: Number(get('WYDATEK').total) || 0,

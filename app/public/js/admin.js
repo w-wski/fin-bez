@@ -3,6 +3,7 @@
 // Zakres (K4, K6, K7): drzewo kategorii księgi + zmiana nazwy, rodzica, archiwizacja/przywrócenie
 // oraz kolory (ręcznie i „Przydziel automatycznie" z palety OKLCH pasującej do motywu).
 import { $, el, api, state, track, toast, refreshers } from './core.js';
+import { initAdminDostep } from './admin-dostep.js';
 // paleta.js jest wczytywana LENIWO (dopiero przy „Przydziel automatycznie"): nie ma jej na
 // liście app-shella w sw.js, więc statyczny import mógłby wywrócić start aplikacji offline.
 const isHex = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
@@ -245,8 +246,12 @@ async function przydzielKolory(przycisk) {
 }
 
 export function initAdmin() {
+  // Panel dostępu (Z12) żyje w OSOBNYM kontenerze (#adminDostepBox), nie w #adminBox —
+  // odswiez() czyści #adminBox przy każdym przeładowaniu drzewa kategorii i skasowałby go.
+  const odswiezDostep = initAdminDostep($('#adminDostepBox'));
   refreshers.admin = async () => {
     if (!ksiega) ksiega = state.me?.scope.ledgers[0] || 1;
     await odswiez();
+    await odswiezDostep();
   };
 }

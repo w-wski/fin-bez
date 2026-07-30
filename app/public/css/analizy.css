@@ -1,0 +1,32 @@
+/* Styl widoku „Analizy" (21d, Z12) — kierunek „Tafla", tokeny wyłącznie ze styles.css.
+   Reużywa .kpi/.bary/.barrow z raporty.css (te same wzorce wizualne — liczby okresu,
+   niezależnie czy z raportu, czy z analizy, mają wyglądać tak samo). Tu tylko to, czego
+   raporty.css nie ma: pasek okresu ze strzałkami i pole narracji modelu. */
+
+.an-pasek { gap: var(--space-2); }
+
+.an-strzalki {
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+.an-strzalki > .btn { flex: none; }
+
+.an-okres-label {
+  min-width: 6.5rem;
+  text-align: center;
+  font: 600 var(--fs-cap)/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.an-wynik { gap: var(--space-4); }
+
+/* Narracja modelu: tekst dłuższy niż zwykłe .msg, więc czytelny odstęp między wierszami
+   i wyraźniejszy kontener — to jedyny fragment karty pisany PROZĄ, nie liczbami. */
+.an-narracja {
+  padding: var(--space-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-md);
+  background: var(--glass-fill);
+  white-space: pre-line;
+}
